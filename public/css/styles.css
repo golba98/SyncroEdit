@@ -1982,8 +1982,8 @@ body.light-theme .entropy-bar {
 
 /* Canvas Themes */
 .page-scaler {
-  background: var(--canvas-bg) !important;
-  color: var(--canvas-text) !important;
+  background: var(--canvas-bg, #0d0d0d) !important;
+  color: var(--canvas-text, #e0e0e0) !important;
 }
 
 .editor-container {
