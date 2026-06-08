@@ -1932,15 +1932,32 @@ body.light-theme .entropy-bar {
   border-radius: 20px;
   margin-top: 6px;
   min-height: 18px;
-  transition: color 0.3s ease, background 0.3s ease, opacity 0.3s ease;
+  transition:
+    color 0.3s ease,
+    background 0.3s ease,
+    opacity 0.3s ease;
   opacity: 0;
 }
-.strength-label:not(:empty) { opacity: 1; }
+.strength-label:not(:empty) {
+  opacity: 1;
+}
 
-.strength-label--weak   { color: var(--error-color);   background: rgba(239,68,68,0.12); }
-.strength-label--fair   { color: var(--warning-color); background: rgba(245,158,11,0.12); }
-.strength-label--strong { color: var(--accent-color);  background: rgba(139,92,246,0.12); }
-.strength-label--elite  { color: #10b981;              background: rgba(16,185,129,0.12); }
+.strength-label--weak {
+  color: var(--error-color);
+  background: rgba(239, 68, 68, 0.12);
+}
+.strength-label--fair {
+  color: var(--warning-color);
+  background: rgba(245, 158, 11, 0.12);
+}
+.strength-label--strong {
+  color: var(--accent-color);
+  background: rgba(139, 92, 246, 0.12);
+}
+.strength-label--elite {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
 
 .requirement-item {
   font-size: 11px;

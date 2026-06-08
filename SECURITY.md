@@ -4,10 +4,10 @@
 
 This project is currently supported only on the latest version available in the default branch.
 
-| Version | Supported |
-| ------- | --------- |
-| Latest  | ✅        |
-| Older versions / previous commits | ❌ |
+| Version                           | Supported |
+| --------------------------------- | --------- |
+| Latest                            | ✅        |
+| Older versions / previous commits | ❌        |
 
 ## Reporting a Vulnerability
 
@@ -18,6 +18,7 @@ Instead, report it privately by emailing:
 **jordanvorster404@gmail.com**
 
 Include as much of the following as possible:
+
 - a clear description of the issue
 - steps to reproduce it
 - the affected file, feature, or component

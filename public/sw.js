@@ -2,6 +2,7 @@ const CACHE_NAME = 'syncroedit-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/config.js',
   '/css/styles.css',
   '/js/app/app.js',
   '/js/app/network.js',
@@ -30,7 +31,8 @@ const ASSETS_TO_CACHE = [
   '/pages/verify.html',
   // External CDNs - Cache them for performance/offline
   '/vendor/fontawesome/css/all.min.css',
-  'https://cdn.quilljs.com/1.3.6/quill.snow.css',  'https://cdn.quilljs.com/1.3.6/quill.js',
+  'https://cdn.quilljs.com/1.3.6/quill.snow.css',
+  'https://cdn.quilljs.com/1.3.6/quill.js',
   'https://unpkg.com/idb-keyval@6.2.1/dist/index.js',
   'https://esm.sh/yjs@13.6.28',
   'https://esm.sh/y-quill@1.0.0?deps=yjs@13.6.28',

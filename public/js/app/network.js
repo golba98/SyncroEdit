@@ -2,6 +2,43 @@ import { Auth } from '/js/features/auth/auth.js';
 
 let _csrfToken = null;
 let _csrfPromise = null;
+let _refreshPromise = null;
+
+function getRuntimeConfig() {
+  return window.SYNCROEDIT_CONFIG || {};
+}
+
+function trimTrailingSlash(value) {
+  return String(value || '').replace(/\/+$/, '');
+}
+
+function isAbsoluteUrl(url) {
+  return /^https?:\/\//i.test(url);
+}
+
+function buildApiUrl(url) {
+  if (isAbsoluteUrl(url)) return url;
+
+  const apiBaseUrl = trimTrailingSlash(getRuntimeConfig().API_BASE_URL);
+  if (!apiBaseUrl) return url;
+
+  return `${apiBaseUrl}/${String(url).replace(/^\/+/, '')}`;
+}
+
+function getConfiguredWebSocketBaseUrl() {
+  const config = getRuntimeConfig();
+  const explicitWsBaseUrl = trimTrailingSlash(config.WS_BASE_URL);
+
+  if (explicitWsBaseUrl) return explicitWsBaseUrl;
+
+  const apiBaseUrl = trimTrailingSlash(config.API_BASE_URL);
+  if (apiBaseUrl) {
+    return apiBaseUrl.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}`;
+}
 
 export const Network = {
   async fetchCsrfToken() {
@@ -9,7 +46,9 @@ export const Network = {
 
     _csrfPromise = (async () => {
       try {
-        const response = await fetch('/api/auth/csrf-token', { credentials: 'include' });
+        const response = await fetch(buildApiUrl('/api/auth/csrf-token'), {
+          credentials: 'include',
+        });
         if (!response.ok) throw new Error(response.statusText);
         const data = await response.json();
         _csrfToken = data.csrfToken;
@@ -45,14 +84,16 @@ export const Network = {
     // Debug CSRF
     // console.log(`[Network] Fetching ${url} with CSRF: ${_csrfToken ? _csrfToken.substring(0,10)+'...' : 'null'}`);
 
-    let response = await fetch(url, { ...options, headers, credentials: 'include' });
+    const requestUrl = buildApiUrl(url);
+
+    let response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
 
     // Interceptor: Check for 403 (Forbidden) - could be CSRF failure
     if (response.status === 403 && !url.includes('/csrf-token')) {
       console.warn('Potential CSRF failure or access denied, retrying with fresh token...');
       await this.fetchCsrfToken();
       headers['X-CSRF-Token'] = _csrfToken;
-      response = await fetch(url, { ...options, headers, credentials: 'include' });
+      response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
     }
 
     // Interceptor: Check for 401 (Unauthorized)
@@ -67,32 +108,44 @@ export const Network = {
     if (response.status === 401 && !isAuthRequest) {
       // console.log('Token expired, attempting refresh...'); // Reduced noise
       try {
-        // Call refresh endpoint
-        // Note: browser automatically sends cookies for same-origin requests
-        const refreshResponse = await fetch('/api/auth/refresh-token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': _csrfToken,
-          },
-          credentials: 'include',
-        });
+        if (!_refreshPromise) {
+          _refreshPromise = (async () => {
+            try {
+              const refreshResponse = await fetch(buildApiUrl('/api/auth/refresh-token'), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-Token': _csrfToken,
+                },
+                credentials: 'include',
+              });
 
-        if (refreshResponse.ok) {
-          const data = await refreshResponse.json();
-          Auth.setToken(data.token); // Update local token
+              if (refreshResponse.ok) {
+                const data = await refreshResponse.json();
+                Auth.setToken(data.token); // Update local token
+                return data.token;
+              } else {
+                await Auth.logout();
+                return null;
+              }
+            } catch (e) {
+              await Auth.logout();
+              return null;
+            } finally {
+              _refreshPromise = null;
+            }
+          })();
+        }
 
+        const newToken = await _refreshPromise;
+        if (newToken) {
           // Retry original request with new token
-          headers.Authorization = `Bearer ${data.token}`;
-          response = await fetch(url, { ...options, headers });
+          headers.Authorization = `Bearer ${newToken}`;
+          response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
         } else {
-          // Silent failure - session expired, let the caller handle it (usually by redirecting)
-          await Auth.logout();
           return;
         }
       } catch (e) {
-        // console.error('Token refresh failed', e);
-        await Auth.logout();
         return;
       }
     }
@@ -153,9 +206,16 @@ export const Network = {
     });
   },
 
+  getApiUrl(url) {
+    return buildApiUrl(url);
+  },
+
+  getWebSocketBaseUrl() {
+    return getConfiguredWebSocketBaseUrl();
+  },
+
   initWebSocket(documentId, onMessage, onStatusChange) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = this.getWebSocketBaseUrl();
     let ws = null;
     let reconnectAttempts = 0;
     const maxReconnectDelay = 30000;
