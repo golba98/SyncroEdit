@@ -47,6 +47,7 @@ if (require.main === module) {
       logger.info(
         `Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`
       );
+      logger.info(`Open SyncroEdit: http://localhost:${PORT}`);
     });
   })();
 }
