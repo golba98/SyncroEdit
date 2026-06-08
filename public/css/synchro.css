@@ -20,20 +20,33 @@
 }
 
 .bot-rig {
-  transition: transform 0.4s, filter 0.3s;
+  transition:
+    transform 0.4s,
+    filter 0.3s;
 }
 
 .head {
-  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+  transition:
+    transform 0.3s,
+    border-color 0.3s,
+    box-shadow 0.3s;
 }
 
 .eye {
-  transition: height 0.25s, width 0.25s, border-radius 0.25s, background 0.25s;
+  transition:
+    height 0.25s,
+    width 0.25s,
+    border-radius 0.25s,
+    background 0.25s;
 }
 
 .pupil {
-  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), 
-              width 0.25s, height 0.25s, border-radius 0.25s, background 0.25s;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.25s,
+    height 0.25s,
+    border-radius 0.25s,
+    background 0.25s;
 }
 
 .eyelid {
@@ -41,19 +54,28 @@
 }
 
 .mouth {
-  transition: width 0.25s, height 0.25s, border-radius 0.25s, 
-              transform 0.25s, background 0.25s, border 0.25s;
+  transition:
+    width 0.25s,
+    height 0.25s,
+    border-radius 0.25s,
+    transform 0.25s,
+    background 0.25s,
+    border 0.25s;
 }
 
 .hand {
-  transition: bottom 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
-              left 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-              right 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-              transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    bottom 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    left 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    right 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .antenna-bulb {
-  transition: background 0.3s, box-shadow 0.3s, opacity 0.3s;
+  transition:
+    background 0.3s,
+    box-shadow 0.3s,
+    opacity 0.3s;
 }
 
 /* ==================== BASE STRUCTURE ==================== */
@@ -300,8 +322,15 @@
 }
 
 @keyframes naturalBlink {
-  0%, 45%, 55%, 100% { height: 0%; }
-  50% { height: 100%; }
+  0%,
+  45%,
+  55%,
+  100% {
+    height: 0%;
+  }
+  50% {
+    height: 100%;
+  }
 }
 
 .bot-rig.idle .head {
@@ -309,8 +338,13 @@
 }
 
 @keyframes breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.01); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.01);
+  }
 }
 
 /* Bored (10s no input) */
@@ -719,7 +753,9 @@
 
 /* Success */
 .bot-rig.success {
-  animation: happyJump 0.6s ease infinite, enterSuccess 0.4s ease-out;
+  animation:
+    happyJump 0.6s ease infinite,
+    enterSuccess 0.4s ease-out;
 }
 .bot-rig.success .antenna-bulb {
   background: var(--synchro-success);
@@ -768,7 +804,9 @@
 
 /* Error */
 .bot-rig.error {
-  animation: shakeHead 0.4s ease-in-out, flashRed 0.4s ease-out;
+  animation:
+    shakeHead 0.4s ease-in-out,
+    flashRed 0.4s ease-out;
 }
 .bot-rig.error .antenna-bulb {
   background: var(--synchro-error);
@@ -821,8 +859,12 @@
 }
 
 @keyframes enterSecure {
-  from { transform: scale(1.02); }
-  to { transform: scale(1); }
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 .bot-rig.peeking {
@@ -830,25 +872,35 @@
 }
 
 @keyframes enterPeeking {
-  0% { transform: scale(0.98); }
-  50% { transform: scale(1.03); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0.98);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 @keyframes enterSuccess {
-  from { 
+  from {
     transform: scale(0.8);
     filter: brightness(1.5);
   }
-  to { 
+  to {
     transform: scale(1);
     filter: brightness(1);
   }
 }
 
 @keyframes flashRed {
-  0% { filter: brightness(1.5) hue-rotate(-20deg); }
-  100% { filter: brightness(1) hue-rotate(0); }
+  0% {
+    filter: brightness(1.5) hue-rotate(-20deg);
+  }
+  100% {
+    filter: brightness(1) hue-rotate(0);
+  }
 }
 
 .bot-rig.hover-ready {
@@ -856,8 +908,12 @@
 }
 
 @keyframes enterConfident {
-  from { transform: translateY(5px); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(5px);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .bot-rig.hover-blocked {
@@ -865,8 +921,12 @@
 }
 
 @keyframes enterBlocked {
-  from { transform: scale(1.02); }
-  to { transform: scale(1); }
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 /* ==================== FORGOT PASSWORD FLOW ==================== */

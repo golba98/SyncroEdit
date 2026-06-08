@@ -48,7 +48,9 @@ export class Editor {
     this.ready = new Promise((resolve) => {
       this._readyResolve = resolve;
     });
-    setTimeout(() => { if (this._readyResolve) this._readyResolve(); }, 10000);
+    setTimeout(() => {
+      if (this._readyResolve) this._readyResolve();
+    }, 10000);
 
     this.plugins = new Map();
 
@@ -259,7 +261,7 @@ export class Editor {
 
   async connectWebSocket(docId, user) {
     console.log('[Editor] connectWebSocket docId=', docId);
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsBaseUrl = Network.getWebSocketBaseUrl();
 
     let ticket;
     try {
@@ -276,12 +278,9 @@ export class Editor {
       this.provider.destroy();
     }
 
-    this.provider = new WebsocketProvider(
-      `${protocol}://${window.location.host}`,
-      docId,
-      this.doc,
-      { params: { ticket: ticket } }
-    );
+    this.provider = new WebsocketProvider(wsBaseUrl, docId, this.doc, {
+      params: { ticket: ticket },
+    });
 
     console.log('[Editor] WebsocketProvider created for docId=', docId);
 
@@ -756,10 +755,7 @@ export class Editor {
     }
 
     // Protection for focused editor
-    if (
-      document.activeElement &&
-      document.activeElement.closest(`#editor-${pageId}`)
-    ) {
+    if (document.activeElement && document.activeElement.closest(`#editor-${pageId}`)) {
       return;
     }
 

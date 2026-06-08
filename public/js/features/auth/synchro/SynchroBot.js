@@ -3,15 +3,15 @@
  */
 export class SynchroBot {
   constructor(options = {}) {
-    this.authFlow = options.authFlow || "login";
+    this.authFlow = options.authFlow || 'login';
     this.container = null;
     this.botRig = null;
     this.pupils = [];
     this.mouseMoveHandler = null;
     this.targetElement = null;
-    this.currentState = "idle";
-    this.focusTarget = "none";
-    this.formCompleteness = "empty";
+    this.currentState = 'idle';
+    this.focusTarget = 'none';
+    this.formCompleteness = 'empty';
     this.isProcessing = false;
     this.idleTimer = null;
     this.blinkTimer = null;
@@ -28,24 +28,24 @@ export class SynchroBot {
     };
 
     // Special state for forgot password flow
-    if (this.authFlow === "forgot") {
-      this.currentState = "empathy";
+    if (this.authFlow === 'forgot') {
+      this.currentState = 'empathy';
     }
   }
 
   init(containerSelector) {
     this.container = document.querySelector(containerSelector);
     if (!this.container) {
-      console.warn("SynchroBot: Container not found");
+      console.warn('SynchroBot: Container not found');
       return false;
     }
 
-    this.botRig = document.getElementById("botRig");
-    this.pupils = Array.from(document.querySelectorAll(".pupil"));
+    this.botRig = document.getElementById('botRig');
+    this.pupils = Array.from(document.querySelectorAll('.pupil'));
     this.mouseMoveHandler = this.handleMouseMove.bind(this);
 
     if (!this.botRig || this.pupils.length === 0) {
-      console.warn("SynchroBot: Bot elements not found");
+      console.warn('SynchroBot: Bot elements not found');
       return false;
     }
 
@@ -58,7 +58,7 @@ export class SynchroBot {
 
   setupEventListeners() {
     // Mouse tracking for cursor following
-    document.addEventListener("mousemove", this.mouseMoveHandler);
+    document.addEventListener('mousemove', this.mouseMoveHandler);
 
     // Requestanimationframe for smooth updates
     this.rafId = null;
@@ -67,10 +67,7 @@ export class SynchroBot {
 
   handleMouseMove(e) {
     // Only track mouse in idle/tracking states
-    if (
-      ["idle", "tracking", "bored"].includes(this.currentState) &&
-      !this.targetElement
-    ) {
+    if (['idle', 'tracking', 'bored'].includes(this.currentState) && !this.targetElement) {
       this.updateEyePosition({ x: e.clientX, y: e.clientY });
     }
   }
@@ -84,7 +81,7 @@ export class SynchroBot {
 
     this.pupils.forEach((pupil) => {
       // Get the center position of the pupil's eye container
-      const eye = pupil.closest(".eye");
+      const eye = pupil.closest('.eye');
       const eyeRect = eye.getBoundingClientRect();
 
       // Calculate the center of the eye in viewport coordinates
@@ -139,15 +136,8 @@ export class SynchroBot {
     const targetY = rect.top + rect.height / 2;
 
     // Validate that we got valid coordinates
-    if (
-      isNaN(targetX) ||
-      isNaN(targetY) ||
-      !isFinite(targetX) ||
-      !isFinite(targetY)
-    ) {
-      console.warn(
-        "SynchroBot: Invalid element coordinates, resetting to center",
-      );
+    if (isNaN(targetX) || isNaN(targetY) || !isFinite(targetX) || !isFinite(targetY)) {
+      console.warn('SynchroBot: Invalid element coordinates, resetting to center');
       // Reset to center if coordinates are invalid
       this.resetEyePosition();
       return;
@@ -161,7 +151,7 @@ export class SynchroBot {
    */
   resetEyePosition() {
     this.pupils.forEach((pupil) => {
-      pupil.style.transform = "translate(-50%, -50%)";
+      pupil.style.transform = 'translate(-50%, -50%)';
     });
     this.stopTrackingLoop();
   }
@@ -170,10 +160,7 @@ export class SynchroBot {
     if (this.rafId || !this.targetElement) return;
 
     const tick = () => {
-      if (
-        !this.targetElement ||
-        ["processing", "success", "error"].includes(this.currentState)
-      ) {
+      if (!this.targetElement || ['processing', 'success', 'error'].includes(this.currentState)) {
         this.rafId = null;
         return;
       }
@@ -195,15 +182,13 @@ export class SynchroBot {
   scheduleBlink() {
     this.clearBlinkTimer();
 
-    if (["processing", "success", "error"].includes(this.currentState)) {
+    if (['processing', 'success', 'error'].includes(this.currentState)) {
       return;
     }
 
     const delay =
       this.config.blinkMinDelay +
-      Math.floor(
-        Math.random() * (this.config.blinkMaxDelay - this.config.blinkMinDelay),
-      );
+      Math.floor(Math.random() * (this.config.blinkMaxDelay - this.config.blinkMinDelay));
 
     this.blinkTimer = setTimeout(() => {
       this.triggerBlink();
@@ -222,17 +207,17 @@ export class SynchroBot {
     if (
       !this.botRig ||
       this.blinking ||
-      ["processing", "success", "error"].includes(this.currentState)
+      ['processing', 'success', 'error'].includes(this.currentState)
     ) {
       return;
     }
 
     this.blinking = true;
-    this.botRig.classList.add("blinking");
+    this.botRig.classList.add('blinking');
 
     setTimeout(() => {
       if (!this.botRig) return;
-      this.botRig.classList.remove("blinking");
+      this.botRig.classList.remove('blinking');
       this.blinking = false;
     }, this.config.blinkDuration);
   }
@@ -245,17 +230,17 @@ export class SynchroBot {
 
     // Remove all state classes
     const stateClasses = [
-      "idle",
-      "tracking",
-      "secure",
-      "peeking",
-      "processing",
-      "success",
-      "error",
-      "bored",
-      "confused",
-      "hover-ready",
-      "hover-blocked",
+      'idle',
+      'tracking',
+      'secure',
+      'peeking',
+      'processing',
+      'success',
+      'error',
+      'bored',
+      'confused',
+      'hover-ready',
+      'hover-blocked',
     ];
 
     stateClasses.forEach((cls) => this.botRig.classList.remove(cls));
@@ -264,9 +249,9 @@ export class SynchroBot {
     this.botRig.classList.add(state);
     this.currentState = state;
 
-    if (["processing", "success", "error"].includes(state)) {
+    if (['processing', 'success', 'error'].includes(state)) {
       this.clearBlinkTimer();
-      this.botRig.classList.remove("blinking");
+      this.botRig.classList.remove('blinking');
       this.blinking = false;
     } else {
       this.scheduleBlink();
@@ -284,28 +269,26 @@ export class SynchroBot {
     let inputElement = document.activeElement;
 
     // Verify it's an input and it matches the field type
-    if (!inputElement || inputElement.tagName !== "INPUT") {
+    if (!inputElement || inputElement.tagName !== 'INPUT') {
       // Fallback: search for the input by type
-      if (fieldName === "password") {
+      if (fieldName === 'password') {
         inputElement =
           document.querySelector('input[type="password"]:focus') ||
           document.querySelector('input[id*="Password"]');
       } else {
         inputElement =
-          document.querySelector(
-            'input[type="email"]:focus, input[type="text"]:focus',
-          ) ||
+          document.querySelector('input[type="email"]:focus, input[type="text"]:focus') ||
           document.querySelector('input[id*="Username"], input[id*="Email"]');
       }
     }
 
-    if (fieldName === "password") {
-      this.applyState("secure");
+    if (fieldName === 'password') {
+      this.applyState('secure');
       this.resetEyePosition(); // Look at center when password field focused
       this.targetElement = null;
       this.stopTrackingLoop();
     } else {
-      this.applyState("tracking");
+      this.applyState('tracking');
       if (inputElement) {
         this.setTargetElement(inputElement);
       }
@@ -316,11 +299,11 @@ export class SynchroBot {
    * Called when a field loses focus
    */
   onFieldBlur() {
-    this.focusTarget = "none";
+    this.focusTarget = 'none';
     this.targetElement = null;
     this.stopTrackingLoop();
     this.resetEyePosition();
-    this.applyState("idle");
+    this.applyState('idle');
     this.resetIdleTimer();
   }
 
@@ -332,9 +315,9 @@ export class SynchroBot {
 
     // Update form completeness based on validation
     if (validation.isValid === false) {
-      this.formCompleteness = "invalid";
+      this.formCompleteness = 'invalid';
     } else if (fieldValue.length > 0) {
-      this.formCompleteness = "partial";
+      this.formCompleteness = 'partial';
     }
   }
 
@@ -344,18 +327,18 @@ export class SynchroBot {
   onPasswordToggle(visible) {
     this.passwordVisible = visible;
 
-    if (this.focusTarget === "password") {
+    if (this.focusTarget === 'password') {
       setTimeout(() => {
         if (visible) {
-          this.applyState("peeking");
+          this.applyState('peeking');
           const passwordInput = document.querySelector(
-            'input[type="text"][id*="password"], input[type="password"]',
+            'input[type="text"][id*="password"], input[type="password"]'
           );
           if (passwordInput) {
             this.setTargetElement(passwordInput);
           }
         } else {
-          this.applyState("secure");
+          this.applyState('secure');
           this.resetEyePosition();
           this.targetElement = null;
         }
@@ -369,28 +352,22 @@ export class SynchroBot {
   onButtonHover(isHovering) {
     if (!isHovering) {
       // Restore previous state
-      if (this.focusTarget !== "none") {
-        if (this.focusTarget === "password" && !this.passwordVisible) {
-          this.applyState("secure");
+      if (this.focusTarget !== 'none') {
+        if (this.focusTarget === 'password' && !this.passwordVisible) {
+          this.applyState('secure');
         } else {
-          this.applyState("tracking");
+          this.applyState('tracking');
         }
       } else {
-        this.applyState("idle");
+        this.applyState('idle');
       }
       return;
     }
 
-    if (
-      this.formCompleteness === "empty" ||
-      this.formCompleteness === "invalid"
-    ) {
-      this.applyState("hover-blocked");
-    } else if (
-      this.formCompleteness === "valid" ||
-      this.formCompleteness === "partial"
-    ) {
-      this.applyState("hover-ready");
+    if (this.formCompleteness === 'empty' || this.formCompleteness === 'invalid') {
+      this.applyState('hover-blocked');
+    } else if (this.formCompleteness === 'valid' || this.formCompleteness === 'partial') {
+      this.applyState('hover-ready');
     }
   }
 
@@ -401,7 +378,7 @@ export class SynchroBot {
     this.isProcessing = true;
     this.targetElement = null;
     this.stopTrackingLoop();
-    this.applyState("processing");
+    this.applyState('processing');
     this.clearIdleTimer();
   }
 
@@ -411,7 +388,7 @@ export class SynchroBot {
   onSuccess() {
     this.isProcessing = false;
     this.stopTrackingLoop();
-    this.applyState("success");
+    this.applyState('success');
     this.clearIdleTimer();
   }
 
@@ -421,7 +398,7 @@ export class SynchroBot {
   onError() {
     this.isProcessing = false;
     this.stopTrackingLoop();
-    this.applyState("error");
+    this.applyState('error');
     this.resetIdleTimer();
   }
 
@@ -431,8 +408,8 @@ export class SynchroBot {
   startIdleTimer() {
     this.clearIdleTimer();
     this.idleTimer = setTimeout(() => {
-      if (this.currentState === "idle") {
-        this.applyState("bored");
+      if (this.currentState === 'idle') {
+        this.applyState('bored');
       }
     }, this.config.idleTimeout);
   }
@@ -459,7 +436,7 @@ export class SynchroBot {
       cancelAnimationFrame(this.rafId);
     }
     if (this.mouseMoveHandler) {
-      document.removeEventListener("mousemove", this.mouseMoveHandler);
+      document.removeEventListener('mousemove', this.mouseMoveHandler);
     }
   }
 }
