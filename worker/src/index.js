@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { handleHealth } from './routes/health.js';
 import { handleConfig } from './routes/config.js';
+import { handleProxy } from './routes/proxy.js';
 import { successResponse, notFoundResponse } from './utils/responses.js';
 
 const app = new Hono();
@@ -12,8 +13,8 @@ app.use(
   '*',
   cors({
     origin: '*',
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   })
 );
 
@@ -26,6 +27,7 @@ app.get('/', (c) => {
 
 app.get('/api/health', handleHealth);
 app.get('/api/config', handleConfig);
+app.all('/api/node/*', handleProxy);
 
 app.notFound((c) => {
   return notFoundResponse(c, 'Not Found');
