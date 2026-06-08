@@ -1,8 +1,0 @@
-{
-  "eslint.options": {
-    "configFile": "config/.eslintrc.json",
-    "ignorePath": "config/.eslintignore"
-  },
-  "prettier.configPath": "config/.prettierrc",
-  "prettier.ignorePath": "config/.prettierignore"
-}

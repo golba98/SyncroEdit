@@ -18,7 +18,9 @@ const server = http.createServer(app);
 const wss = documentSocket.init(server);
 
 // Setup Shutdown and Process Handlers
-setupShutdownHandlers(server, wss);
+if (process.env.NODE_ENV !== 'test') {
+  setupShutdownHandlers(server, wss);
+}
 
 // Setup Middleware
 setupMiddleware(app);
@@ -49,4 +51,4 @@ if (require.main === module) {
   })();
 }
 
-module.exports = { app, server };
+module.exports = { app, server, wss };

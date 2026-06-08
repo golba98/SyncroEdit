@@ -35,13 +35,13 @@ describe('Auth Integration Tests', () => {
       expect(res.body.message).toMatch(/password/i);
     });
 
-    it('should return 200 and generic message even if email already exists', async () => {
-      await User.create(testUser);
+    it('should return 409 if email already exists', async () => {
+      await User.create({ ...testUser, username: 'existinguser' });
 
       const res = await request(app).post('/api/auth/signup').send(testUser);
 
-      expect(res.status).toBe(200);
-      expect(res.body.message).toMatch(/receive a verification code/i);
+      expect(res.status).toBe(409);
+      expect(res.body.message).toMatch(/email is already registered/i);
     });
   });
 

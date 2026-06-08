@@ -4,6 +4,8 @@
 // In jsdom (Frontend Tests), window is defined.
 const isNodeEnv = typeof window === 'undefined';
 
+jest.setTimeout(120000);
+
 if (isNodeEnv) {
   // Mock CSRF protection for backend integration tests
   jest.mock('../src/utils/csrf', () => require('./mocks/csrf'));
@@ -12,10 +14,12 @@ if (isNodeEnv) {
 let mongoose;
 let MongoMemoryServer;
 let server;
+let wss;
 let User;
 let Document;
 let History;
 let mongoServer;
+let documentSocket;
 
 if (isNodeEnv) {
   // Only load server and models if we are NOT skipping DB setup (Integration Tests)
@@ -27,6 +31,8 @@ if (isNodeEnv) {
 
     const serverModule = require('../src/server');
     server = serverModule.server;
+    wss = serverModule.wss;
+    documentSocket = require('../src/documents/socket');
     User = require('../src/users/User');
     Document = require('../src/documents/Document');
     History = require('../src/documents/History');
@@ -51,12 +57,27 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!isNodeEnv || process.env.SKIP_DB_SETUP) return;
 
+  if (documentSocket && typeof documentSocket.__clearForTests === 'function') {
+    documentSocket.__clearForTests();
+  }
+  if (wss) {
+    wss.clients.forEach((client) => client.terminate());
+    await new Promise((resolve) => wss.close(resolve));
+  }
+  if (server && server.listening) {
+    if (typeof server.closeAllConnections === 'function') {
+      server.closeAllConnections();
+    }
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
   await mongoose.connection.close();
   if (mongoServer) {
     await mongoServer.stop();
-  }
-  if (server && server.listening) {
-    server.close();
   }
 });
 

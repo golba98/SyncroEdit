@@ -14,7 +14,8 @@ exports.createTicket = (userId) => {
   tickets.set(ticket, { userId, expires });
 
   // Cleanup
-  setTimeout(() => tickets.delete(ticket), 30000);
+  const cleanupTimeout = setTimeout(() => tickets.delete(ticket), 30000);
+  if (typeof cleanupTimeout.unref === 'function') cleanupTimeout.unref();
   return ticket;
 };
 

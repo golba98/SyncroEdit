@@ -1,125 +1,101 @@
-# SynchroEdit
+# SyncroEdit
 
-## 1. Description
+SyncroEdit is a real-time collaborative document editor built with Node.js, Express,
+MongoDB, WebSockets, and Yjs. The frontend is a vanilla JavaScript app served from
+`public/`, with feature modules under `public/js/features/`.
 
-SynchroEdit is a high-performance, real-time collaborative document editor. It features a minimalist "Dark OLED" aesthetic and utilizes CRDT technology (**Yjs**) to allow seamless multi-user collaboration without merge conflicts.
+## Install
 
-Test it out here: https://syncroedit.online
-
-## 2. Key Features
-
-- **Real-time Editing**: Instant synchronization across all users via Yjs and WebSockets.
-- **Visual Presence**: Live cursor tracking with user names and personalized accent colors.
-- **OLED Theming**: True black background with a dynamic, algorithmically-generated accent color engine.
-- **Page Layout Engine**: A4-style pagination that dynamically manages content flow and page creation.
-- **Robust Security**: Secure authentication with JWT, refresh tokens, Bcrypt hashing, account lockouts, and full email verification flows.
-- **Offline Support**: Document persistence via IndexedDB allows for instant loading and offline resiliency.
-
-## 3. Dynamic Theme System
-
-The UI adaptively generates its color palette based on a user's chosen accent color:
-
-- **Shade Generation**: The system calculates complementary lighter and darker shades on the fly.
-- **Visual Cohesion**: Themes are applied to button glows, borders, selection highlights, and UI transitions.
-- **Interactive Background**: A canvas-based constellation background reacts to the current theme.
-
-## 4. Technical Stack
-
-- **Frontend**: Vanilla JavaScript (ES Modules), Quill.js, Yjs.
-- **Sync Engine**: Yjs (CRDT) over WebSockets.
-- **Backend**: Node.js, Express.
-- **Database**: MongoDB via Mongoose.
-- **Storage**: IndexedDB (Frontend Cache).
-
-## 5. Project Structure
-
-The project follows a modular, manager-based architecture for maximum maintainability.
-
-```
-SynchroEdit/
-├── config/              # Configuration files (ESLint, Prettier, Playwright, Babel)
-├── docs/                # Development documentation
-│   ├── AI_CONTEXT.md   # AI assistant context and conventions
-│   ├── AGENTS.md       # AI agent instructions
-│   ├── PERFORMANCE.md  # Performance optimization plans
-│   ├── SECURITY_CHECKLIST.md
-│   └── SETUP.md        # Detailed setup instructions
-├── public/             # Frontend static files
-│   └── js/
-│       ├── app/        # Application initialization
-│       ├── core/       # Core application lifecycle
-│       ├── editor/     # Central Editor class
-│       ├── features/   # Feature modules (auth, theme, etc.)
-│       ├── managers/   # Specialized handlers (pages, library, cursors)
-│       └── ui/         # UI components and controllers
-├── scripts/            # Utility scripts
-│   ├── dev/           # Development utilities
-│   └── test/          # Test utilities
-├── src/               # Backend source code
-│   ├── auth/          # Authentication & JWT logic
-│   ├── documents/     # Document models & WebSocket sync
-│   ├── middleware/    # Express middleware (security, auth, errors)
-│   ├── users/         # User profiles & account management
-│   ├── utils/         # Server utilities & logging
-│   └── server.js      # Application entry point
-├── tests/             # Test suites
-│   ├── e2e/           # End-to-end (Playwright)
-│   ├── frontend/      # Frontend unit tests
-│   ├── integration/   # Backend integration tests
-│   └── unit/          # Backend unit tests
-└── logs/              # Runtime logs (gitignored)
+```bash
+npm install
 ```
 
-For detailed architecture and development guidance, see [`docs/AI_CONTEXT.md`](docs/AI_CONTEXT.md).
+Copy the local environment template and update values as needed:
 
-## 6. Quick Start
+```bash
+cp .env.example .env
+```
 
-### Local Development
+At minimum, local development needs:
 
-1. **Clone the repository**:
+- `PORT`: local server port, usually `3000`
+- `MONGODB_URI`: MongoDB connection string
+- `JWT_SECRET`: random secret for JWT signing
+- `DISABLE_SECURE_COOKIE=true`: required for local HTTP development
 
-   ```bash
-   git clone https://github.com/yourusername/synchroedit.git
-   cd synchroedit
-   ```
+## Run Locally
 
-2. **Install dependencies**:
+```bash
+npm run dev
+```
 
-   ```bash
-   npm install
-   ```
+Open `http://localhost:3000`.
 
-3. **Configure Environment**:
-   Copy the example environment file and update it with your settings:
+For production-style startup:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+npm start
+```
 
-   See [`docs/SETUP.md`](docs/SETUP.md) for detailed configuration instructions.
+## Run With Docker
 
-4. **Start the server**:
-   ```bash
-   npm start
-   ```
+Copy the Docker environment template:
 
-### Docker Deployment
+```bash
+cp .env.docker.example .env
+```
 
-1. **Copy and configure docker environment**:
+Start the app and MongoDB:
 
-   ```bash
-   cp .env.docker.example .env
-   ```
+```bash
+docker compose up -d
+```
 
-   Edit `.env` and set secure values for `JWT_SECRET` and RSA keys.
+Validate the Compose file without starting services:
 
-2. **Start with Docker Compose**:
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+docker compose config
+```
 
-**Security Note**: Never commit your `.env` file or any file containing secrets to version control. All sensitive configuration is excluded via `.gitignore`.
+## Test And Lint
 
-## 7. License
+```bash
+npm test
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run lint
+```
 
-Licensed under the ISC License.
+There is currently no `npm run build` script; the app is served directly by Express.
+
+## Important Files
+
+- Backend: `src/`
+- Frontend: `public/`
+- Tests: `tests/`
+- Config: `config/`
+- Documentation: `docs/`
+- Scripts: `scripts/`
+- Docker: `Dockerfile`, `docker-compose.yml`, `.dockerignore`
+
+See `docs/PROJECT_STRUCTURE.md` for a fuller map of the repository.
+
+## Documentation
+
+- Setup: `docs/setup/SETUP.md`
+- Security checklist: `docs/security/SECURITY_CHECKLIST.md`
+- Architecture context: `docs/architecture/AI_CONTEXT.md`
+- Testing notes: `docs/testing/TESTING.md`
+- Cleanup report: `docs/CLEANUP_REPORT.md`
+- Archived planning/design material: `docs/archive/`
+
+## Troubleshooting
+
+- If cookies do not work locally, confirm `DISABLE_SECURE_COOKIE=true` in `.env` or use
+  `npm run dev`.
+- If integration tests cannot download MongoDB binaries, remove `.cache/mongodb-binaries`
+  and rerun `npm test`.
+- If Docker starts but the app cannot connect to MongoDB, confirm `MONGODB_URI` points to
+  `mongodb://mongo:27017/synchroedit` for Compose.
+- Do not commit `.env`, logs, local cache folders, generated reports, or secret key files.

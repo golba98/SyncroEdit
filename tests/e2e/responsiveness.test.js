@@ -27,7 +27,7 @@ test.describe('Responsiveness', () => {
     await page.fill('#signupPassword', 'Password123!');
     await page.fill('#signupPasswordConfirm', 'Password123!');
     await page.click('#signupBtn');
-    await expect(page).toHaveURL(/\/index.html/);
+    await expect(page).toHaveURL(/\/(?:index\.html)?$/);
     await page.waitForTimeout(1000);
     await page.click('#createNewDoc');
 
