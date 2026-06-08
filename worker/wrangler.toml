@@ -1,3 +1,9 @@
 name = "syncroedit-api"
 main = "src/index.js"
 compatibility_date = "2026-06-08"
+
+[vars]
+APP_NAME = "SyncroEdit"
+ENVIRONMENT = "development"
+API_VERSION = "v1"
+BACKEND_ORIGIN = "http://localhost:3000"
