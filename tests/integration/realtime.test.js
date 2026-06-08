@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const { server } = require('../../src/server');
-const mongoose = require('mongoose');
 const Document = require('../../src/documents/Document');
 const User = require('../../src/users/User');
 const { createTicket } = require('../../src/utils/ticketStore');
@@ -15,6 +14,8 @@ describe('Real-time Collaboration Tests', () => {
   let ownerId, editorId, viewerId;
   let docId;
   let ownerTicket, editorTicket, viewerTicket;
+  let clients = [];
+  let awarenessInstances = [];
 
   beforeAll((done) => {
     if (!server.listening) {
@@ -34,22 +35,42 @@ describe('Real-time Collaboration Tests', () => {
     // Server close handled by setup.js
   });
 
+  afterEach(async () => {
+    await Promise.all(
+      clients.map(
+        (client) =>
+          new Promise((resolve) => {
+            if (client.readyState === WebSocket.CLOSED) {
+              resolve();
+              return;
+            }
+
+            client.once('close', resolve);
+            client.terminate();
+          })
+      )
+    );
+    clients = [];
+    awarenessInstances.forEach((awareness) => awareness.destroy());
+    awarenessInstances = [];
+  });
+
   beforeEach(async () => {
     // DB cleared by setup.js
     const owner = await User.create({
       username: 'owner',
       email: 'owner@test.com',
-      password: 'password123',
+      password: 'Password123!',
     });
     const editor = await User.create({
       username: 'editor',
       email: 'editor@test.com',
-      password: 'password123',
+      password: 'Password123!',
     });
     const viewer = await User.create({
       username: 'viewer',
       email: 'viewer@test.com',
-      password: 'password123',
+      password: 'Password123!',
     });
 
     ownerId = owner._id.toString();
@@ -70,7 +91,9 @@ describe('Real-time Collaboration Tests', () => {
   });
 
   function createClient(ticket) {
-    return new WebSocket(`${baseUrl}?documentId=${docId}&ticket=${ticket}`);
+    const client = new WebSocket(`${baseUrl}?documentId=${docId}&ticket=${ticket}`);
+    clients.push(client);
+    return client;
   }
 
   it('should allow editors to sync updates (Conflict Resolution)', (done) => {
@@ -230,6 +253,7 @@ describe('Real-time Collaboration Tests', () => {
       encoding.writeVarUint(encoder, 1); // messageAwareness
 
       const awareness = new awarenessProtocol.Awareness(new Y.Doc());
+      awarenessInstances.push(awareness);
       awareness.setLocalState({ user: { name: 'Owner' } });
       const update = awarenessProtocol.encodeAwarenessUpdate(awareness, [awareness.clientID]);
 
@@ -241,7 +265,7 @@ describe('Real-time Collaboration Tests', () => {
       const decoder = decoding.createDecoder(new Uint8Array(data));
       const messageType = decoding.readVarUint(decoder);
       if (messageType === 1) {
-        const update = decoding.readVarUint8Array(decoder);
+        decoding.readVarUint8Array(decoder);
         c1.close();
         c2.close();
         done();

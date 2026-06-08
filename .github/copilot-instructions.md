@@ -28,7 +28,7 @@
 SynchroEdit uses **Yjs (CRDT)** for conflict-free collaborative editing:
 
 - **Binary Storage:** Document state is stored as Base64-encoded Yjs updates in MongoDB (`yjsState` field)
-- **Server-Side Y.Doc:** Backend maintains in-memory Y.Doc instances (`src/sockets/documentSocket.js`)
+- **Server-Side Y.Doc:** Backend maintains in-memory Y.Doc instances (`src/documents/socket.js`)
 - **Debounced Persistence:** Changes are batched and saved to MongoDB after 2 seconds
 - **WebSocket Protocol:** Uses `y-protocols/sync` and `y-protocols/awareness` for real-time synchronization
 - **Direct Buffer Application:** Updates are applied from Buffers without intermediate serialization for performance
@@ -37,18 +37,23 @@ SynchroEdit uses **Yjs (CRDT)** for conflict-free collaborative editing:
 
 Modular class-based architecture with distinct responsibilities:
 
-#### Core (`/public/js/core`)
+#### App (`/public/js/app`)
 
 - **`app.js`**: Main `App` class that bootstraps the application and manages global instances
+- **`network.js`**: API helper methods
+- **`utils.js`**: Shared frontend utilities
 - Sets `window.app` globally for cross-module access
 
-#### Feature Modules (`/public/js`)
+#### Feature Modules (`/public/js/features`)
 
 Organized by feature domain:
 
-- **`/ui`**: UI components (`Auth`, `Theme`, `Profile`, `UIManager`, `DynamicBackground`)
-- **`/editor`**: Editor integration (location varies by file structure)
-- **`/managers`**: Specialized handlers (document library, page virtualization, cursors, etc.)
+- **`/auth`**: Auth state and login/signup page controller
+- **`/editor`**: Editor integration and editor managers
+- **`/library`**: Document library manager
+- **`/profile`**: Profile settings and account UI
+- **`/theme`**: Theme and dynamic background modules
+- **`/ui`**: UI components and toolbar orchestration
 
 Key managers referenced in code:
 
@@ -70,10 +75,6 @@ Feature-based organization:
 │   └── History.js         # Version history model
 ├── /users                 # User profiles and account management
 ├── /middleware            # Security, auth, error handling
-├── /sockets
-│   └── documentSocket.js  # Core Yjs sync logic
-├── /routes                # RESTful API definitions
-├── /controllers           # API request handlers
 └── /utils                 # Logging, shutdown handlers
 ```
 
@@ -131,7 +132,8 @@ The editor uses `IntersectionObserver` to mount/unmount pages dynamically:
 
 #### Backend Tests
 
-- **Integration tests:** Use `mongodb-memory-server` for real database operations
+- **Integration tests:** Use `mongodb-memory-server` for real database operations; binaries
+  cache under `.cache/mongodb-binaries`
 - **CSRF mocking:** CSRF protection is automatically mocked via `tests/mocks/csrf.js`
 - **Test isolation:** `beforeEach` clears User, Document, and History collections
 
@@ -242,16 +244,22 @@ npx jest --watch tests/unit
 
 ### Documentation
 
-- Development Docs: `docs/` (AI_CONTEXT.md, AGENTS.md, SETUP.md, PERFORMANCE.md, SECURITY_CHECKLIST.md)
+- Project structure: `docs/PROJECT_STRUCTURE.md`
+- Setup docs: `docs/setup/`
+- Architecture docs: `docs/architecture/`
+- Security docs: `docs/security/`
+- Testing docs: `docs/testing/`
+- Archived planning docs: `docs/archive/`
 - Root: `README.md`, `SECURITY.md`
 
 ### Scripts
 
 - Development utilities: `scripts/dev/`
-- Test utilities: `scripts/test/`
+- Test data utilities: `scripts/test/`
+- Maintenance diagnostics: `scripts/maintenance/`
 
 ### Entry Points
 
 - **Backend:** `src/server.js`
-- **Frontend:** `public/js/core/app.js` (loaded via `public/index.html`)
+- **Frontend:** `public/js/app/app.js` (loaded via `public/index.html`)
 - **Service Worker:** `public/sw.js` (offline caching)

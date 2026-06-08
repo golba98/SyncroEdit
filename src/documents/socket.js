@@ -16,6 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 // Store active Y.Docs: documentId -> Y.Doc
 const docs = new Map();
+const evictionTimeouts = new Set();
 
 // Helper: Setup a Y.Doc with persistence
 async function getOrCreateDoc(documentId, gc = true) {
@@ -93,6 +94,7 @@ async function getOrCreateDoc(documentId, gc = true) {
   doc.on('update', (update, origin) => {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(saveToDB, 2000); // Save every 2 seconds of inactivity
+    if (typeof saveTimeout.unref === 'function') saveTimeout.unref();
 
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);
@@ -123,6 +125,7 @@ function init(server) {
       ws.ping();
     });
   }, 30000);
+  if (typeof interval.unref === 'function') interval.unref();
 
   wss.on('close', () => clearInterval(interval));
 
@@ -294,7 +297,8 @@ function init(server) {
         // Implementation of Server-Side Memory Eviction
         // If all clients disconnected, schedule doc removal from memory
         // Grace period (e.g. 10s) to handle page refreshes or quick re-entry
-        setTimeout(() => {
+        const evictionTimeout = setTimeout(() => {
+          evictionTimeouts.delete(evictionTimeout);
           const currentDoc = docs.get(documentId);
           if (currentDoc && currentDoc.conns.size === 0) {
             console.log(`[Memory Management] Unloading doc ${documentId} due to inactivity.`);
@@ -303,6 +307,8 @@ function init(server) {
             docs.delete(documentId);
           }
         }, 10000);
+        if (typeof evictionTimeout.unref === 'function') evictionTimeout.unref();
+        evictionTimeouts.add(evictionTimeout);
       }
     });
   });
@@ -318,4 +324,10 @@ function broadcastMaintenance(wss) {
   // ...
 }
 
-module.exports = { init, notifyDocumentDeleted, broadcastMaintenance };
+function __clearForTests() {
+  evictionTimeouts.forEach((timeout) => clearTimeout(timeout));
+  evictionTimeouts.clear();
+  docs.clear();
+}
+
+module.exports = { init, notifyDocumentDeleted, broadcastMaintenance, __clearForTests };

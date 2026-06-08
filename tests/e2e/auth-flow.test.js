@@ -13,8 +13,8 @@ test.describe('Auth and Basic Document Flow', () => {
     await page.fill('#signupPasswordConfirm', 'Password123!');
     await page.click('#signupBtn');
 
-    // Wait for redirect to index.html (since email verification is disabled)
-    await expect(page).toHaveURL(/\/index.html/);
+    // Wait for redirect to the app entrypoint (since email verification is disabled)
+    await expect(page).toHaveURL(/\/(?:index\.html)?$/);
 
     // 2. Create Document
     // Library should be open by default if no doc is in URL

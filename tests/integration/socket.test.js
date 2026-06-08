@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const { server } = require('../../src/server');
-const mongoose = require('mongoose');
 const Document = require('../../src/documents/Document');
 const User = require('../../src/users/User');
 const { createTicket } = require('../../src/utils/ticketStore');
@@ -40,7 +39,7 @@ describe('Socket Logic Integration Tests', () => {
     const user = await User.create({
       username: 'socketuser',
       email: 'socket@test.com',
-      password: 'password123',
+      password: 'Password123!',
     });
     userId = user._id.toString();
 

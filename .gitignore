@@ -17,7 +17,6 @@ pnpm-debug.log*
 !.env.example
 !.env.docker.example
 env.bak
-tests/env.js
 
 # JWT Keys (if generated locally)
 jwtRS256.key
@@ -33,6 +32,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Testing
+.cache/
 coverage/
 .nyc_output/
 playwright-report/

@@ -10,7 +10,7 @@
     "test:unit": "cross-env SKIP_DB_SETUP=true jest tests/unit",
     "test:integration": "jest tests/integration",
     "test:e2e": "playwright test --config=config/playwright.config.js",
-    "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint . -c config/.eslintrc.json --ignore-path config/.eslintignore",
+    "lint": "eslint . --config config/eslint.config.cjs",
     "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore"
   },
   "jest": {

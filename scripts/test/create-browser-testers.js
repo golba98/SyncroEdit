@@ -2,7 +2,7 @@ const path = require('path');
 // Ensure we load .env from the project root
 require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 const mongoose = require('mongoose');
-const User = require('../src/users/User');
+const User = require('../../src/users/User');
 
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 

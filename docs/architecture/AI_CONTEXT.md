@@ -39,9 +39,10 @@ SYNCHROEDIT | PROJECT CONTEXT
 
 6. DIRECTORY STRUCTURE
 
-- /public/js/core: Entry points and network logic.
-- /public/js/editor: Quill-to-Yjs binding logic.
-- /public/js/managers: Page breaks, borders, and cursor display.
-- /public/js/ui: Auth forms, modals, and theme switching.
-- /src/models: Database schemas (Users, Docs, Sessions).
-- /src/sockets: WebSocket handling and sync logic.
+- /public/js/app: Frontend entrypoint, network helpers, and shared utilities.
+- /public/js/features/editor: Quill-to-Yjs binding logic and editor managers.
+- /public/js/features/library: Document library management.
+- /public/js/features/profile: Profile UI and account settings.
+- /public/js/features/ui: Modals, toolbar controls, and UI rendering helpers.
+- /src/auth, /src/documents, /src/users: Feature-local backend models, routes, and controllers.
+- /src/documents/socket.js: WebSocket handling and sync logic.

@@ -14,8 +14,8 @@ const logger = winston.createLogger({
   transports: [],
 });
 
-// Add File transports only in non-production environments
-if (process.env.NODE_ENV !== 'production') {
+// Add file transports for local development, but not during tests where they keep Jest open.
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   logger.add(new winston.transports.File({ filename: 'logs/error.log', level: 'error' }));
   logger.add(new winston.transports.File({ filename: 'logs/combined.log' }));
 }

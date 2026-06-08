@@ -80,7 +80,7 @@ describe('Document Integration Tests', () => {
       const otherUser = await User.create({
         username: 'other_owner',
         email: 'other_owner@test.com',
-        password: 'password',
+        password: 'Password123!',
       });
 
       // Create owned document
@@ -137,7 +137,7 @@ describe('Document Integration Tests', () => {
       const otherUser = await User.create({
         username: 'other',
         email: 'other@test.com',
-        password: 'password',
+        password: 'Password123!',
       });
       const doc = await Document.create({ title: 'Other Doc', owner: otherUser._id });
 
@@ -152,7 +152,7 @@ describe('Document Integration Tests', () => {
       const otherUser = await User.create({
         username: 'sharer',
         email: 'sharer@test.com',
-        password: 'password',
+        password: 'Password123!',
       });
       const doc = await Document.create({
         title: 'Shared Doc',
@@ -186,7 +186,7 @@ describe('Document Integration Tests', () => {
       const otherUser = await User.create({
         username: 'owner2',
         email: 'owner2@test.com',
-        password: 'password',
+        password: 'Password123!',
       });
       const doc = await Document.create({
         title: 'Owner Doc',
