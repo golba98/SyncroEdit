@@ -2,6 +2,7 @@ import { Auth } from '/js/features/auth/auth.js';
 
 let _csrfToken = null;
 let _csrfPromise = null;
+let _refreshPromise = null;
 
 function getRuntimeConfig() {
   return window.SYNCROEDIT_CONFIG || {};
@@ -107,32 +108,44 @@ export const Network = {
     if (response.status === 401 && !isAuthRequest) {
       // console.log('Token expired, attempting refresh...'); // Reduced noise
       try {
-        // Call refresh endpoint
-        // Note: browser automatically sends cookies for same-origin requests
-        const refreshResponse = await fetch(buildApiUrl('/api/auth/refresh-token'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': _csrfToken,
-          },
-          credentials: 'include',
-        });
+        if (!_refreshPromise) {
+          _refreshPromise = (async () => {
+            try {
+              const refreshResponse = await fetch(buildApiUrl('/api/auth/refresh-token'), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-Token': _csrfToken,
+                },
+                credentials: 'include',
+              });
 
-        if (refreshResponse.ok) {
-          const data = await refreshResponse.json();
-          Auth.setToken(data.token); // Update local token
+              if (refreshResponse.ok) {
+                const data = await refreshResponse.json();
+                Auth.setToken(data.token); // Update local token
+                return data.token;
+              } else {
+                await Auth.logout();
+                return null;
+              }
+            } catch (e) {
+              await Auth.logout();
+              return null;
+            } finally {
+              _refreshPromise = null;
+            }
+          })();
+        }
 
+        const newToken = await _refreshPromise;
+        if (newToken) {
           // Retry original request with new token
-          headers.Authorization = `Bearer ${data.token}`;
+          headers.Authorization = `Bearer ${newToken}`;
           response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
         } else {
-          // Silent failure - session expired, let the caller handle it (usually by redirecting)
-          await Auth.logout();
           return;
         }
       } catch (e) {
-        // console.error('Token refresh failed', e);
-        await Auth.logout();
         return;
       }
     }

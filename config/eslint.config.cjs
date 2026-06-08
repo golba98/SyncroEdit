@@ -13,6 +13,8 @@ module.exports = [
       'test-results/**',
       'public/vendor/fontawesome/**',
       'public/js/utils.js',
+      'worker/.wrangler/**',
+      '**/.wrangler/**',
     ],
   },
   {
