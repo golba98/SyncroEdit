@@ -11,7 +11,10 @@
     "test:integration": "jest tests/integration",
     "test:e2e": "playwright test --config=config/playwright.config.js",
     "lint": "eslint . --config config/eslint.config.cjs",
-    "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore"
+    "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore",
+    "cf:dev": "cd worker && wrangler dev",
+    "cf:deploy": "cd worker && wrangler deploy",
+    "pages:deploy": "wrangler pages deploy public --project-name syncroedit"
   },
   "jest": {
     "setupFilesAfterEnv": [
@@ -57,6 +60,7 @@
     "express-rate-limit": "^8.2.2",
     "geoip-lite": "^2.0.1",
     "helmet": "^8.1.0",
+    "hono": "^4.12.24",
     "idb-keyval": "^6.2.2",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.1",
@@ -83,6 +87,7 @@
     "jest-environment-jsdom": "^30.2.0",
     "mongodb-memory-server": "^11.0.1",
     "prettier": "^3.8.3",
-    "supertest": "^7.1.4"
+    "supertest": "^7.1.4",
+    "wrangler": "^4.98.0"
   }
 }

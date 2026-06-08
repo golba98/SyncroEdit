@@ -67,3 +67,7 @@ config/local.json
 gemini.md
 CLAUDE.md
 AGENTS.md
+
+# Cloudflare Wrangler local state
+.wrangler/
+worker/.wrangler/
