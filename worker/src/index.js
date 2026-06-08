@@ -1,8 +1,13 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { securityHeaders } from './middleware/securityHeaders.js';
+import { handleHealth } from './routes/health.js';
+import { handleConfig } from './routes/config.js';
+import { successResponse, notFoundResponse } from './utils/responses.js';
 
 const app = new Hono();
 
+app.use('*', securityHeaders);
 app.use(
   '*',
   cors({
@@ -13,19 +18,17 @@ app.use(
 );
 
 app.get('/', (c) => {
-  return c.json({
-    ok: true,
+  return successResponse(c, {
     message: 'SyncroEdit Cloudflare Worker is running',
     health: '/api/health',
   });
 });
 
-app.get('/api/health', (c) => {
-  return c.json({
-    ok: true,
-    service: 'syncroedit-worker',
-    runtime: 'cloudflare-workers',
-  });
+app.get('/api/health', handleHealth);
+app.get('/api/config', handleConfig);
+
+app.notFound((c) => {
+  return notFoundResponse(c, 'Not Found');
 });
 
 export default app;
