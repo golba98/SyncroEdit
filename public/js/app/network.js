@@ -22,7 +22,15 @@ function buildApiUrl(url) {
   const apiBaseUrl = trimTrailingSlash(getRuntimeConfig().API_BASE_URL);
   if (!apiBaseUrl) return url;
 
-  return `${apiBaseUrl}/${String(url).replace(/^\/+/, '')}`;
+  const normalizedUrl = String(url);
+  const requestPath = normalizedUrl.replace(/^\/+/, '');
+  const basePath = new URL(apiBaseUrl, window.location.origin).pathname.replace(/\/+$/, '');
+
+  if (basePath && basePath !== '/' && requestPath.startsWith('api/')) {
+    return `${apiBaseUrl}/${requestPath.replace(/^api\/?/, '')}`;
+  }
+
+  return `${apiBaseUrl}/${requestPath}`;
 }
 
 function getConfiguredWebSocketBaseUrl() {
