@@ -5,6 +5,7 @@ This document details the implementation of full Yjs/y-websocket protocol compat
 ## Implemented Features
 
 ### 1. Durable Object Yjs Sync Protocol
+
 - **Single Instance Y.Doc & Awareness**: Inside `DocumentSyncObject`, a single `Y.Doc` and `Awareness` instance are maintained for each active document room.
 - **WebSocket Upgrade Handling**: Correctly accepts the connection and immediately sends Yjs sync step 1 (server state vector) and the current awareness states of all other connected clients.
 - **y-websocket Protocol Support**: Supports `messageSync = 0` and `messageAwareness = 1` binary payload structures.
@@ -13,12 +14,14 @@ This document details the implementation of full Yjs/y-websocket protocol compat
 - **DO Storage Persistence**: Encodes document state as compacted updates (`Y.encodeStateAsUpdate`) and persists it to Durable Object SQLite storage. State writes are debounced (2-second buffer) and immediately flushed on the last client's disconnect.
 
 ### 2. Node Backend Ticket Consumption Bridge
+
 - Added `POST /api/auth/ws-ticket/consume` route.
 - Bypasses global CSRF protection specifically for this bridge path.
 - Consumes and validates the Node-issued WebSocket ticket.
 - Verifies document permissions (owner/collaborator/viewer/public) and determines the read-only flag before returning a clean JSON structure to the Worker: `{ ok: true, user: { id, username }, readOnly }`.
 
 ### 3. Frontend Config Backend Resolution
+
 - Added `REALTIME_BACKEND` option to `public/config.js` (and local/production examples), defaulting to `"node"`.
 - Frontend `editor.js` checks this configuration option. When set to `"durable-object"`, it targets the Worker WebSocket route `/ws/:documentId`.
 
@@ -35,6 +38,7 @@ This document details the implementation of full Yjs/y-websocket protocol compat
 ## Verification
 
 ### Automated Tests
+
 - Written unit tests verifying the Hono routing, mock ticket bridge validation, and Durable Object WebSocket upgrades.
 - Verified Yjs multi-client state sync, awareness propagation, read-only protection, and storage persistence.
 - Verified CSRF bypass and Node consumption bridge integration tests.
@@ -57,17 +61,18 @@ This document details the implementation of full Yjs/y-websocket protocol compat
    window.SYNCROEDIT_CONFIG = {
      API_BASE_URL: 'http://localhost:8787/api/node',
      WS_BASE_URL: 'ws://localhost:8787',
-     REALTIME_BACKEND: 'durable-object'
+     REALTIME_BACKEND: 'durable-object',
    };
    ```
 3. Start the application stack:
+
    ```bash
    # Terminal 1: MongoDB
    docker start syncroedit-mongo
-   
+
    # Terminal 2: Node backend
    npm run dev
-   
+
    # Terminal 3: Cloudflare Worker
    npm run cf:dev
    ```
@@ -77,6 +82,7 @@ This document details the implementation of full Yjs/y-websocket protocol compat
 ## Rollback Plan
 
 If issues occur with the Cloudflare Durable Object route:
+
 1. Revert `REALTIME_BACKEND` to `"node"` in the frontend configuration (`public/config.js`).
 2. Keep `REALTIME_DURABLE_OBJECTS_ENABLED = "false"` in the wrangler settings/environment variables.
 3. Node will instantly serve as the default fallback WebSocket handler, bypassing Worker routing to DO.

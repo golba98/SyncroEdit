@@ -77,6 +77,13 @@ describe('Network Module', () => {
 
       expect(Network.getWebSocketBaseUrl()).toBe('wss://syncroedit.example.com/ws');
     });
+
+    it('strips /api/node when REALTIME_BACKEND is durable-object', () => {
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/api/node';
+      window.SYNCROEDIT_CONFIG.REALTIME_BACKEND = 'durable-object';
+
+      expect(Network.getWebSocketBaseUrl()).toBe('wss://syncroedit.example.com');
+    });
   });
 
   describe('initWebSocket', () => {
@@ -136,6 +143,26 @@ describe('Network Module', () => {
       mockWebSocket.onmessage({ data: JSON.stringify(message) });
 
       expect(onMessage).toHaveBeenCalledWith(message);
+    });
+
+    it('should initialize WebSocket connection for durable-object backend', async () => {
+      const onMessage = jest.fn();
+      window.SYNCROEDIT_CONFIG.REALTIME_BACKEND = 'durable-object';
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/api/node';
+
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ ticket: 'mock-ticket' }),
+      });
+
+      Network.initWebSocket('doc1', onMessage);
+
+      // Wait for async connect()
+      await new Promise(process.nextTick);
+
+      expect(global.WebSocket).toHaveBeenCalledWith(
+        'wss://syncroedit.example.com/ws/doc1?ticket=mock-ticket'
+      );
     });
   });
 });

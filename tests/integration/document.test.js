@@ -223,4 +223,116 @@ describe('Document Integration Tests', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/internal/documents/:documentId/yjs-state', () => {
+    let doc;
+    const syncSecret = 'test-sync-token-999';
+
+    beforeEach(async () => {
+      doc = await Document.create({ title: 'Sync Doc', owner: userId });
+      process.env.DO_PERSISTENCE_SYNC_ENABLED = 'true';
+      process.env.DO_SYNC_SECRET = syncSecret;
+    });
+
+    afterEach(() => {
+      delete process.env.DO_PERSISTENCE_SYNC_ENABLED;
+      delete process.env.DO_SYNC_SECRET;
+    });
+
+    it('should reject when bridge is disabled', async () => {
+      process.env.DO_PERSISTENCE_SYNC_ENABLED = 'false';
+
+      const res = await request(app)
+        .post(`/api/internal/documents/${doc._id}/yjs-state`)
+        .set('Authorization', `Bearer ${syncSecret}`)
+        .send({
+          documentId: doc._id.toString(),
+          encoding: 'base64',
+          state: 'SGVsbG8gWWpz',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('disabled');
+    });
+
+    it('should reject when service token is missing or invalid', async () => {
+      const res = await request(app).post(`/api/internal/documents/${doc._id}/yjs-state`).send({
+        documentId: doc._id.toString(),
+        encoding: 'base64',
+        state: 'SGVsbG8gWWpz',
+      });
+
+      expect(res.status).toBe(401);
+
+      const res2 = await request(app)
+        .post(`/api/internal/documents/${doc._id}/yjs-state`)
+        .set('Authorization', `Bearer wrong-token`)
+        .send({
+          documentId: doc._id.toString(),
+          encoding: 'base64',
+          state: 'SGVsbG8gWWpz',
+        });
+
+      expect(res2.status).toBe(401);
+    });
+
+    it('should reject when documentId does not match URL param', async () => {
+      const res = await request(app)
+        .post(`/api/internal/documents/${doc._id}/yjs-state`)
+        .set('Authorization', `Bearer ${syncSecret}`)
+        .send({
+          documentId: new mongoose.Types.ObjectId().toString(),
+          encoding: 'base64',
+          state: 'SGVsbG8gWWpz',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain('match');
+    });
+
+    it('should reject when encoding is not base64', async () => {
+      const res = await request(app)
+        .post(`/api/internal/documents/${doc._id}/yjs-state`)
+        .set('Authorization', `Bearer ${syncSecret}`)
+        .send({
+          documentId: doc._id.toString(),
+          encoding: 'binary',
+          state: 'SGVsbG8gWWpz',
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should reject when state is not valid base64', async () => {
+      const res = await request(app)
+        .post(`/api/internal/documents/${doc._id}/yjs-state`)
+        .set('Authorization', `Bearer ${syncSecret}`)
+        .send({
+          documentId: doc._id.toString(),
+          encoding: 'base64',
+          state: 'not-valid-base64-!!!',
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should succeed and persist state when valid', async () => {
+      const base64State = Buffer.from('compacted-yjs-state').toString('base64');
+
+      const res = await request(app)
+        .post(`/api/internal/documents/${doc._id}/yjs-state`)
+        .set('Authorization', `Bearer ${syncSecret}`)
+        .send({
+          documentId: doc._id.toString(),
+          encoding: 'base64',
+          state: base64State,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+
+      const dbDoc = await Document.findById(doc._id).select('+yjsState');
+      expect(dbDoc.yjsState).toBe(base64State);
+    });
+  });
 });

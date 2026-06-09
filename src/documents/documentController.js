@@ -289,3 +289,70 @@ exports.getDocumentInfo = async (req, res, next) => {
     isShared,
   });
 };
+
+exports.updateYjsState = async (req, res, next) => {
+  try {
+    const isEnabled = process.env.DO_PERSISTENCE_SYNC_ENABLED === 'true';
+    if (!isEnabled) {
+      return next(new AppError('Persistence sync bridge is disabled', 403));
+    }
+
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+    const expectedSecret = process.env.DO_SYNC_SECRET;
+
+    if (!expectedSecret || token !== expectedSecret) {
+      return next(new AppError('Unauthorized', 401));
+    }
+
+    const { documentId: paramDocId } = req.params;
+    const { documentId, encoding, state } = req.body;
+
+    if (!documentId || documentId !== paramDocId) {
+      return next(new AppError('Invalid document ID match', 400));
+    }
+
+    // Validate documentId format
+    if (typeof documentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(documentId)) {
+      return next(new AppError('Invalid documentId format', 400));
+    }
+
+    if (encoding !== 'base64') {
+      return next(new AppError('Only base64 encoding is supported', 400));
+    }
+
+    if (typeof state !== 'string') {
+      return next(new AppError('Invalid state payload', 400));
+    }
+
+    // Validate body size (5MB limit)
+    if (Buffer.byteLength(state, 'utf8') > 5 * 1024 * 1024) {
+      return next(new AppError('State payload too large', 413));
+    }
+
+    // Validate base64 string
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(state)) {
+      return next(new AppError('Invalid base64 payload', 400));
+    }
+
+    const dbDoc = await Document.findById(documentId);
+    if (!dbDoc) {
+      return next(new AppError('Document not found', 404));
+    }
+
+    dbDoc.yjsState = state;
+    dbDoc.lastModified = new Date();
+    await dbDoc.save();
+
+    logger.info(`Compacted Yjs state sync'd from Durable Object for doc: ${documentId}`);
+
+    res.json({
+      ok: true,
+      message: "Compacted Yjs state sync'd successfully",
+    });
+  } catch (err) {
+    logger.error('Error in internal updateYjsState sync:', err.message);
+    return next(new AppError('Internal Server Error', 500));
+  }
+};

@@ -39,8 +39,11 @@ function getConfiguredWebSocketBaseUrl() {
 
   if (explicitWsBaseUrl) return explicitWsBaseUrl;
 
-  const apiBaseUrl = trimTrailingSlash(config.API_BASE_URL);
+  let apiBaseUrl = trimTrailingSlash(config.API_BASE_URL);
   if (apiBaseUrl) {
+    if (config.REALTIME_BACKEND === 'durable-object' && apiBaseUrl.endsWith('/api/node')) {
+      apiBaseUrl = apiBaseUrl.substring(0, apiBaseUrl.length - '/api/node'.length);
+    }
     return apiBaseUrl.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
   }
 
@@ -237,7 +240,18 @@ export const Network = {
         // This also verifies the session is still active
         const { ticket } = await this.fetchAPI('/api/auth/ws-ticket');
 
-        const wsFullUrl = `${wsUrl}/?documentId=${documentId}&ticket=${ticket}`;
+        const config = getRuntimeConfig();
+        const realtimeBackend = config.REALTIME_BACKEND || 'node';
+        let wsFullUrl;
+        if (realtimeBackend === 'durable-object') {
+          let base = wsUrl;
+          if (!base.endsWith('/ws')) {
+            base = `${base.replace(/\/+$/, '')}/ws`;
+          }
+          wsFullUrl = `${base}/${documentId}?ticket=${ticket}`;
+        } else {
+          wsFullUrl = `${wsUrl}/?documentId=${documentId}&ticket=${ticket}`;
+        }
         ws = new WebSocket(wsFullUrl);
 
         ws.onopen = () => {
