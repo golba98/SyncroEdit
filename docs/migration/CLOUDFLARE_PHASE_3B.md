@@ -83,6 +83,7 @@ The following operations remain fully on Node:
    - Runs the backend on `http://localhost:3000`.
 
 2. **Start the Cloudflare Worker:**
+
    ```bash
    npm run cf:dev
    ```
@@ -113,6 +114,7 @@ Open a terminal and verify endpoints using `curl -i`:
    - **Validation:** Verify that `Set-Cookie` headers for `ps-csrf-secret` are returned from the response.
 
 3. **Test Proxied User Profile Endpoint (Requires Auth):**
+
    ```bash
    curl -i http://localhost:8787/api/node/user/profile
    ```

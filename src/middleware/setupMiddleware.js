@@ -82,7 +82,11 @@ const setupMiddleware = (app) => {
 
   // Apply CSRF protection to all API routes
   app.use('/api/', (req, res, next) => {
-    if (req.path === '/auth/ws-ticket/consume' || req.path === '/api/auth/ws-ticket/consume') {
+    if (
+      req.path === '/auth/ws-ticket/consume' ||
+      req.path === '/api/auth/ws-ticket/consume' ||
+      req.path.startsWith('/internal/')
+    ) {
       return next();
     }
     return doubleCsrfProtection(req, res, next);

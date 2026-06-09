@@ -79,6 +79,7 @@ export class DocumentSyncObject {
 
     const url = new URL(request.url);
     const documentId = url.searchParams.get('documentId') || 'unknown';
+    this.documentId = documentId;
     const userId = url.searchParams.get('userId') || 'unknown';
     const username = url.searchParams.get('username') || 'unknown';
     const readOnly = url.searchParams.get('readOnly') === 'true';
@@ -204,8 +205,90 @@ export class DocumentSyncObject {
     try {
       const state = Y.encodeStateAsUpdate(this.doc);
       await this.ctx.storage.put('yjsState', state);
+      await this.flushToNode();
     } catch (err) {
       console.error('Failed to write Yjs state to DO storage:', err);
+    }
+  }
+
+  async flushToNode() {
+    const isEnabled =
+      String(this.env?.DO_PERSISTENCE_SYNC_ENABLED || 'false').toLowerCase() === 'true';
+    if (!isEnabled) return;
+
+    if (!this.documentId) {
+      for (const ws of this.ctx.getWebSockets()) {
+        try {
+          const attachment = ws.deserializeAttachment();
+          if (attachment && attachment.documentId) {
+            this.documentId = attachment.documentId;
+            break;
+          }
+        } catch {}
+      }
+    }
+
+    const documentId = this.documentId;
+    if (!documentId || documentId === 'unknown') {
+      console.warn('[DO Flush] Cannot flush: documentId is unknown');
+      return;
+    }
+
+    const syncSecret = this.env?.DO_SYNC_SECRET;
+    if (!syncSecret) {
+      console.warn('[DO Flush] Cannot flush: DO_SYNC_SECRET is missing');
+      return;
+    }
+
+    const backendOrigin = this.env?.BACKEND_ORIGIN;
+    let flushUrl = this.env?.DO_PERSISTENCE_SYNC_URL;
+    if (!flushUrl && backendOrigin) {
+      flushUrl = `${backendOrigin.replace(/\/+$/, '')}/api/internal/documents/${documentId}/yjs-state`;
+    }
+
+    if (!flushUrl) {
+      console.warn(
+        '[DO Flush] Cannot flush: flush URL cannot be derived (no BACKEND_ORIGIN or DO_PERSISTENCE_SYNC_URL)'
+      );
+      return;
+    }
+
+    try {
+      const stateUpdate = Y.encodeStateAsUpdate(this.doc);
+      let binary = '';
+      const len = stateUpdate.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(stateUpdate[i]);
+      }
+      const stateBase64 = btoa(binary);
+
+      const payload = {
+        documentId,
+        encoding: 'base64',
+        state: stateBase64,
+        updatedAt: new Date().toISOString(),
+        source: 'cloudflare-durable-object',
+      };
+
+      const res = await fetch(flushUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${syncSecret}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.error(
+          `[DO Flush Error] Failed to flush to Node: status=${res.status} error=${errText}`
+        );
+      } else {
+        console.log(`[DO Flush Success] Compacted state flushed to Node for doc: ${documentId}`);
+      }
+    } catch (err) {
+      console.error('[DO Flush Error] Network or server error during flush:', err.message || err);
     }
   }
 }

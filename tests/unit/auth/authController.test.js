@@ -1,7 +1,7 @@
 const authController = require('../../../src/auth/authController');
 const User = require('../../../src/users/User');
 const { sendVerificationEmail } = require('../../../src/utils/email');
-const { createTicket } = require('../../../src/utils/ticketStore');
+const { createTicket, verifyTicket } = require('../../../src/utils/ticketStore');
 const jwt = require('jsonwebtoken');
 
 // Mock Dependencies
@@ -21,21 +21,11 @@ jest.mock('mongoose', () => {
       this.statics = {};
     }
     pre() {}
+    index() {}
   }
   MockSchema.Types = { ObjectId: 'ObjectId' };
 
-  const MockModel = jest.fn().mockImplementation((doc) => ({
-    ...doc,
-    save: jest.fn().mockResolvedValue(doc),
-  }));
-
-  // Mock Static Property used in Controller
-  MockModel.PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])(?=.{8,})/;
-
-  MockModel.findOne = jest.fn();
-  MockModel.findById = jest.fn();
-  MockModel.deleteOne = jest.fn();
-  MockModel.deleteMany = jest.fn();
+  const models = {};
 
   return {
     connection: {
@@ -43,8 +33,22 @@ jest.mock('mongoose', () => {
     },
     Schema: MockSchema,
     model: jest.fn((name, schema) => {
-      Object.assign(MockModel, schema.statics);
-      return MockModel;
+      if (!models[name]) {
+        const MockModel = jest.fn().mockImplementation((doc) => ({
+          ...doc,
+          save: jest.fn().mockResolvedValue(doc),
+        }));
+        MockModel.PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])(?=.{8,})/;
+        MockModel.findOne = jest.fn();
+        MockModel.findById = jest.fn();
+        MockModel.deleteOne = jest.fn();
+        MockModel.deleteMany = jest.fn();
+        if (schema && schema.statics) {
+          Object.assign(MockModel, schema.statics);
+        }
+        models[name] = MockModel;
+      }
+      return models[name];
     }),
   };
 });
@@ -439,6 +443,106 @@ describe('Auth Controller Unit Tests', () => {
 
       expect(mockUser.save).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
+    });
+  });
+
+  describe('consumeWsTicket', () => {
+    const Document = require('../../../src/documents/Document');
+
+    it('should return 400 if ticket or documentId is missing', async () => {
+      req.body = { ticket: 't1' }; // missing documentId
+      await authController.consumeWsTicket(req, res, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Ticket and documentId are required', statusCode: 400 })
+      );
+    });
+
+    it('should return 401 if ticket is invalid or expired', async () => {
+      req.body = { ticket: 'invalid', documentId: 'doc123' };
+      verifyTicket.mockReturnValue(null);
+
+      await authController.consumeWsTicket(req, res, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Invalid or expired ticket', statusCode: 401 })
+      );
+    });
+
+    it('should return 401 if user is not found', async () => {
+      req.body = { ticket: 'valid', documentId: 'doc123' };
+      verifyTicket.mockReturnValue('user123');
+      User.findById.mockResolvedValue(null);
+
+      await authController.consumeWsTicket(req, res, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'User not found', statusCode: 401 })
+      );
+    });
+
+    it('should return 404 if document is not found', async () => {
+      req.body = { ticket: 'valid', documentId: 'doc123' };
+      verifyTicket.mockReturnValue('user123');
+      User.findById.mockResolvedValue({ _id: 'user123', username: 'alice' });
+      Document.findById.mockResolvedValue(null);
+
+      await authController.consumeWsTicket(req, res, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Document not found', statusCode: 404 })
+      );
+    });
+
+    it('should return 403 if user does not have access to document', async () => {
+      req.body = { ticket: 'valid', documentId: 'doc123' };
+      verifyTicket.mockReturnValue('user123');
+      User.findById.mockResolvedValue({ _id: 'user123', username: 'alice' });
+      Document.findById.mockResolvedValue({
+        owner: 'otheruser',
+        sharedWith: [],
+        viewers: [],
+        isPublic: false,
+      });
+
+      await authController.consumeWsTicket(req, res, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Forbidden', statusCode: 403 })
+      );
+    });
+
+    it('should succeed and return user info on valid ticket and owner access', async () => {
+      req.body = { ticket: 'valid', documentId: 'doc123' };
+      verifyTicket.mockReturnValue('user123');
+      User.findById.mockResolvedValue({ _id: 'user123', username: 'alice' });
+      Document.findById.mockResolvedValue({
+        owner: 'user123',
+        sharedWith: [],
+        viewers: [],
+        isPublic: false,
+      });
+
+      await authController.consumeWsTicket(req, res, next);
+      expect(res.json).toHaveBeenCalledWith({
+        ok: true,
+        user: { id: 'user123', username: 'alice' },
+        readOnly: false,
+      });
+    });
+
+    it('should succeed and return readOnly true if user is viewer', async () => {
+      req.body = { ticket: 'valid', documentId: 'doc123' };
+      verifyTicket.mockReturnValue('user123');
+      User.findById.mockResolvedValue({ _id: 'user123', username: 'alice' });
+      Document.findById.mockResolvedValue({
+        owner: 'otheruser',
+        sharedWith: [],
+        viewers: ['user123'],
+        isPublic: false,
+      });
+
+      await authController.consumeWsTicket(req, res, next);
+      expect(res.json).toHaveBeenCalledWith({
+        ok: true,
+        user: { id: 'user123', username: 'alice' },
+        readOnly: true,
+      });
     });
   });
 });

@@ -14,7 +14,8 @@
     "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore",
     "cf:dev": "cd worker && wrangler dev",
     "cf:deploy": "cd worker && wrangler deploy",
-    "pages:deploy": "wrangler pages deploy public --project-name syncroedit"
+    "pages:deploy": "wrangler pages deploy public --project-name syncroedit",
+    "cf:tail": "cd worker && wrangler tail"
   },
   "jest": {
     "setupFilesAfterEnv": [

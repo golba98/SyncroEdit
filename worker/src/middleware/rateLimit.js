@@ -66,6 +66,8 @@ export async function edgeRateLimit(c, next) {
   c.header('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
 
   if (bucket.count > limit.max) {
+    const retryAfter = Math.max(Math.ceil((bucket.resetAt - now) / 1000), 1);
+    c.header('Retry-After', String(retryAfter));
     return errorResponse(c, 'Too many requests', 429);
   }
 

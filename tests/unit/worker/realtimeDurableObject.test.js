@@ -33,10 +33,12 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
   let OriginalResponse;
 
   let createdPairs = [];
+  let createdSyncObjects = [];
 
   beforeEach(() => {
     global.fetch = jest.fn();
     createdPairs = [];
+    createdSyncObjects = [];
     global.WebSocketPair = class WebSocketPair {
       constructor() {
         this.client = new MockWebSocket();
@@ -68,6 +70,17 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
     if (OriginalResponse) {
       global.Response = OriginalResponse;
     }
+    createdSyncObjects.forEach((syncObj) => {
+      if (syncObj.doc) {
+        syncObj.doc.destroy();
+      }
+      if (syncObj.awareness) {
+        syncObj.awareness.destroy();
+      }
+      if (syncObj.saveTimeout) {
+        clearTimeout(syncObj.saveTimeout);
+      }
+    });
   });
 
   describe('Worker realtime.js & index.js Routes', () => {
@@ -206,6 +219,7 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
       mockStorageMap.set('yjsState', stateUpdate);
 
       const syncObj = new DocumentSyncObject(mockState, {});
+      createdSyncObjects.push(syncObj);
       await syncObj.initialized;
 
       expect(mockState.storage.get).toHaveBeenCalledWith('yjsState');
@@ -214,6 +228,7 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
 
     it('sends sync step 1 and current awareness states on fetch connection upgrade', async () => {
       const syncObj = new DocumentSyncObject(mockState, {});
+      createdSyncObjects.push(syncObj);
       await syncObj.initialized;
 
       // Seed an awareness state to verify it sends it
@@ -249,6 +264,7 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
 
     it('exchanges Yjs sync updates between two clients', async () => {
       const syncObj = new DocumentSyncObject(mockState, {});
+      createdSyncObjects.push(syncObj);
       await syncObj.initialized;
 
       const ws1 = new MockWebSocket();
@@ -286,6 +302,7 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
 
     it('enforces read-only check and blocks updates from read-only viewers', async () => {
       const syncObj = new DocumentSyncObject(mockState, {});
+      createdSyncObjects.push(syncObj);
       await syncObj.initialized;
 
       const wsReadOnly = new MockWebSocket();
@@ -309,6 +326,7 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
 
     it('broadcasts awareness updates and cleans them up on close', async () => {
       const syncObj = new DocumentSyncObject(mockState, {});
+      createdSyncObjects.push(syncObj);
       await syncObj.initialized;
 
       const ws1 = new MockWebSocket();
@@ -362,6 +380,7 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
 
     it('flushes persisted state on save and on last connection close', async () => {
       const syncObj = new DocumentSyncObject(mockState, {});
+      createdSyncObjects.push(syncObj);
       await syncObj.initialized;
 
       const ws = new MockWebSocket();
@@ -388,6 +407,81 @@ describe('Worker Realtime Durable Object Sync & Bridge', () => {
       const restoredDoc = new Y.Doc();
       Y.applyUpdate(restoredDoc, stateUpdate);
       expect(restoredDoc.getText('content').toString()).toBe('Flush Test');
+    });
+
+    it('flushes state to Node if DO_PERSISTENCE_SYNC_ENABLED is true', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: async () => 'OK',
+      });
+
+      const syncObj = new DocumentSyncObject(mockState, {
+        DO_PERSISTENCE_SYNC_ENABLED: 'true',
+        DO_SYNC_SECRET: 'supersecret',
+        BACKEND_ORIGIN: 'http://node.local',
+      });
+      createdSyncObjects.push(syncObj);
+      await syncObj.initialized;
+
+      syncObj.documentId = 'doc123';
+      syncObj.doc.getText('content').insert(0, 'Flush Node Test');
+
+      // Trigger save
+      await syncObj.saveToStorage();
+
+      // Clear the background debounce timeout to prevent post-test execution
+      if (syncObj.saveTimeout) {
+        clearTimeout(syncObj.saveTimeout);
+      }
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://node.local/api/internal/documents/doc123/yjs-state',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer supersecret',
+            'Content-Type': 'application/json',
+          }),
+          body: expect.any(String),
+        })
+      );
+
+      const requestBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+      expect(requestBody.documentId).toBe('doc123');
+      expect(requestBody.encoding).toBe('base64');
+      expect(requestBody.state).toBeDefined();
+
+      const decodedUpdate = new Uint8Array(
+        atob(requestBody.state)
+          .split('')
+          .map((c) => c.charCodeAt(0))
+      );
+      const restoredDoc = new Y.Doc();
+      Y.applyUpdate(restoredDoc, decodedUpdate);
+      expect(restoredDoc.getText('content').toString()).toBe('Flush Node Test');
+    });
+
+    it('does not crash or disconnect if the flush request fails', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('Network offline'));
+
+      const syncObj = new DocumentSyncObject(mockState, {
+        DO_PERSISTENCE_SYNC_ENABLED: 'true',
+        DO_SYNC_SECRET: 'supersecret',
+        BACKEND_ORIGIN: 'http://node.local',
+      });
+      createdSyncObjects.push(syncObj);
+      await syncObj.initialized;
+
+      syncObj.documentId = 'doc123';
+      syncObj.doc.getText('content').insert(0, 'Failed Flush Test');
+
+      // Should not throw
+      await expect(syncObj.saveToStorage()).resolves.not.toThrow();
+
+      // Clear the background debounce timeout to prevent post-test execution
+      if (syncObj.saveTimeout) {
+        clearTimeout(syncObj.saveTimeout);
+      }
     });
   });
 
