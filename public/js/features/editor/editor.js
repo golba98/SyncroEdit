@@ -261,7 +261,29 @@ export class Editor {
 
   async connectWebSocket(docId, user) {
     console.log('[Editor] connectWebSocket docId=', docId);
-    const wsBaseUrl = Network.getWebSocketBaseUrl();
+
+    const config = window.SYNCROEDIT_CONFIG || {};
+    const backend = config.REALTIME_BACKEND || 'node';
+    let wsBaseUrl = Network.getWebSocketBaseUrl();
+
+    if (backend === 'durable-object') {
+      if (config.WS_BASE_URL) {
+        wsBaseUrl = config.WS_BASE_URL;
+      } else {
+        const apiBaseUrl = config.API_BASE_URL;
+        if (apiBaseUrl) {
+          const urlObj = new URL(apiBaseUrl, window.location.origin);
+          const protocol = urlObj.protocol === 'https:' ? 'wss:' : 'ws:';
+          wsBaseUrl = `${protocol}//${urlObj.host}`;
+        } else {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          wsBaseUrl = `${protocol}//${window.location.host}`;
+        }
+      }
+      if (!wsBaseUrl.endsWith('/ws')) {
+        wsBaseUrl = `${wsBaseUrl.replace(/\/+$/, '')}/ws`;
+      }
+    }
 
     let ticket;
     try {

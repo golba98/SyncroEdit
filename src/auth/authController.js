@@ -151,6 +151,56 @@ exports.getWsTicket = (req, res, next) => {
   }
 };
 
+exports.consumeWsTicket = async (req, res, next) => {
+  try {
+    const { ticket, documentId } = req.body;
+    if (!ticket || !documentId) {
+      return next(new AppError('Ticket and documentId are required', 400));
+    }
+
+    const { verifyTicket } = require('../utils/ticketStore');
+    const userId = verifyTicket(ticket);
+    if (!userId) {
+      return next(new AppError('Invalid or expired ticket', 401));
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new AppError('User not found', 401));
+    }
+
+    const Document = require('../documents/Document');
+    const dbDoc = await Document.findById(documentId);
+    if (!dbDoc) {
+      return next(new AppError('Document not found', 404));
+    }
+
+    const isOwner = dbDoc.owner.toString() === userId;
+    const isShared = dbDoc.sharedWith && dbDoc.sharedWith.some((id) => id.toString() === userId);
+    const isViewer = dbDoc.viewers && dbDoc.viewers.some((id) => id.toString() === userId);
+    const isPublic = dbDoc.isPublic === true;
+
+    if (!isOwner && !isShared && !isViewer && !isPublic) {
+      return next(new AppError('Forbidden', 403));
+    }
+
+    const readOnly = isViewer && !isOwner && !isShared;
+
+    logger.debug(`Successfully consumed ticket for user ${userId} on doc ${documentId}`);
+    res.json({
+      ok: true,
+      user: {
+        id: user._id.toString(),
+        username: user.username,
+      },
+      readOnly,
+    });
+  } catch (err) {
+    logger.error('Error consuming WS ticket:', err);
+    next(err);
+  }
+};
+
 exports.getCsrfToken = (req, res) => {
   const token = generateToken(req, res);
   res.json({ csrfToken: token });

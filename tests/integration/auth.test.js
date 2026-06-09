@@ -198,4 +198,80 @@ describe('Auth Integration Tests', () => {
       expect(res.status).toBe(403); // Middleware returns 403 for invalid
     });
   });
+
+  describe('POST /api/auth/ws-ticket/consume', () => {
+    let user, token, doc, ticket;
+
+    beforeEach(async () => {
+      user = await User.create({ ...testUser, isEmailVerified: true });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: testUser.username, password: testUser.password });
+      token = loginRes.body.token;
+
+      // Get a ticket
+      const ticketRes = await request(app)
+        .get('/api/auth/ws-ticket')
+        .set('Authorization', `Bearer ${token}`);
+      ticket = ticketRes.body.ticket;
+
+      const Document = require('../../src/documents/Document');
+      doc = await Document.create({
+        title: 'Test Doc',
+        owner: user._id,
+      });
+    });
+
+    it('should consume a valid ticket and verify doc access (bypassing CSRF)', async () => {
+      const res = await request(app)
+        .post('/api/auth/ws-ticket/consume')
+        .send({ ticket, documentId: doc._id.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.user.id).toBe(user._id.toString());
+      expect(res.body.user.username).toBe(user.username);
+      expect(res.body.readOnly).toBe(false);
+    });
+
+    it('should return 401 for an invalid or already consumed ticket', async () => {
+      // Consume it first
+      await request(app)
+        .post('/api/auth/ws-ticket/consume')
+        .send({ ticket, documentId: doc._id.toString() });
+
+      // Try consuming again
+      const res = await request(app)
+        .post('/api/auth/ws-ticket/consume')
+        .send({ ticket, documentId: doc._id.toString() });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toMatch(/invalid or expired ticket/i);
+    });
+
+    it('should return 403 if the user does not have access to the document', async () => {
+      // Create a ticket for a different user
+      await User.create({
+        username: 'otheruser',
+        email: 'other@example.com',
+        password: 'Password123!',
+        isEmailVerified: true,
+      });
+      const otherLoginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'otheruser', password: 'Password123!' });
+      const otherToken = otherLoginRes.body.token;
+
+      const ticketRes = await request(app)
+        .get('/api/auth/ws-ticket')
+        .set('Authorization', `Bearer ${otherToken}`);
+      const otherTicket = ticketRes.body.ticket;
+
+      const res = await request(app)
+        .post('/api/auth/ws-ticket/consume')
+        .send({ ticket: otherTicket, documentId: doc._id.toString() });
+
+      expect(res.status).toBe(403);
+    });
+  });
 });
