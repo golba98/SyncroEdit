@@ -15,6 +15,10 @@ jest.mock('/js/features/auth/auth.js', () => ({
 describe('Network Module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.SYNCROEDIT_CONFIG = {
+      API_BASE_URL: '',
+      WS_BASE_URL: '',
+    };
     global.fetch = jest.fn();
     Auth.getToken.mockReturnValue('mock-token');
   });
@@ -46,6 +50,32 @@ describe('Network Module', () => {
       });
 
       await expect(Network.fetchAPI('/api/test')).rejects.toThrow('API error: 500');
+    });
+  });
+
+  describe('runtime URL config', () => {
+    it('keeps same-origin API URLs by default', () => {
+      expect(Network.getApiUrl('/api/auth/login')).toBe('/api/auth/login');
+    });
+
+    it('supports origin-only API base URLs', () => {
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://api.example.com';
+
+      expect(Network.getApiUrl('/api/auth/login')).toBe('https://api.example.com/api/auth/login');
+    });
+
+    it('supports Worker proxy API base URLs with a path', () => {
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/api/node';
+
+      expect(Network.getApiUrl('/api/auth/login')).toBe(
+        'https://syncroedit.example.com/api/node/auth/login'
+      );
+    });
+
+    it('uses explicit WebSocket base URL when configured', () => {
+      window.SYNCROEDIT_CONFIG.WS_BASE_URL = 'wss://syncroedit.example.com/ws';
+
+      expect(Network.getWebSocketBaseUrl()).toBe('wss://syncroedit.example.com/ws');
     });
   });
 
@@ -83,13 +113,10 @@ describe('Network Module', () => {
       // Simulate Open
       mockWebSocket.onopen();
       expect(onStatusChange).toHaveBeenCalledWith('connected');
-      expect(mockWebSocket.send).toHaveBeenCalledWith(
-        JSON.stringify({
-          type: 'join-document',
-          documentId: 'doc1',
-          ticket: 'mock-ticket',
-        })
+      expect(global.WebSocket).toHaveBeenCalledWith(
+        expect.stringContaining('?documentId=doc1&ticket=mock-ticket')
       );
+      expect(mockWebSocket.send).not.toHaveBeenCalled();
     });
 
     it('should handle incoming messages', async () => {

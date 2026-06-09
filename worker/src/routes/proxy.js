@@ -16,7 +16,7 @@ export async function handleProxy(c) {
   const urlObj = new URL(c.req.url);
   targetUrl.search = urlObj.search;
 
-  console.log(`[Proxy] Forwarding ${c.req.method} ${c.req.path} -> ${targetUrl.toString()}`);
+  console.log(`[Proxy] Forwarding ${c.req.method} ${c.req.path}`);
 
   const filteredHeaders = filterRequestHeaders(c.req.raw.headers);
 
@@ -42,7 +42,7 @@ export async function handleProxy(c) {
       headers: filteredResHeaders,
     });
   } catch (err) {
-    console.error(`[Proxy Error] Failed to proxy request to ${targetUrl.toString()}:`, err);
+    console.error(`[Proxy Error] Failed to proxy ${c.req.method} ${c.req.path}:`, err);
     return errorResponse(c, 'Bad Gateway', 502);
   }
 }
