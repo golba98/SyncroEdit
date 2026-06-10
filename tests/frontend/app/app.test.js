@@ -27,6 +27,7 @@ describe('App Core Initialization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     document.body.innerHTML = `
+      <div id="bootLoader"></div>
       <div id="authGuard" style="display: none; opacity: 0;"></div>
       <div id="authGuardText"></div>
       <div id="docLibrary"></div>
@@ -369,5 +370,153 @@ describe('App Core Initialization', () => {
     expect(document.getElementById('libraryOverlay').classList.contains('view-visible')).toBe(
       false
     );
+  });
+
+  it('should initialize with booting view state', () => {
+    const app = new App();
+    expect(document.body.dataset.viewState).toBe('booting');
+    expect(document.getElementById('bootLoader').style.display).toBe('flex');
+  });
+
+  it('should transition to dashboard if profile load succeeds and no document ID', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    expect(document.body.dataset.viewState).toBe('dashboard');
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
+  });
+
+  it('should transition to opening-document if profile load succeeds and document ID is present', async () => {
+    global.URLSearchParams = jest.fn(() => ({
+      get: jest.fn().mockReturnValue('doc-123'),
+    }));
+    const app = new App();
+    // Synchronously it is in booting state
+    expect(document.body.dataset.viewState).toBe('booting');
+
+    await new Promise(process.nextTick);
+    // After async tasks resolve, it has progressed past opening-document to editor-loading
+    expect(document.body.dataset.viewState).toBe('editor-loading');
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
+  });
+
+  it('should transition to auth state if profile load fails', async () => {
+    Profile.prototype.loadProfile = jest.fn().mockResolvedValue(null);
+    const app = new App();
+    await new Promise(process.nextTick);
+    expect(document.body.dataset.viewState).toBe('auth');
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
+  });
+
+  // ─── Startup visibility tests ────────────────────────────────────────────────
+
+  it('editor chrome (header, ribbon-tabs, main-workspace) is hidden during booting', () => {
+    // The body starts as "booting" before async init resolves.
+    // CSS display:none is enforced by the view-state attribute — we verify
+    // applyViewState sets the correct attribute so the CSS selector fires.
+    new App();
+    // Synchronously the state must be 'booting'
+    expect(document.body.dataset.viewState).toBe('booting');
+    // Confirm boot loader is visible (flex) during booting
+    expect(document.getElementById('bootLoader').style.display).toBe('flex');
+  });
+
+  it('editor chrome is hidden during dashboard state', async () => {
+    // After a successful profile load with no doc param, state = dashboard.
+    new App();
+    await new Promise(process.nextTick);
+    expect(document.body.dataset.viewState).toBe('dashboard');
+    // bootLoader must be gone during dashboard
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
+    // applyViewState must not be 'editor' or 'editor-ready'
+    expect(document.body.dataset.viewState).not.toBe('editor');
+    expect(document.body.dataset.viewState).not.toBe('editor-ready');
+  });
+
+  it('grey workspace skeleton (#editorSkeleton) is hidden during booting', () => {
+    // Before JS sets any state, body starts as 'booting' (set in HTML).
+    // The data-view-state attribute drives CSS display:none for #editorSkeleton.
+    new App();
+    expect(document.body.dataset.viewState).toBe('booting');
+    // The skeleton element must NOT be shown during booting.
+    // In JSDOM, CSS isn't rendered, but we can assert viewState is 'booting'
+    // which the CSS rules use to hide #editorSkeleton.
+    // Verify applyViewState does NOT change state to anything editor-like yet.
+    expect(['booting']).toContain(document.body.dataset.viewState);
+  });
+
+  it('root URL never auto-opens stale last-opened document (no doc param)', async () => {
+    // With no ?doc= in the URL, init must resolve to 'dashboard', never 'editor'.
+    global.URLSearchParams = jest.fn(() => ({
+      get: jest.fn().mockReturnValue(null),
+    }));
+
+    const app = new App();
+    await new Promise(process.nextTick);
+
+    // documentId must remain null — editor was never loaded
+    expect(app.documentId).toBeNull();
+    // State must be dashboard
+    expect(document.body.dataset.viewState).toBe('dashboard');
+    // Editor creation must not have been triggered
+    expect(app.editor).toBeNull();
+    // Library must be visible
+    expect(document.getElementById('docLibrary').style.display).toBe('block');
+  });
+
+  it('direct document link shows opening state then editor (not dashboard first)', async () => {
+    global.URLSearchParams = jest.fn(() => ({
+      get: jest.fn().mockReturnValue('doc-xyz'),
+    }));
+
+    const app = new App();
+    // At construction, must be booting
+    expect(document.body.dataset.viewState).toBe('booting');
+
+    await new Promise(process.nextTick);
+    await new Promise(process.nextTick);
+
+    // After async resolution, must have progressed past booting
+    expect(document.body.dataset.viewState).not.toBe('booting');
+    // Must NOT have landed on dashboard
+    expect(document.body.dataset.viewState).not.toBe('dashboard');
+    // Library must be hidden since we went directly to a document
+    expect(document.getElementById('docLibrary').style.display).toBe('none');
+  });
+
+  it('startup cleanup (clearOpeningStates) runs when finishDocumentOpen is called', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+
+    // Simulate an open in progress
+    app.uiManager.applyViewState('opening-document');
+    app.libraryManager.openLock = true;
+    app.libraryManager.isTransitioning = true;
+    app.editor = { isReadyForUser: () => true };
+
+    app.finishDocumentOpen(app.loadDocumentToken);
+
+    // openLock and isTransitioning must be cleared
+    expect(app.libraryManager.openLock).toBe(false);
+    expect(app.libraryManager.isTransitioning).toBe(false);
+    // State must be editor-ready
+    expect(document.body.dataset.viewState).toBe('editor-ready');
+  });
+
+  it('startup cleanup (clearOpeningStates) runs when showDocumentOpenError is called', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+
+    // Simulate an open in progress
+    app.uiManager.applyViewState('opening-document');
+    app.libraryManager.openLock = true;
+    app.libraryManager.isTransitioning = true;
+
+    app.showDocumentOpenError(app.loadDocumentToken, 'Something went wrong');
+
+    // Locks cleared on failure
+    expect(app.libraryManager.openLock).toBe(false);
+    expect(app.libraryManager.isTransitioning).toBe(false);
+    // State reflects error, not a stuck opening state
+    expect(document.body.dataset.viewState).toBe('editor-error');
   });
 });

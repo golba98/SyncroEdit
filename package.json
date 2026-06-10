@@ -9,9 +9,10 @@
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "test": "npm run test:unit && npm run test:integration",
+    "test": "npm run test:unit && npm run test:integration && npm run test:frontend",
     "test:unit": "cross-env SKIP_DB_SETUP=true jest tests/unit",
     "test:integration": "cross-env SKIP_DB_SETUP=true jest tests/integration",
+    "test:frontend": "cross-env SKIP_DB_SETUP=true jest tests/frontend",
     "test:e2e": "playwright test --config=config/playwright.config.js",
     "lint": "eslint . --config config/eslint.config.cjs",
     "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore"
