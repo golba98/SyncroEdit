@@ -22,6 +22,14 @@ migrations_dir = "migrations"
 name = "DOCUMENT_SYNC_OBJECT"
 class_name = "DocumentSyncObject"
 
+[[durable_objects.bindings]]
+name = "RATE_LIMIT_OBJECT"
+class_name = "RateLimitObject"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["DocumentSyncObject"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RateLimitObject"]

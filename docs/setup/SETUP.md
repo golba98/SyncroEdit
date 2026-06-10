@@ -91,10 +91,10 @@ Cloudflare will deploy your static files to the edge network and expose your API
 
 ### JWT Token Verification Failures
 
-If you receive 401 Unauthorized errors in local development, ensure that your environment isn't overriding the fallback secret. You can set a custom local secret by adding a `.dev.vars` file in the project root:
+If you receive 401 Unauthorized errors in local development, ensure that a local signing secret is configured. Add a `.dev.vars` file in the project root:
 
 ```env
-JWT_SECRET=my-custom-local-secret-key
+JWT_SECRET = "replace-with-a-long-random-local-secret"
 ```
 
 _Note: Do not commit `.dev.vars` to Git._

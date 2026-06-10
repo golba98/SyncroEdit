@@ -6,12 +6,12 @@ SYNCHROEDIT | PROJECT CONTEXT
    simultaneously without conflicts, matching industry standards.
 
 2. ARCHITECTURE AND TECHNOLOGY
-   The application uses a full-stack JavaScript environment:
+   The application uses a Cloudflare-native JavaScript environment:
 
-- Backend: Node.js and Express.js for the API and static assets.
-- Database: MongoDB for persistent storage of users and documents.
+- Backend: Cloudflare Worker with Hono for API routes and static assets.
+- Database: Cloudflare D1 for users, sessions, documents, and permissions.
 - Frontend: Vanilla JavaScript (ES modules) with Quill.js for the editor.
-- Real-time: Powered by Yjs and WebSockets (CRDTs) for instant syncing.
+- Real-time: Durable Objects, Yjs, and WebSockets for instant syncing.
 
 3. USER SYSTEM
 
@@ -44,5 +44,4 @@ SYNCHROEDIT | PROJECT CONTEXT
 - /public/js/features/library: Document library management.
 - /public/js/features/profile: Profile UI and account settings.
 - /public/js/features/ui: Modals, toolbar controls, and UI rendering helpers.
-- /src/auth, /src/documents, /src/users: Feature-local backend models, routes, and controllers.
-- /src/documents/socket.js: WebSocket handling and sync logic.
+- /src-worker: Worker routes, auth/session helpers, D1 validation, and Durable Object sync.

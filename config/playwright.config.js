@@ -8,7 +8,7 @@ module.exports = defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8787',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -23,8 +23,8 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: 'node ../tests/e2e/start-server.js',
-    url: 'http://localhost:3000',
+    command: 'npx wrangler dev --port 8787',
+    url: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8787',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
