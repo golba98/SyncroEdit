@@ -72,7 +72,8 @@ export class LibraryManager {
             this.showLibrary();
           }
         },
-        this.app.user._id
+        this.app.user._id,
+        { openingDocumentId: this.app.openingDocumentId }
       );
     };
 
@@ -132,84 +133,22 @@ export class LibraryManager {
     this.isTransitioning = true;
 
     try {
-      // Quick visual feedback - close library immediately
-      const library = document.getElementById('docLibrary');
-      const overlay = document.getElementById('libraryOverlay');
-      if (library) library.classList.remove('view-visible');
-      if (overlay) overlay.classList.remove('view-visible');
-
-      // Create document in background
       const doc = await Network.createDocument();
-
-      // Update URL without reload
-      const newUrl = `${window.location.pathname}?doc=${doc._id}`;
-      window.history.pushState({ view: 'editor', docId: doc._id }, '', newUrl);
-
-      // Hide library after transition
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      if (library) library.style.display = 'none';
-      if (overlay) overlay.style.display = 'none';
-
-      // Invalidate library cache since we have a new doc
       localStorage.removeItem('syncroedit_library_cache');
-
-      // Load document inline (same as openDocument does)
-      this.app.documentId = doc._id;
-      await this.app.loadDocument();
-
-      this.isTransitioning = false;
+      await this.app.openDocument(doc._id, { focusTitle: true });
     } catch (err) {
       console.error('Failed to create document:', err);
-      this.isTransitioning = false;
-      // Re-show library on error
-      const library = document.getElementById('docLibrary');
-      const overlay = document.getElementById('libraryOverlay');
-      if (library) {
-        library.style.display = 'block';
-        library.classList.add('view-visible');
-      }
-      if (overlay) {
-        overlay.style.display = 'block';
-        overlay.classList.add('view-visible');
-      }
       alert('Failed to create document. Please try again.');
+    } finally {
+      this.isTransitioning = false;
     }
   }
 
   async openDocument(docId) {
-    // Prevent rapid transitions
-    if (this.isTransitioning) return;
-    this.isTransitioning = true;
-
     try {
-      // Get library elements
-      const library = document.getElementById('docLibrary');
-      const overlay = document.getElementById('libraryOverlay');
-
-      // Start fade-out transition
-      if (library) library.classList.remove('view-visible');
-      if (overlay) overlay.classList.remove('view-visible');
-
-      // Wait for transition to complete (200ms)
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Hide library after transition
-      if (library) library.style.display = 'none';
-      if (overlay) overlay.style.display = 'none';
-
-      // Update URL with document ID
-      const newUrl = `${window.location.pathname}?doc=${docId}`;
-      window.history.pushState({ view: 'editor', docId }, '', newUrl);
-
-      // Update app state and load document
-      this.app.documentId = docId;
-      await this.app.loadDocument();
-
-      // Release transition lock
-      this.isTransitioning = false;
+      await this.app.openDocument(docId);
     } catch (err) {
       console.error('Failed to open document:', err);
-      this.isTransitioning = false;
       alert('Failed to open document');
     }
   }

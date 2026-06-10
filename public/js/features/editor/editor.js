@@ -11,7 +11,6 @@ import { ToolbarController } from '/js/features/ui/ToolbarController.js';
 import { ReadabilityManager } from '/js/features/editor/managers/ReadabilityManager.js';
 import { NavigationManager } from '/js/features/editor/managers/NavigationManager.js';
 import { SearchManager } from '/js/features/editor/managers/SearchManager.js';
-import { Auth } from '/js/features/auth/auth.js';
 import { Network } from '/js/app/network.js';
 import { debounce } from '/js/app/utils.js';
 
@@ -24,6 +23,15 @@ export class Editor {
     this.pageBindings = new Map(); // pageId -> QuillBinding
     this.currentPageIndex = 0;
     this.currentZoom = 100;
+    this.currentDocId = options.docId || new URLSearchParams(window.location.search).get('doc');
+    this.user = options.user || {
+      username: 'Anonymous',
+      accentColor: '#ff0000',
+    };
+    this.destroyed = false;
+    this.cleanupFns = [];
+    this.connectRetryTimer = null;
+    this.syncTimeout = null;
 
     // Callbacks
     this.onPageChange = options.onPageChange || (() => {});
@@ -35,11 +43,6 @@ export class Editor {
 
     // Yjs Setup
     this.doc = new Y.Doc();
-    const docId = new URLSearchParams(window.location.search).get('doc');
-    const token = Auth.getToken();
-    const user = options.user || { username: 'Anonymous', accentColor: '#ff0000' };
-    this.user = user;
-    this.currentDocId = docId;
     this.yPages = this.doc.getArray('pages');
 
     // Ready promise — resolves when pages first render, or after 10s safety fallback
@@ -67,12 +70,6 @@ export class Editor {
 
     this.setupGlobalListeners();
 
-    // 1. Instant Load from IndexedDB
-    this.loadFromCache(docId).then(() => {
-      // Only connect after cache check (or concurrently, but we apply cache first)
-      this.connectWebSocket(docId, user);
-    });
-
     this.yPages.observe((event) => {
       this.renderAllPages(event);
     });
@@ -81,14 +78,18 @@ export class Editor {
     this.doc.on(
       'update',
       debounce(() => {
-        this.saveToCache(docId);
+        this.saveToCache(this.currentDocId);
       }, 1000)
     );
 
     // Persistence: Save immediately on close
-    window.addEventListener('beforeunload', () => {
-      this.saveToCache(docId);
-    });
+    this.beforeUnloadHandler = () => {
+      this.saveToCache(this.currentDocId);
+    };
+    window.addEventListener('beforeunload', this.beforeUnloadHandler);
+    this.cleanupFns.push(() =>
+      window.removeEventListener('beforeunload', this.beforeUnloadHandler)
+    );
 
     this.setupTitleDebounce();
     this.setupScrollListener();
@@ -104,6 +105,8 @@ export class Editor {
       rootMargin: '1200px 0px 1200px 0px',
       threshold: 0.01,
     };
+
+    if (typeof IntersectionObserver === 'undefined') return;
 
     this.observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -123,53 +126,53 @@ export class Editor {
     const container = document.getElementById('pagesContainer');
     if (!container) return;
 
-    container.addEventListener(
-      'scroll',
-      debounce(() => {
-        if (document.activeElement && document.activeElement.closest('.ql-editor')) {
-          const activePageEl = document.activeElement.closest('.editor-container');
-          if (activePageEl) {
-            const activeId = activePageEl.dataset.pageId;
-            const pages = this.yPages.toArray();
-            const activeIndex = pages.findIndex((p) => p.get('id') === activeId);
+    this.scrollHandler = debounce(() => {
+      if (document.activeElement && document.activeElement.closest('.ql-editor')) {
+        const activePageEl = document.activeElement.closest('.editor-container');
+        if (activePageEl) {
+          const activeId = activePageEl.dataset.pageId;
+          const pages = this.yPages.toArray();
+          const activeIndex = pages.findIndex((p) => p.get('id') === activeId);
 
-            if (activeIndex !== -1 && activeIndex !== this.currentPageIndex) {
-              this.currentPageIndex = activeIndex;
-              this.quill = this.pageQuillInstances.get(activeId);
-              this.onPageChange(activeIndex);
-              return;
-            }
+          if (activeIndex !== -1 && activeIndex !== this.currentPageIndex) {
+            this.currentPageIndex = activeIndex;
+            this.quill = this.pageQuillInstances.get(activeId);
+            this.onPageChange(activeIndex);
+            return;
           }
         }
+      }
 
-        const pages = this.container.querySelectorAll('.editor-container');
-        let closestPageIndex = this.currentPageIndex;
-        let minDistance = Infinity;
+      const pages = this.container.querySelectorAll('.editor-container');
+      let closestPageIndex = this.currentPageIndex;
+      let minDistance = Infinity;
 
-        const containerRect = container.getBoundingClientRect();
-        const containerCenter = containerRect.top + containerRect.height / 2;
-        const scale = this.currentZoom / 100;
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.top + containerRect.height / 2;
+      const scale = this.currentZoom / 100;
 
-        pages.forEach((page) => {
-          const rect = page.getBoundingClientRect();
-          const pageCenter = rect.top + rect.height / 2;
-          const distance = Math.abs(pageCenter - containerCenter) / scale;
+      pages.forEach((page) => {
+        const rect = page.getBoundingClientRect();
+        const pageCenter = rect.top + rect.height / 2;
+        const distance = Math.abs(pageCenter - containerCenter) / scale;
 
-          if (distance < minDistance) {
-            minDistance = distance;
-            const pageId = page.dataset.pageId;
-            closestPageIndex = this.yPages.toArray().findIndex((p) => p.get('id') === pageId);
-          }
-        });
-
-        if (closestPageIndex !== -1 && closestPageIndex !== this.currentPageIndex) {
-          this.currentPageIndex = closestPageIndex;
-          const pageId = this.yPages.get(closestPageIndex).get('id');
-          this.quill = this.pageQuillInstances.get(pageId) || null;
-          this.onPageChange(closestPageIndex);
+        if (distance < minDistance) {
+          minDistance = distance;
+          const pageId = page.dataset.pageId;
+          closestPageIndex = this.yPages.toArray().findIndex((p) => p.get('id') === pageId);
         }
-      }, 150)
-    );
+      });
+
+      if (closestPageIndex !== -1 && closestPageIndex !== this.currentPageIndex) {
+        this.currentPageIndex = closestPageIndex;
+        const pageId = this.yPages.get(closestPageIndex).get('id');
+        this.quill = this.pageQuillInstances.get(pageId) || null;
+        this.onPageChange(closestPageIndex);
+      }
+    }, 150);
+
+    container.addEventListener('scroll', this.scrollHandler);
+    this.cleanupFns.push(() => container.removeEventListener('scroll', this.scrollHandler));
   }
 
   async loadFromCache(docId) {
@@ -208,12 +211,15 @@ export class Editor {
             }
           }, 100);
         }
+        return true;
       } else {
         console.log('[Editor] cache miss for docId=', docId);
       }
     } catch (err) {
       console.warn('[Editor] Failed to load from IndexedDB:', err);
     }
+
+    return false;
   }
 
   async saveToCache(docId) {
@@ -260,7 +266,9 @@ export class Editor {
   }
 
   async connectWebSocket(docId, user) {
+    if (!docId || this.destroyed) return;
     console.log('[Editor] connectWebSocket docId=', docId);
+    this.onStatusChange('connecting');
 
     const config = window.SYNCROEDIT_CONFIG || {};
     const backend = config.REALTIME_BACKEND || 'node';
@@ -292,7 +300,9 @@ export class Editor {
       console.log('[Editor] WS ticket received');
     } catch (err) {
       console.error('[Editor] Failed to get WS ticket:', err);
-      setTimeout(() => this.connectWebSocket(docId, user), 1000);
+      this.onStatusChange('reconnecting');
+      clearTimeout(this.connectRetryTimer);
+      this.connectRetryTimer = setTimeout(() => this.connectWebSocket(docId, user), 1000);
       return;
     }
 
@@ -307,7 +317,8 @@ export class Editor {
     console.log('[Editor] WebsocketProvider created for docId=', docId);
 
     // Timeout: if sync never fires within 15s, show a visible error
-    const syncTimeout = setTimeout(() => {
+    clearTimeout(this.syncTimeout);
+    this.syncTimeout = setTimeout(() => {
       if (!this.provider?.synced) {
         console.error('[Editor] Sync timeout — document server unreachable for docId:', docId);
         this._showSyncError();
@@ -316,7 +327,8 @@ export class Editor {
     }, 15000);
 
     this.provider.on('status', async ({ status }) => {
-      this.onStatusChange(status);
+      const mappedStatus = status === 'disconnected' ? 'reconnecting' : status;
+      this.onStatusChange(mappedStatus);
       if (status === 'disconnected') {
         try {
           const data = await Network.fetchAPI('/api/auth/ws-ticket');
@@ -331,7 +343,7 @@ export class Editor {
 
     this.provider.on('sync', (isSynced) => {
       console.log('[Editor] sync isSynced=', isSynced, 'docId=', docId);
-      clearTimeout(syncTimeout);
+      clearTimeout(this.syncTimeout);
       if (isSynced) {
         const isNewDoc = this.yPages.length === 0;
         if (isNewDoc) {
@@ -346,6 +358,7 @@ export class Editor {
           this.switchToPage(0, 'start');
         }
         this.saveToCache(docId);
+        this.onStatusChange('connected');
       }
     });
   }
@@ -365,12 +378,14 @@ export class Editor {
 
   async reconnect(user = null) {
     if (user) this.user = user;
-    const docId = new URLSearchParams(window.location.search).get('doc');
-    await this.connectWebSocket(docId, this.user);
+    await this.connectWebSocket(this.currentDocId, this.user);
   }
 
   destroy() {
     console.log('[Editor] destroy docId=', this.currentDocId);
+    this.destroyed = true;
+    clearTimeout(this.connectRetryTimer);
+    clearTimeout(this.syncTimeout);
     if (this.provider) {
       this.provider.destroy();
       this.provider = null;
@@ -385,6 +400,14 @@ export class Editor {
     this.plugins.clear();
     this.pageQuillInstances.clear();
     this.pageBindings.clear();
+    this.cleanupFns.forEach((cleanup) => cleanup());
+    this.cleanupFns = [];
+    if (this.metaObserver && this.meta && typeof this.meta.unobserve === 'function') {
+      this.meta.unobserve(this.metaObserver);
+    }
+    if (this.doc) {
+      this.doc.destroy();
+    }
     if (this.container) this.container.innerHTML = '';
   }
 
@@ -410,8 +433,7 @@ export class Editor {
     const placeholderId = 'page-placeholder';
     if (document.getElementById(placeholderId)) return;
 
-    const docId = new URLSearchParams(window.location.search).get('doc');
-    const previewHtml = localStorage.getItem(`doc-preview-${docId}`);
+    const previewHtml = localStorage.getItem(`doc-preview-${this.currentDocId}`);
 
     const newPageContainer = document.createElement('div');
     newPageContainer.className = 'editor-container loading-placeholder';
@@ -527,8 +549,12 @@ export class Editor {
     const Parchment = Quill.import('parchment');
     const Style = Parchment.Attributor.Style;
 
-    const Width = new Style('width', 'width', { scope: Parchment.Scope.INLINE });
-    const Height = new Style('height', 'height', { scope: Parchment.Scope.INLINE });
+    const Width = new Style('width', 'width', {
+      scope: Parchment.Scope.INLINE,
+    });
+    const Height = new Style('height', 'height', {
+      scope: Parchment.Scope.INLINE,
+    });
     const Float = new Style('float', 'float', {
       whitelist: ['left', 'right', 'none'],
       scope: Parchment.Scope.INLINE,
@@ -537,7 +563,9 @@ export class Editor {
       whitelist: ['inline', 'block', 'inline-block'],
       scope: Parchment.Scope.INLINE,
     });
-    const Margin = new Style('margin', 'margin', { scope: Parchment.Scope.INLINE });
+    const Margin = new Style('margin', 'margin', {
+      scope: Parchment.Scope.INLINE,
+    });
 
     Quill.register(Width, true);
     Quill.register(Height, true);
@@ -548,22 +576,25 @@ export class Editor {
 
   setupTitleDebounce() {
     const docTitle = document.getElementById('docTitle');
-    const meta = this.doc.getMap('meta');
+    this.meta = this.doc.getMap('meta');
 
     if (docTitle) {
-      meta.observe((event) => {
+      this.metaObserver = (event) => {
         if (event.keysChanged.has('title')) {
-          const newTitle = meta.get('title');
+          const newTitle = this.meta.get('title');
           if (docTitle.value !== newTitle) {
             docTitle.value = newTitle;
             this.onTitleChange(newTitle);
           }
         }
-      });
-      docTitle.addEventListener('input', (e) => {
-        meta.set('title', e.target.value);
+      };
+      this.meta.observe(this.metaObserver);
+      this.titleInputHandler = (e) => {
+        this.meta.set('title', e.target.value);
         this.onTitleChange(e.target.value);
-      });
+      };
+      docTitle.addEventListener('input', this.titleInputHandler);
+      this.cleanupFns.push(() => docTitle.removeEventListener('input', this.titleInputHandler));
     }
   }
 
@@ -684,11 +715,15 @@ export class Editor {
   }
 
   setupGlobalListeners() {
-    this.container.addEventListener('click', (e) => {
+    this.containerClickHandler = (e) => {
       if (e.target === this.container && this.quill) {
         this.quill.focus();
       }
-    });
+    };
+    this.container.addEventListener('click', this.containerClickHandler);
+    this.cleanupFns.push(() =>
+      this.container.removeEventListener('click', this.containerClickHandler)
+    );
   }
 
   // --- Virtualization & DOM Management ---
@@ -986,5 +1021,49 @@ export class Editor {
 
   get pages() {
     return this.yPages.toArray().map((map) => ({ content: map.get('content'), id: map.get('id') }));
+  }
+
+  hasRenderableContent() {
+    return this.yPages.length > 0;
+  }
+
+  async applySnapshot(snapshot) {
+    if (!snapshot || this.destroyed) return false;
+
+    const title = snapshot.title || 'Untitled document';
+    if (snapshot.yjsState) {
+      const update = this.base64ToUint8Array(snapshot.yjsState);
+      Y.applyUpdate(this.doc, update);
+      this.renderAllPages();
+      return true;
+    }
+
+    if (this.yPages.length === 0) {
+      const meta = this.doc.getMap('meta');
+      meta.set('title', title);
+
+      const page = new Y.Map();
+      page.set('id', Math.random().toString(36).slice(2, 11));
+      const content = new Y.Text();
+      if (snapshot.pageContent) {
+        content.insert(0, snapshot.pageContent);
+      }
+      page.set('content', content);
+      this.yPages.push([page]);
+      this.renderAllPages();
+      return true;
+    }
+
+    return this.hasRenderableContent();
+  }
+
+  base64ToUint8Array(base64) {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   }
 }

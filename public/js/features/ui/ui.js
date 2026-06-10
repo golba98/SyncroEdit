@@ -1,7 +1,17 @@
 import { escapeHTML } from '/js/app/utils.js';
 
 export const UI = {
-  renderDocumentList(container, documents, currentDocId, onOpen, onDelete, currentUserId) {
+  renderDocumentList(
+    container,
+    documents,
+    currentDocId,
+    onOpen,
+    onDelete,
+    currentUserId,
+    options = {}
+  ) {
+    const openingDocumentId = options.openingDocumentId || null;
+
     if (!documents || documents.length === 0) {
       container.innerHTML = `
                 <tr>
@@ -16,6 +26,7 @@ export const UI = {
     container.innerHTML = documents
       .map((doc) => {
         const isActive = doc._id === currentDocId;
+        const isOpening = doc._id === openingDocumentId;
         const date = new Date(doc.lastModified);
         const today = new Date();
         const isToday = date.toDateString() === today.toDateString();
@@ -29,7 +40,10 @@ export const UI = {
           if (date.toDateString() === yesterday.toDateString()) {
             dateStr = `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
           } else {
-            dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            dateStr = date.toLocaleDateString([], {
+              month: 'short',
+              day: 'numeric',
+            });
           }
         }
 
@@ -46,15 +60,20 @@ export const UI = {
         const safeTitle = escapeHTML(doc.title);
 
         return `
-                <tr class="doc-item" data-doc-id="${doc._id}">
+                <tr class="doc-item ${isActive ? 'is-active' : ''} ${isOpening ? 'is-opening' : ''}" data-doc-id="${doc._id}" ${isOpening ? 'aria-busy="true"' : ''}>
                     <td style="padding: 16px 24px;">
                         <div style="display: flex; align-items: center; gap: 16px;">
                             <div class="doc-icon-container">
-                                <i class="fas fa-file-alt"></i>
+                                <i class="fas ${isOpening ? 'fa-spinner fa-spin' : 'fa-file-alt'}"></i>
                             </div>
                             <div>
                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                                     <div class="doc-title-text">${safeTitle}</div>
+                                    ${
+                                      isOpening
+                                        ? '<span class="doc-opening-pill">Opening...</span>'
+                                        : ''
+                                    }
                                 </div>
                                 <div class="doc-meta-text" style="font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px;">${previewText}</div>
                             </div>
@@ -63,7 +82,7 @@ export const UI = {
                     <td class="doc-meta-text" style="padding: 16px 24px; font-size: 14px;">${location}</td>
                     <td class="doc-meta-text" style="padding: 16px 24px; font-size: 14px;">${dateStr}</td>
                     <td style="padding: 16px 24px; text-align: center;">
-                        <button class="delete-doc-btn" data-doc-id="${doc._id}" title="Delete">
+                        <button class="delete-doc-btn" data-doc-id="${doc._id}" title="Delete" ${isOpening ? 'disabled aria-disabled="true"' : ''}>
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
@@ -83,6 +102,7 @@ export const UI = {
       }
 
       if (docItem) {
+        if (docItem.classList.contains('is-opening')) return;
         onOpen(docItem.dataset.docId);
       }
     };
