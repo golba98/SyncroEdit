@@ -1,227 +1,89 @@
-# Setup Guide for Developers
+# Setup Guide for Developers (Cloudflare Native)
 
-This guide will help you set up SynchroEdit for local development with proper security configurations.
+This guide helps you set up and run SynchroEdit locally using the Cloudflare Workers, D1 database, and Durable Objects emulator.
 
 ## Prerequisites
 
 - Node.js 18 or higher
-- MongoDB (local installation or cloud instance)
+- npm 9 or higher
 - Git
 
-## Installation Steps
+---
+
+## Installation & Setup
 
 ### 1. Clone the Repository
-
 ```bash
-git clone https://github.com/yourusername/synchroedit.git
-cd synchroedit
+git clone https://github.com/golba98-dev/SynchroEdit.git
+cd SynchroEdit
 ```
 
 ### 2. Install Dependencies
-
 ```bash
 npm install
 ```
 
-### 3. Environment Configuration
-
-#### Create Your Environment File
-
-Copy the example environment file:
-
+### 3. Initialize D1 Local Database & Apply Schema
+Before running the application, create and apply the database schema to your local wrangler D1 emulator:
 ```bash
-cp .env.example .env
+npm run db:migrate:local
 ```
 
-#### Generate Secure Secrets
-
-**Generate JWT Secret:**
-
+### 4. Run Development Server
+Wrangler will compile the Hono worker, start a local D1/Durable Objects emulator, bind the static assets folder (`./public`), and host everything on port `8787`:
 ```bash
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+npm run dev
 ```
 
-Copy the output and set it as `JWT_SECRET` in your `.env` file.
+Open `http://localhost:8787` in your web browser. You can register an account, login, create, and collaboratively edit documents.
 
-**Generate RSA Key Pair (Recommended for Production):**
+---
 
+## Deploying to Production
+
+When you are ready to publish the application to your Cloudflare account:
+
+### 1. Create a D1 Database
+Create a D1 database using wrangler CLI:
 ```bash
-# Generate private key
-ssh-keygen -t rsa -b 2048 -m PEM -f jwtRS256.key -N ""
-
-# Extract public key
-openssl rsa -in jwtRS256.key -pubout -outform PEM -out jwtRS256.key.pub
+npx wrangler d1 create synchroedit-db
 ```
+Copy the `database_id` from the terminal output and paste it into your `wrangler.toml` file under `[[d1_databases]]`.
 
-Then update your `.env` file:
-
+### 2. Apply Schema to Production Database
+Apply the SQL migrations to your remote production D1 database:
 ```bash
-# Read the private key
-cat jwtRS256.key
-
-# Read the public key
-cat jwtRS256.key.pub
+npm run db:migrate:remote
 ```
 
-Format them in your `.env` file as:
-
-```env
-JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
-your_private_key_content_here
------END PRIVATE KEY-----"
-
-JWT_PUBLIC_KEYS={"v1":"-----BEGIN PUBLIC KEY-----\nyour_public_key_content_here\n-----END PUBLIC KEY-----"}
-```
-
-#### Configure MongoDB
-
-Set your MongoDB connection string:
-
-```env
-MONGODB_URI=mongodb://localhost:27017/synchroedit
-```
-
-Or use MongoDB Atlas:
-
-```env
-MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>
-```
-
-#### Email Configuration (Optional)
-
-If you want to enable email verification features:
-
-```env
-ENABLE_EMAIL_VERIFICATION=true
-EMAIL_SERVICE=gmail
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
-```
-
-### 4. Start Development Server
-
+### 3. Configure Secrets
+Set the production secret key for JWT session tokens:
 ```bash
-npm start
+npx wrangler secret put JWT_SECRET
 ```
 
-The application will be available at `http://localhost:3000`
-
-## Docker Setup
-
-### For Local Docker Development
-
-1. Copy the Docker environment example:
-
+### 4. Deploy Static Assets and Worker
+Deploy the code and assets directly to your Cloudflare account:
 ```bash
-cp .env.docker.example .env
+npm run deploy
 ```
 
-2. Generate and configure secrets as described above
+Cloudflare will deploy your static files to the edge network and expose your APIs globally on a `*.workers.dev` subdomain (or a custom domain if configured).
 
-3. Start the containers:
-
-```bash
-docker-compose up -d
-```
-
-4. View logs:
-
-```bash
-docker-compose logs -f
-```
-
-## Security Best Practices
-
-### ⚠️ Critical Security Rules
-
-1. **NEVER commit `.env` files to version control**
-   - All `.env` files are already excluded in `.gitignore`
-   - Always use `.env.example` as a template
-
-2. **Use strong, unique secrets for production**
-   - Never use default or example secrets in production
-   - Rotate secrets regularly
-
-3. **Generate new RSA keys for each environment**
-   - Development keys should differ from production
-   - Store production keys securely (use secret managers like AWS Secrets Manager, Azure Key Vault, etc.)
-
-4. **Validate environment variables on startup**
-   - The application should fail to start if critical variables are missing
-   - Use strong validation for secret complexity
-
-### What's Safe to Commit
-
-✅ `.env.example` - Template with placeholders
-✅ `.env.docker.example` - Docker template
-✅ Configuration files without secrets
-✅ Code and documentation
-
-### What Should NEVER be Committed
-
-❌ `.env` - Your actual environment file
-❌ `.env.local`, `.env.production` - Any environment files
-❌ `jwtRS256.key`, `jwtRS256.key.pub` - RSA key files
-❌ Any files containing passwords, API keys, or secrets
-
-## Testing
-
-Run the test suite:
-
-```bash
-npm test
-```
-
-Run end-to-end tests:
-
-```bash
-npm run test:e2e
-```
-
-## Production Deployment
-
-For production deployment:
-
-1. Use environment variables provided by your hosting platform
-2. Enable all security features (HTTPS, secure cookies, CSRF protection)
-3. Set `NODE_ENV=production`
-4. Use managed database services with authentication
-5. Implement proper logging and monitoring
-6. Enable rate limiting and DDoS protection
-7. Regular security audits and dependency updates
+---
 
 ## Troubleshooting
 
-### MongoDB Connection Issues
-
-- Verify MongoDB is running: `mongod --version`
-- Check connection string format
-- Ensure network access is allowed (for cloud databases)
-
-### JWT Token Issues
-
-- Verify `JWT_SECRET` is set and is a strong random string
-- Check that RSA keys are properly formatted in `.env`
-- Ensure `JWT_CURRENT_KID` matches a key in `JWT_PUBLIC_KEYS`
-
-### Port Already in Use
-
-```bash
-# Find and kill process on port 3000
-# Windows:
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-
-# Linux/Mac:
-lsof -ti:3000 | xargs kill -9
+### JWT Token Verification Failures
+If you receive 401 Unauthorized errors in local development, ensure that your environment isn't overriding the fallback secret. You can set a custom local secret by adding a `.dev.vars` file in the project root:
+```env
+JWT_SECRET=my-custom-local-secret-key
 ```
+*Note: Do not commit `.dev.vars` to Git.*
 
-## Getting Help
-
-- Check existing issues: [GitHub Issues](https://github.com/yourusername/synchroedit/issues)
-- Read the [Security Documentation](./mds/SECURITY.md)
-- Contact: your-email@example.com
-
-## License
-
-ISC License - See LICENSE file for details
+### Local Database Reset
+To wipe your local development database and start fresh, run:
+```bash
+rm -rf .wrangler/state/v3/d1
+npm run db:migrate:local
+```

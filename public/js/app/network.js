@@ -24,11 +24,6 @@ function buildApiUrl(url) {
 
   const normalizedUrl = String(url);
   const requestPath = normalizedUrl.replace(/^\/+/, '');
-  const basePath = new URL(apiBaseUrl, window.location.origin).pathname.replace(/\/+$/, '');
-
-  if (basePath && basePath !== '/' && requestPath.startsWith('api/')) {
-    return `${apiBaseUrl}/${requestPath.replace(/^api\/?/, '')}`;
-  }
 
   return `${apiBaseUrl}/${requestPath}`;
 }
@@ -39,11 +34,8 @@ function getConfiguredWebSocketBaseUrl() {
 
   if (explicitWsBaseUrl) return explicitWsBaseUrl;
 
-  let apiBaseUrl = trimTrailingSlash(config.API_BASE_URL);
+  const apiBaseUrl = trimTrailingSlash(config.API_BASE_URL);
   if (apiBaseUrl) {
-    if (config.REALTIME_BACKEND === 'durable-object' && apiBaseUrl.endsWith('/api/node')) {
-      apiBaseUrl = apiBaseUrl.substring(0, apiBaseUrl.length - '/api/node'.length);
-    }
     return apiBaseUrl.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
   }
 

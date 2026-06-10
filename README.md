@@ -1,101 +1,112 @@
-# SyncroEdit
+# SyncroEdit (Cloudflare-Native)
 
-SyncroEdit is a real-time collaborative document editor built with Node.js, Express,
-MongoDB, WebSockets, and Yjs. The frontend is a vanilla JavaScript app served from
-`public/`, with feature modules under `public/js/features/`.
+SyncroEdit is a high-performance, real-time collaborative document editor rebuilt as a **Cloudflare-native backend** with a minimalist "Dark OLED" design. It uses Conflict-free Replicated Data Types (CRDTs) via **Yjs** and WebSockets coordinated by **Durable Objects** to provide zero-conflict, real-time multi-user editing.
 
-## Install
+---
 
+## Architecture Overview
+
+SyncroEdit is deployed completely on Cloudflare's serverless edge architecture:
+
+```mermaid
+graph TD
+    Client[Browser Client] -->|HTTP / API| Worker[Cloudflare Worker / Hono]
+    Client -->|WebSocket| DO[Durable Object: DocumentSyncObject]
+    Worker -->|D1 Binding| D1[(D1 SQLite Database)]
+    DO -->|Sync State & Pages| D1
+    Worker -->|Assets| CF_Assets[Static Assets /public]
+```
+
+- **Cloudflare Worker (Hono):** Handles all HTTP routing, user authentication, profile details, and document CRUD API endpoints.
+- **Cloudflare D1:** Acts as the primary SQL relational database (replacing MongoDB) to store users, sessions, documents, and permissions.
+- **Durable Objects (`DocumentSyncObject`):** Represents individual document collaboration rooms. Manages WebSocket connections, state vectors, Yjs sync steps, cursor awareness propagation, and debounces state flushes back to D1.
+- **Static Assets:** Served directly from the `./public` directory via Wrangler's assets binding.
+
+---
+
+## Tech Stack & Core Libraries
+
+- **Frontend:** Vanilla JavaScript (ES Modules), Quill.js (Rich text editor), Yjs (Sync engine), `y-websocket` (WebSocket provider).
+- **Backend Worker:** Hono Router, Web Crypto APIs for JWT/password hashing, Durable Objects.
+- **Database:** Cloudflare D1 (SQLite).
+
+---
+
+## Required Cloudflare Bindings & Secrets
+
+To run SyncroEdit in production, configure the following bindings in your Cloudflare dashboard or `wrangler.toml`:
+
+### Bindings
+1. **D1 Database:** Bind a D1 database to `DB`.
+2. **Durable Objects:** Bind the class `DocumentSyncObject` to `DOCUMENT_SYNC_OBJECT`.
+
+### Secrets
+Set the following secret using wrangler CLI:
+```bash
+wrangler secret put JWT_SECRET
+```
+*Note: `JWT_SECRET` is used for signing/verifying session access tokens and short-lived WebSocket connection tickets.*
+
+---
+
+## Development Setup
+
+### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-Copy the local environment template and update values as needed:
-
+### 2. Apply Database Migrations (Local)
+Create the local SQLite database and apply the schema:
 ```bash
-cp .env.example .env
+npm run db:migrate:local
 ```
 
-At minimum, local development needs:
-
-- `PORT`: local server port, usually `3000`
-- `MONGODB_URI`: MongoDB connection string
-- `JWT_SECRET`: random secret for JWT signing
-- `DISABLE_SECURE_COOKIE=true`: required for local HTTP development
-
-## Run Locally
-
+### 3. Start Local Development Server
+Launch wrangler's local dev server (which emulates D1 and Durable Objects locally):
 ```bash
 npm run dev
 ```
+Open `http://localhost:8787` in your browser.
 
-Open `http://localhost:3000`.
+---
 
-For production-style startup:
+## CLI Commands
 
-```bash
-npm start
-```
+| Command | Description |
+|---|---|
+| `npm run dev` | Runs the wrangler dev emulator on `http://localhost:8787` |
+| `npm run deploy` | Deploys the Worker and static assets to Cloudflare |
+| `npm run db:migrate:local` | Applies migrations to the local development D1 database |
+| `npm run db:migrate:remote` | Applies migrations to the production remote D1 database |
+| `npm run test` | Runs the Jest test suite |
+| `npm run lint` | Runs ESLint checker |
+| `npm run format` | Standardizes codebase formatting via Prettier |
 
-## Run With Docker
+---
 
-Copy the Docker environment template:
+## Testing
 
-```bash
-cp .env.docker.example .env
-```
+The tests run using Jest and Hono's lightweight request testing harness combined with a stateful D1 mock database.
 
-Start the app and MongoDB:
-
-```bash
-docker compose up -d
-```
-
-Validate the Compose file without starting services:
-
-```bash
-docker compose config
-```
-
-## Test And Lint
-
+To execute tests:
 ```bash
 npm test
-npm run test:unit
-npm run test:integration
-npm run test:e2e
-npm run lint
 ```
 
-There is currently no `npm run build` script; the app is served directly by Express.
+---
 
-## Important Files
+## What Was Removed / Replaced
 
-- Backend: `src/`
-- Frontend: `public/`
-- Tests: `tests/`
-- Config: `config/`
-- Documentation: `docs/`
-- Scripts: `scripts/`
-- Docker: `Dockerfile`, `docker-compose.yml`, `.dockerignore`
+1. **MongoDB / Mongoose:** Replaced with Cloudflare D1 (relational SQLite database).
+2. **Node.js / Express Server:** Replaced with Cloudflare Workers (Hono framework).
+3. **Local Tunnel Tunnels / trycloudflare:** Removed completely. Development and production both run direct endpoints.
+4. **Hybrid Proxy Config:** Removed all Worker-to-Node proxy routes. The worker now directly handles all API routes.
+5. **Old test files:** Archival copy of old MongoDB/Express integration and unit tests moved to `tests/archive/`.
 
-See `docs/PROJECT_STRUCTURE.md` for a fuller map of the repository.
+---
 
-## Documentation
+## Follow-up / Future Work
 
-- Setup: `docs/setup/SETUP.md`
-- Security checklist: `docs/security/SECURITY_CHECKLIST.md`
-- Architecture context: `docs/architecture/AI_CONTEXT.md`
-- Testing notes: `docs/testing/TESTING.md`
-- Cleanup report: `docs/CLEANUP_REPORT.md`
-- Archived planning/design material: `docs/archive/`
-
-## Troubleshooting
-
-- If cookies do not work locally, confirm `DISABLE_SECURE_COOKIE=true` in `.env` or use
-  `npm run dev`.
-- If integration tests cannot download MongoDB binaries, remove `.cache/mongodb-binaries`
-  and rerun `npm test`.
-- If Docker starts but the app cannot connect to MongoDB, confirm `MONGODB_URI` points to
-  `mongodb://mongo:27017/synchroedit` for Compose.
-- Do not commit `.env`, logs, local cache folders, generated reports, or secret key files.
+- **Turnstile Integration:** Optionally integrate Cloudflare Turnstile on the signup/login pages for DDoS protection.
+- **Document Exporter:** Add export to PDF/Docx directly using Worker-compatible libraries if needed in the future.
