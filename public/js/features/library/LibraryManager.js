@@ -206,6 +206,7 @@ export class LibraryManager {
     if (this.openLock) return;
     this.openLock = true;
     this.isTransitioning = true;
+    console.log('[OPEN] click blank');
     console.log('[OPEN] start');
     this.markCreateOpening(true);
     this.disableLibraryInteraction('create');
@@ -256,6 +257,7 @@ export class LibraryManager {
     if (this.openLock) return;
     this.openLock = true;
     this.isTransitioning = true;
+    console.log('[OPEN] click recent', { docId });
     console.log('[OPEN] start');
     this.disableLibraryInteraction('open', docId);
 
@@ -283,25 +285,22 @@ export class LibraryManager {
 
   async startEditorTransition() {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const run = () => {
-      const library = document.getElementById('docLibrary');
-      const overlay = document.getElementById('libraryOverlay');
-      if (library) library.classList.remove('view-visible');
-      if (overlay) overlay.classList.remove('view-visible');
-    };
+    const library = document.getElementById('docLibrary');
+    const overlay = document.getElementById('libraryOverlay');
 
-    // View Transition API disabled for dashboard -> editor to prevent giant bad snapshots
-    const useViewTransition = false;
-
-    if (useViewTransition && !reduceMotion && document.startViewTransition) {
-      const transition = document.startViewTransition(run);
-      await transition.ready.catch(() => {});
-      return;
+    if (!reduceMotion) {
+      if (library) library.classList.add('view-exiting');
+      if (overlay) overlay.classList.add('view-exiting');
+      await new Promise((resolve) => setTimeout(resolve, 180));
     }
 
-    run();
-    if (!reduceMotion) {
-      await new Promise((resolve) => setTimeout(resolve, 180));
+    if (library) {
+      library.classList.remove('view-visible', 'view-exiting');
+      library.style.display = 'none';
+    }
+    if (overlay) {
+      overlay.classList.remove('view-visible', 'view-exiting');
+      overlay.style.display = 'none';
     }
   }
 

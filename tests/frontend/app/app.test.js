@@ -86,6 +86,8 @@ describe('App Core Initialization', () => {
       removeEventListener: jest.fn(),
     });
 
+    window.requestAnimationFrame = jest.fn().mockImplementation((cb) => cb());
+
     // Mock URLSearchParams globally
     global.URLSearchParams = jest.fn(() => ({
       get: jest.fn().mockReturnValue(null), // Default no doc param
@@ -518,5 +520,107 @@ describe('App Core Initialization', () => {
     expect(app.libraryManager.isTransitioning).toBe(false);
     // State reflects error, not a stuck opening state
     expect(document.body.dataset.viewState).toBe('editor-error');
+  });
+
+  // ─── UX/Animation and Transition tests ──────────────────────────────────────────
+
+  it('boot loader gets .fading-out class before it is hidden', () => {
+    jest.useFakeTimers();
+    try {
+      window.matchMedia = jest.fn().mockReturnValue({
+        matches: false, // Transitions enabled!
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      });
+
+      const app = new App();
+
+      // Force booting state first
+      app.uiManager.applyViewState('booting');
+      const bootLoader = document.getElementById('bootLoader');
+      expect(bootLoader.style.display).toBe('flex');
+      expect(bootLoader.classList.contains('fading-out')).toBe(false);
+
+      // Transition away from booting
+      app.uiManager.applyViewState('dashboard');
+      expect(bootLoader.classList.contains('fading-out')).toBe(true);
+      expect(bootLoader.style.display).toBe('flex'); // Still flex while fading out
+
+      jest.advanceTimersByTime(200);
+      expect(bootLoader.style.display).toBe('none');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('soft-reveal-enter and soft-reveal-ready classes are applied correctly to editor elements', () => {
+    const app = new App();
+
+    // Create dummy header/workspace elements since JSDOM might not have them unless they exist in setup
+    document.body.innerHTML += `
+      <div class="header"></div>
+      <div class="ribbon-tabs"></div>
+      <div class="ribbon-content"></div>
+      <div class="main-workspace"></div>
+    `;
+
+    const header = document.querySelector('.header');
+
+    // On opening-document
+    app.uiManager.applyViewState('opening-document');
+    expect(header.classList.contains('soft-reveal-enter')).toBe(true);
+    expect(header.classList.contains('soft-reveal-ready')).toBe(false);
+
+    // On editor-loading
+    app.uiManager.applyViewState('editor-loading');
+    expect(header.classList.contains('soft-reveal-enter')).toBe(false);
+    expect(header.classList.contains('soft-reveal-ready')).toBe(true);
+
+    // On back to dashboard, they should be cleaned up
+    app.uiManager.applyViewState('dashboard');
+    expect(header.classList.contains('soft-reveal-enter')).toBe(false);
+    expect(header.classList.contains('soft-reveal-ready')).toBe(false);
+  });
+
+  it('view-exiting is applied to library during transition', async () => {
+    jest.useFakeTimers();
+    try {
+      window.matchMedia = jest.fn().mockReturnValue({
+        matches: false, // Enable motion to trigger timeout
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      });
+
+      const app = new App();
+      const library = document.getElementById('docLibrary');
+      const overlay = document.getElementById('libraryOverlay');
+
+      library.classList.add('view-visible');
+      overlay.classList.add('view-visible');
+
+      const transitionPromise = app.libraryManager.startEditorTransition();
+
+      expect(library.classList.contains('view-exiting')).toBe(true);
+      expect(overlay.classList.contains('view-exiting')).toBe(true);
+
+      jest.advanceTimersByTime(180);
+      await transitionPromise;
+
+      expect(library.classList.contains('view-visible')).toBe(false);
+      expect(library.classList.contains('view-exiting')).toBe(false);
+      expect(library.style.display).toBe('none');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('pagesContainer state attribute control matches design', () => {
+    const app = new App();
+
+    app.uiManager.setDocumentOpenState('loading-document');
+    expect(document.body.dataset.documentOpenState).toBe('loading-document');
+
+    app.uiManager.setDocumentOpenState('ready');
+    expect(document.body.dataset.documentOpenState).toBe('ready');
   });
 });
