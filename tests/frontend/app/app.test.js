@@ -34,6 +34,7 @@ describe('App Core Initialization', () => {
       <button id="closeLibrary"></button>
       <div id="documentList"></div>
       <div id="activeCollaborators"></div>
+      <div id="connectionBadge" hidden></div>
       <div id="serverOfflineOverlay"></div>
       
       <div id="userProfileTrigger">
@@ -131,41 +132,35 @@ describe('App Core Initialization', () => {
     expect(Utils.navigateTo).toHaveBeenCalledWith('pages/login.html?doc=doc-42');
   });
 
-  it('should not show connection overlay if page is hidden', async () => {
+  it('should update connection badge without showing the connection overlay', async () => {
     jest.useFakeTimers();
-    global.URLSearchParams = jest.fn(() => ({
-      get: jest.fn().mockReturnValue('123'),
-    }));
+    try {
+      global.URLSearchParams = jest.fn(() => ({
+        get: jest.fn().mockReturnValue('123'),
+      }));
 
-    // Mock hidden state
-    Object.defineProperty(document, 'visibilityState', {
-      value: 'hidden',
-      configurable: true,
-    });
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        configurable: true,
+      });
 
-    const app = new App();
-    // Use runAllTicks instead of nextTick promise for fake timers
-    jest.runAllTicks();
+      const app = new App();
+      jest.runAllTicks();
 
-    const overlay = document.getElementById('serverOfflineOverlay');
-    overlay.style.display = 'none';
-    app.handleWSStatusChange('connecting');
+      const overlay = document.getElementById('serverOfflineOverlay');
+      const badge = document.getElementById('connectionBadge');
+      overlay.style.display = 'none';
 
-    expect(overlay.style.display).toBe('none');
+      app.handleWSStatusChange('connecting');
+      jest.advanceTimersByTime(5000);
 
-    // Change to visible
-    Object.defineProperty(document, 'visibilityState', {
-      value: 'visible',
-      configurable: true,
-    });
-
-    app.handleWSStatusChange('connecting');
-
-    // Fast-forward 5 seconds
-    jest.advanceTimersByTime(5000);
-
-    expect(overlay.style.display).toBe('flex');
-    jest.useRealTimers();
+      expect(overlay.style.display).toBe('none');
+      expect(badge.hidden).toBe(false);
+      expect(badge.textContent).toBe('Connecting...');
+      expect(badge.dataset.status).toBe('connecting');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('should recheck session silently when tab becomes visible', async () => {

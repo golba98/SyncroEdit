@@ -50,127 +50,6 @@
     </script>
   </head>
   <body style="margin: 0; padding: 0">
-    <!-- Cold Start Splash Screen -->
-    <div id="cold-splash">
-      <style>
-        #cold-splash {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: #000000;
-          z-index: 1000000;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          transition: opacity 0.4s ease-out;
-          pointer-events: all;
-        }
-        .splash-content {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 24px;
-        }
-        .splash-logo {
-          width: 80px;
-          height: 80px;
-          filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.4));
-          animation: splashPulse 2s infinite ease-in-out;
-        }
-        .splash-text {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-        .splash-title {
-          color: #ffffff;
-          font-size: 32px;
-          font-weight: 700;
-          letter-spacing: 4px;
-          text-transform: uppercase;
-          margin: 0;
-          font-family: 'Montserrat', sans-serif;
-        }
-        .splash-status {
-          color: rgba(255, 255, 255, 0.5);
-          font-size: 14px;
-          letter-spacing: 1.5px;
-          font-weight: 400;
-          text-transform: uppercase;
-        }
-        .splash-loader {
-          width: 40px;
-          height: 2px;
-          background: rgba(139, 92, 246, 0.2);
-          position: relative;
-          overflow: hidden;
-          border-radius: 2px;
-          margin-top: 10px;
-        }
-        .splash-loader::after {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -50%;
-          width: 50%;
-          height: 100%;
-          background: #8b5cf6;
-          animation: shimmer 1.5s infinite linear;
-        }
-        @keyframes splashPulse {
-          0%,
-          100% {
-            transform: scale(1);
-            opacity: 0.9;
-          }
-          50% {
-            transform: scale(1.05);
-            opacity: 1;
-          }
-        }
-        @keyframes shimmer {
-          0% {
-            left: -50%;
-          }
-          100% {
-            left: 100%;
-          }
-        }
-      </style>
-      <div class="splash-content">
-        <img src="/logo.svg" class="splash-logo" alt="SyncroEdit Logo" />
-        <div class="splash-text">
-          <h1 class="splash-title">SyncroEdit</h1>
-          <span class="splash-status">Preparing workspace...</span>
-        </div>
-        <div class="splash-loader"></div>
-      </div>
-    </div>
-
-    <!-- Editor Skeleton (shown during document load) -->
-    <div id="editorSkeleton" class="editor-skeleton hidden">
-      <div class="skeleton-toolbar">
-        <div class="skeleton-toolbar-item skeleton-page"></div>
-        <div class="skeleton-toolbar-item skeleton-page"></div>
-        <div class="skeleton-toolbar-item skeleton-page"></div>
-        <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
-        <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
-        <div class="skeleton-toolbar-item skeleton-page"></div>
-        <div class="skeleton-toolbar-item skeleton-page"></div>
-      </div>
-      <div class="skeleton-paper">
-        <div class="skeleton-line skeleton-page"></div>
-        <div class="skeleton-line skeleton-page"></div>
-        <div class="skeleton-line skeleton-page"></div>
-        <div class="skeleton-line skeleton-page"></div>
-        <div class="skeleton-line skeleton-page"></div>
-      </div>
-    </div>
-
     <div
       id="authGuard"
       style="
@@ -274,6 +153,9 @@
           >
             <i class="fas fa-file-export"></i> Save As
           </button>
+        </div>
+        <div id="connectionBadge" class="connection-badge" data-status="connecting" hidden>
+          Connecting...
         </div>
 
         <div
@@ -2480,6 +2362,36 @@
 
     <!-- Main Workspace -->
     <div class="main-workspace">
+      <!-- Editor Skeleton (shown inside the editor workspace during document load) -->
+      <div id="editorSkeleton" class="editor-skeleton hidden">
+        <div class="skeleton-toolbar">
+          <div class="skeleton-toolbar-item skeleton-page"></div>
+          <div class="skeleton-toolbar-item skeleton-page"></div>
+          <div class="skeleton-toolbar-item skeleton-page"></div>
+          <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
+          <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
+          <div class="skeleton-toolbar-item skeleton-page"></div>
+          <div class="skeleton-toolbar-item skeleton-page"></div>
+        </div>
+        <div id="editorSkeletonMessage" class="editor-skeleton-message" hidden>
+          Still loading document...
+        </div>
+        <div class="skeleton-paper">
+          <div class="skeleton-line skeleton-page"></div>
+          <div class="skeleton-line skeleton-page"></div>
+          <div class="skeleton-line skeleton-page"></div>
+          <div class="skeleton-line skeleton-page"></div>
+          <div class="skeleton-line skeleton-page"></div>
+        </div>
+        <div id="editorOpenError" class="editor-open-error" hidden>
+          <div class="editor-open-error-icon">
+            <i class="fas fa-triangle-exclamation"></i>
+          </div>
+          <div id="editorOpenErrorMessage">Could not load this document.</div>
+          <button id="editorOpenRetry" class="toolbar-btn">Retry</button>
+        </div>
+      </div>
+
       <!-- Left Sidebar: Outline -->
       <div class="sidebar" id="outlineSidebar">
         <div
