@@ -277,24 +277,34 @@ export class LibraryManager {
   }
 
   async startEditorTransition() {
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const library = document.getElementById('docLibrary');
     const overlay = document.getElementById('libraryOverlay');
 
-    if (!reduceMotion) {
-      if (library) library.classList.add('view-exiting');
-      if (overlay) overlay.classList.add('view-exiting');
-      await new Promise((resolve) => setTimeout(resolve, 180));
-    }
-
     if (library) {
-      library.classList.remove('view-visible', 'view-exiting');
-      library.style.display = 'none';
+      library.classList.remove('view-visible');
+      library.classList.add('view-exiting');
     }
     if (overlay) {
-      overlay.classList.remove('view-visible', 'view-exiting');
-      overlay.style.display = 'none';
+      overlay.classList.remove('view-visible');
+      overlay.classList.add('view-exiting');
     }
+
+    // Cleanup after animation finishes, but don't block the main flow
+    setTimeout(() => {
+      if (library) {
+        library.classList.remove('view-exiting');
+        // Only hide if we are not back on the dashboard
+        if (!document.body.dataset.viewState || document.body.dataset.viewState !== 'dashboard') {
+          library.style.display = 'none';
+        }
+      }
+      if (overlay) {
+        overlay.classList.remove('view-exiting');
+        if (!document.body.dataset.viewState || document.body.dataset.viewState !== 'dashboard') {
+          overlay.style.display = 'none';
+        }
+      }
+    }, 250);
   }
 
   markCreateOpening(isOpening) {

@@ -226,6 +226,13 @@ export class App {
   handleEditorLifecycleChange(state, detail, requestToken) {
     if (requestToken !== this.loadDocumentToken) return;
 
+    // Guard: Once editor is ready for this document, don't revert to loading/error states
+    // for subsequent lifecycle events (like delayed connection errors after user started typing).
+    if (this.isEditorReadyForCurrentDocument() && state !== 'ready') {
+      console.log('[SYNC] suppressed lifecycle update after ready:', state);
+      return;
+    }
+
     this.setDocumentLifecycleState(state, detail || {});
     if (state === 'ready') this.finishDocumentOpen(requestToken);
     if (state === 'error') {
