@@ -1,4 +1,7 @@
 import { sign, verify } from 'hono/jwt';
+import { requireDb, requireJwtSecret } from './security.js';
+
+const PBKDF2_ITERATIONS = 100000;
 
 // Web Crypto PBKDF2 Password Hashing
 export async function hashPassword(password) {
@@ -20,7 +23,7 @@ export async function hashPassword(password) {
     {
       name: 'PBKDF2',
       salt: salt,
-      iterations: 10000,
+      iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
     passwordKey,
@@ -30,21 +33,33 @@ export async function hashPassword(password) {
   const hashHex = Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-  return `pbkdf2:10000:${saltHex}:${hashHex}`;
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
 }
 
 export async function verifyPassword(password, storedHash) {
-  if (!storedHash || !storedHash.startsWith('pbkdf2:10000:')) {
+  if (!storedHash || !storedHash.startsWith('pbkdf2:')) {
     // Prevent timing attacks
     await hashPassword('dummy-password-hash');
     return false;
   }
 
   const parts = storedHash.split(':');
-  if (parts.length !== 4) return false;
+  if (parts.length !== 4) {
+    await hashPassword('dummy-password-hash');
+    return false;
+  }
   const iterations = parseInt(parts[1], 10);
   const saltHex = parts[2];
   const hashHex = parts[3];
+  if (
+    !Number.isInteger(iterations) ||
+    iterations < 10000 ||
+    !/^[0-9a-f]+$/i.test(saltHex) ||
+    !/^[0-9a-f]+$/i.test(hashHex)
+  ) {
+    await hashPassword('dummy-password-hash');
+    return false;
+  }
 
   const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
   const encoder = new TextEncoder();
@@ -85,8 +100,9 @@ function timingSafeEqual(a, b) {
 
 // Generate new access and refresh tokens, storing session in D1
 export async function generateTokens(user, env, userAgent = '', ipAddress = '') {
+  const db = requireDb(env);
   const sessionId = crypto.randomUUID();
-  const jwtSecret = env.JWT_SECRET || 'dev-secret-key';
+  const jwtSecret = requireJwtSecret(env);
 
   const accessToken = await sign(
     {
@@ -108,24 +124,25 @@ export async function generateTokens(user, env, userAgent = '', ipAddress = '') 
   );
 
   // Store session in database (keeping at most 5 sessions per user)
-  const existingSessions = await env.DB.prepare(
-    'SELECT id FROM sessions WHERE userId = ? ORDER BY lastActive ASC'
-  )
+  const existingSessions = await db
+    .prepare('SELECT id FROM sessions WHERE userId = ? ORDER BY lastActive ASC')
     .bind(user.id)
     .all();
 
   if (existingSessions.results && existingSessions.results.length >= 5) {
     const sessionsToRemove = existingSessions.results.length - 4;
     for (let i = 0; i < sessionsToRemove; i++) {
-      await env.DB.prepare('DELETE FROM sessions WHERE id = ?')
+      await db
+        .prepare('DELETE FROM sessions WHERE id = ?')
         .bind(existingSessions.results[i].id)
         .run();
     }
   }
 
-  await env.DB.prepare(
-    "INSERT INTO sessions (id, userId, refreshToken, userAgent, ipAddress, lastActive) VALUES (?, ?, ?, ?, ?, datetime('now'))"
-  )
+  await db
+    .prepare(
+      "INSERT INTO sessions (id, userId, refreshToken, userAgent, ipAddress, lastActive) VALUES (?, ?, ?, ?, ?, datetime('now'))"
+    )
     .bind(sessionId, user.id, refreshToken, userAgent, ipAddress)
     .run();
 
@@ -139,12 +156,14 @@ export async function authenticateUser(c, next) {
     return c.json({ message: 'Authentication required' }, 401);
   }
   const token = authHeader.substring(7);
-  const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key';
+  const jwtSecret = requireJwtSecret(c.env);
+  const db = requireDb(c.env);
   try {
     const decoded = await verify(token, jwtSecret, 'HS256');
 
     // Check if session still exists in D1
-    const session = await c.env.DB.prepare('SELECT id FROM sessions WHERE id = ?')
+    const session = await db
+      .prepare('SELECT id FROM sessions WHERE id = ?')
       .bind(decoded.sessionId)
       .first();
     if (!session) {

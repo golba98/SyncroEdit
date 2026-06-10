@@ -1,5 +1,6 @@
 import { Auth } from '/js/features/auth/auth.js';
 import { Network } from '/js/app/network.js';
+import { escapeHTML } from '/js/app/utils.js';
 import { UI } from '/js/features/ui/ui.js';
 
 export class UIManager {
@@ -188,7 +189,9 @@ export class UIManager {
       }
 
       try {
-        await Network.updateDocumentSettings(this.app.documentId, { isPublic: enabled });
+        await Network.updateDocumentSettings(this.app.documentId, {
+          isPublic: enabled,
+        });
 
         // Update link visual state
         if (shareLinkContainer) {
@@ -375,18 +378,21 @@ export class UIManager {
     try {
       const history = await Network.getHistory(this.app.documentId);
       list.innerHTML = history
-        .map(
-          (item) => `
+        .map((item) => {
+          const username = escapeHTML(item.username || 'Unknown');
+          const action = escapeHTML(item.action || '');
+          const details = escapeHTML(item.details || '');
+          return `
                 <div style="padding: 10px; border-bottom: 1px solid #2a2a2a;">
                     <div style="display: flex; justify-content: space-between;">
-                        <strong>${item.username}</strong>
+                        <strong>${username}</strong>
                         <small>${new Date(item.timestamp).toLocaleString()}</small>
                     </div>
-                    <div>${item.action}</div>
-                    ${item.details ? `<div style="font-size: 11px; color: #666;">${item.details}</div>` : ''}
+                    <div>${action}</div>
+                    ${details ? `<div style="font-size: 11px; color: #666;">${details}</div>` : ''}
                 </div>
-            `
-        )
+            `;
+        })
         .join('');
     } catch (err) {
       list.innerHTML = 'Failed to load history';

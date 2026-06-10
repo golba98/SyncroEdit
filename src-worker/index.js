@@ -1,27 +1,101 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { sign, verify } from 'hono/jwt';
 import { hashPassword, verifyPassword, generateTokens, authenticateUser } from './auth.js';
+import { RateLimitObject } from './rateLimitObject.js';
+import {
+  AppError,
+  LIMITS,
+  assertDocumentEditable,
+  assertDocumentOwner,
+  assertDocumentReadable,
+  getClientIp,
+  getDocumentAccess,
+  jsonError,
+  readJson,
+  requireDb,
+  requireDurableObject,
+  requireJwtSecret,
+  securityHeaders,
+  tightCors,
+  validateBoolean,
+  validateEmail,
+  validatePageContent,
+  validatePassword,
+  validateTitle,
+  validateUsername,
+  validateUuid,
+} from './security.js';
 
 // Export Durable Object class so Cloudflare can bind it
 export { DocumentSyncObject } from './syncObject.js';
+export { RateLimitObject };
 
 const app = new Hono();
 
-// Enable CORS for development
-app.use(
-  '/api/*',
-  cors({
-    origin: (origin) => origin,
-    credentials: true,
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-  })
-);
+app.onError((err, c) => {
+  if (err instanceof AppError) {
+    return jsonError(c, err.status, err.message, err.code);
+  }
 
-// Password Policy Regex
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])(?=.{8,})/;
+  console.error('Unhandled Worker error:', {
+    message: err && err.message ? err.message : 'Unknown error',
+  });
+  return jsonError(c, 500, 'Internal Server Error', 'internal_error');
+});
+
+app.use('*', securityHeaders);
+app.use('/api/*', tightCors);
+
+app.use('/api/*', async (c, next) => {
+  if (c.req.path !== '/api/config') {
+    requireDb(c.env);
+  }
+  await next();
+});
+
+const AUTH_RATE_LIMITS = {
+  '/api/auth/signup': { route: 'signup', limit: 8, windowSeconds: 300 },
+  '/api/auth/login': { route: 'login', limit: 12, windowSeconds: 300 },
+  '/api/auth/check-username': {
+    route: 'check-username',
+    limit: 30,
+    windowSeconds: 300,
+  },
+  '/api/auth/refresh-token': {
+    route: 'refresh-token',
+    limit: 60,
+    windowSeconds: 300,
+  },
+  '/api/auth/ws-ticket': { route: 'ws-ticket', limit: 120, windowSeconds: 300 },
+};
+
+app.use('/api/auth/*', async (c, next) => {
+  const config = AUTH_RATE_LIMITS[c.req.path];
+  if (!config) {
+    await next();
+    return;
+  }
+
+  const binding = requireDurableObject(c.env, 'RATE_LIMIT_OBJECT');
+  const key = getClientIp(c);
+  const id = binding.idFromName(`${config.route}:${key}`);
+  const stub = binding.get(id);
+  const response = await stub.fetch('https://rate-limit.local/check', {
+    method: 'POST',
+    body: JSON.stringify({ ...config, key }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result || result.allowed !== true) {
+    const retryAfter = String(result && result.retryAfter ? result.retryAfter : 60);
+    c.header('Retry-After', retryAfter);
+    return jsonError(c, 429, 'Too many requests. Please try again later.', 'rate_limited');
+  }
+
+  c.header('X-RateLimit-Limit', String(result.limit));
+  c.header('X-RateLimit-Remaining', String(result.remaining));
+  await next();
+});
 
 // Helper to log document audit/history events
 async function logHistory(db, docId, userId, username, action, details = '') {
@@ -52,21 +126,7 @@ app.get('/api/config', (c) => {
   return c.json({
     emailVerificationEnabled: false,
     realtimeBackend: 'durable-object',
-  });
-});
-
-app.get('/api/debug/bindings', (c) => {
-  return c.json({
-    hasDB: c.env.DB !== undefined,
-    hasDocumentSyncObject: c.env.DOCUMENT_SYNC_OBJECT !== undefined,
-  });
-});
-
-// Provide a mock CSRF token route for compatibility.
-// Bearer-token authentication is stateless and header-based, so CSRF is not required.
-app.get('/api/auth/csrf-token', (c) => {
-  return c.json({
-    csrfToken: 'cf-csrf-compatible-token-static-12345678',
+    authMode: 'bearer-access-token-refresh-cookie',
   });
 });
 
@@ -76,47 +136,37 @@ app.get('/api/auth/csrf-token', (c) => {
 
 app.post('/api/auth/signup', async (c) => {
   try {
-    const { username, email, password } = await c.req.json();
-    if (!username || !email || !password) {
-      return c.json({ message: 'Username, email, and password are required' }, 400);
-    }
-
-    const trimmedUsername = username.trim();
-    if (trimmedUsername.length < 3) {
-      return c.json({ message: 'Username must be at least 3 characters long' }, 400);
-    }
-
-    if (!PASSWORD_REGEX.test(password)) {
-      return c.json(
-        {
-          message:
-            'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one symbol (!@#$%^&*).',
-        },
-        400
-      );
-    }
+    const db = requireDb(c.env);
+    const { username, email, password } = await readJson(c, LIMITS.authBody);
+    const trimmedUsername = validateUsername(username);
+    const normalizedEmail = validateEmail(email);
+    validatePassword(password);
 
     // Check uniqueness
-    const existingUser = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE username = ? OR email = ?'
-    )
-      .bind(trimmedUsername, email.toLowerCase().trim())
+    const existingUser = await db
+      .prepare('SELECT id FROM users WHERE username = ? OR email = ?')
+      .bind(trimmedUsername, normalizedEmail)
       .first();
 
     if (existingUser) {
-      return c.json({ message: 'Username or email already exists' }, 400);
+      return c.json({ message: 'Unable to create account with those credentials' }, 400);
     }
 
     const hashedPassword = await hashPassword(password);
     const userId = crypto.randomUUID();
 
-    await c.env.DB.prepare(
-      'INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)'
-    )
-      .bind(userId, trimmedUsername, email.toLowerCase().trim(), hashedPassword)
+    await db
+      .prepare(
+        'INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)'
+      )
+      .bind(userId, trimmedUsername, normalizedEmail, hashedPassword)
       .run();
 
-    const userObj = { id: userId, username: trimmedUsername, email };
+    const userObj = {
+      id: userId,
+      username: trimmedUsername,
+      email: normalizedEmail,
+    };
     const { accessToken, refreshToken } = await generateTokens(
       userObj,
       c.env,
@@ -136,26 +186,28 @@ app.post('/api/auth/signup', async (c) => {
       {
         token: accessToken,
         username: trimmedUsername,
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
       },
       201
     );
   } catch (err) {
-    return c.json({ message: err.message || 'Internal Server Error' }, 500);
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'Internal Server Error', 'signup_failed');
   }
 });
 
 app.post('/api/auth/login', async (c) => {
   try {
-    const { username, password } = await c.req.json();
-    if (!username || !password) {
-      return c.json({ message: 'Username and password are required' }, 400);
+    const db = requireDb(c.env);
+    const { username, password } = await readJson(c, LIMITS.authBody);
+    const trimmedUsername = validateUsername(username);
+    if (typeof password !== 'string' || password.length === 0 || password.length > 1024) {
+      return c.json({ message: 'Invalid username or password' }, 401);
     }
 
-    const user = await c.env.DB.prepare(
-      'SELECT id, username, email, password FROM users WHERE username = ?'
-    )
-      .bind(username.trim())
+    const user = await db
+      .prepare('SELECT id, username, email, password FROM users WHERE username = ?')
+      .bind(trimmedUsername)
       .first();
 
     if (!user) {
@@ -190,22 +242,25 @@ app.post('/api/auth/login', async (c) => {
       email: user.email,
     });
   } catch (err) {
-    return c.json({ message: err.message || 'Internal Server Error' }, 500);
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'Internal Server Error', 'login_failed');
   }
 });
 
 app.post('/api/auth/check-username', async (c) => {
-  const { username } = await c.req.json();
-  if (!username) return c.json({ message: 'Username is required' }, 400);
+  const db = requireDb(c.env);
+  const { username } = await readJson(c, LIMITS.authBody);
+  const trimmedUsername = validateUsername(username);
 
-  const user = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?')
-    .bind(username.trim())
+  const user = await db
+    .prepare('SELECT id FROM users WHERE username = ?')
+    .bind(trimmedUsername)
     .first();
   if (user) {
     const suggestions = [
-      `${username}${Math.floor(Math.random() * 99)}`,
-      `${username}_edit`,
-      `sync_${username}`,
+      `${trimmedUsername}${Math.floor(Math.random() * 99)}`,
+      `${trimmedUsername}_edit`,
+      `sync_${trimmedUsername}`,
     ];
     return c.json({ available: false, suggestions });
   }
@@ -213,11 +268,12 @@ app.post('/api/auth/check-username', async (c) => {
 });
 
 app.post('/api/auth/logout', async (c) => {
+  const db = requireDb(c.env);
   const cookieToken = getCookie(c, 'refreshToken');
   if (cookieToken) {
     try {
-      const decoded = await verify(cookieToken, c.env.JWT_SECRET || 'dev-secret-key', 'HS256');
-      await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(decoded.sessionId).run();
+      const decoded = await verify(cookieToken, requireJwtSecret(c.env), 'HS256');
+      await db.prepare('DELETE FROM sessions WHERE id = ?').bind(decoded.sessionId).run();
     } catch {}
   }
   deleteCookie(c, 'refreshToken', { path: '/' });
@@ -225,22 +281,25 @@ app.post('/api/auth/logout', async (c) => {
 });
 
 app.post('/api/auth/refresh-token', async (c) => {
+  const db = requireDb(c.env);
   const cookieToken = getCookie(c, 'refreshToken');
   if (!cookieToken) {
     return c.json({ message: 'Refresh token required' }, 401);
   }
 
-  const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key';
+  const jwtSecret = requireJwtSecret(c.env);
   try {
     const decoded = await verify(cookieToken, jwtSecret, 'HS256');
-    const session = await c.env.DB.prepare('SELECT id FROM sessions WHERE id = ?')
+    const session = await db
+      .prepare('SELECT id FROM sessions WHERE id = ?')
       .bind(decoded.sessionId)
       .first();
     if (!session) {
       return c.json({ message: 'Session expired' }, 401);
     }
 
-    const user = await c.env.DB.prepare('SELECT username, email FROM users WHERE id = ?')
+    const user = await db
+      .prepare('SELECT username, email FROM users WHERE id = ?')
       .bind(decoded.id)
       .first();
     if (!user) {
@@ -258,7 +317,8 @@ app.post('/api/auth/refresh-token', async (c) => {
       jwtSecret
     );
 
-    await c.env.DB.prepare("UPDATE sessions SET lastActive = datetime('now') WHERE id = ?")
+    await db
+      .prepare("UPDATE sessions SET lastActive = datetime('now') WHERE id = ?")
       .bind(decoded.sessionId)
       .run();
 
@@ -270,7 +330,7 @@ app.post('/api/auth/refresh-token', async (c) => {
 
 app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
   const user = c.get('user');
-  const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key';
+  const jwtSecret = requireJwtSecret(c.env);
 
   // Create short-lived ticket JWT (valid for 30s)
   const ticket = await sign(
@@ -291,10 +351,12 @@ app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
 // -------------------------------------------------------------
 
 app.get('/api/user/profile', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const profile = await c.env.DB.prepare(
-    'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, createdAt FROM users WHERE id = ?'
-  )
+  const profile = await db
+    .prepare(
+      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, createdAt FROM users WHERE id = ?'
+    )
     .bind(user.id)
     .first();
 
@@ -306,35 +368,52 @@ app.get('/api/user/profile', authenticateUser, async (c) => {
 });
 
 app.put('/api/user/profile', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const { profilePicture, accentColor, bio, showOnlineStatus } = await c.req.json();
+  const { profilePicture, accentColor, bio, showOnlineStatus } = await readJson(
+    c,
+    LIMITS.profileBody
+  );
 
-  const current = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(user.id).first();
+  const current = await db.prepare('SELECT id FROM users WHERE id = ?').bind(user.id).first();
   if (!current) return c.json({ message: 'User not found' }, 404);
 
   const updates = [];
   const bindings = [];
 
   if (profilePicture !== undefined) {
+    if (typeof profilePicture !== 'string' || profilePicture.length > LIMITS.profilePicture) {
+      throw new AppError(400, 'Invalid profile picture', 'invalid_profile_picture');
+    }
     updates.push('profilePicture = ?');
     bindings.push(profilePicture);
   }
   if (accentColor !== undefined) {
+    if (typeof accentColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(accentColor)) {
+      throw new AppError(400, 'Invalid accent color', 'invalid_accent_color');
+    }
     updates.push('accentColor = ?');
     bindings.push(accentColor);
   }
   if (bio !== undefined) {
+    if (typeof bio !== 'string' || bio.length > LIMITS.bio) {
+      throw new AppError(400, 'Invalid bio', 'invalid_bio');
+    }
     updates.push('bio = ?');
     bindings.push(bio);
   }
   if (showOnlineStatus !== undefined) {
+    if (typeof showOnlineStatus !== 'boolean') {
+      throw new AppError(400, 'showOnlineStatus must be a boolean', 'invalid_show_online_status');
+    }
     updates.push('showOnlineStatus = ?');
     bindings.push(showOnlineStatus ? 1 : 0);
   }
 
   if (updates.length > 0) {
     bindings.push(user.id);
-    await c.env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)
+    await db
+      .prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...bindings)
       .run();
   }
@@ -349,10 +428,12 @@ app.put('/api/user/profile', authenticateUser, async (c) => {
 });
 
 app.put('/api/user/password', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const { currentPassword, newPassword } = await c.req.json();
+  const { currentPassword, newPassword } = await readJson(c, LIMITS.authBody);
 
-  const userRecord = await c.env.DB.prepare('SELECT password FROM users WHERE id = ?')
+  const userRecord = await db
+    .prepare('SELECT password FROM users WHERE id = ?')
     .bind(user.id)
     .first();
   if (!userRecord) return c.json({ message: 'User not found' }, 404);
@@ -360,12 +441,11 @@ app.put('/api/user/password', authenticateUser, async (c) => {
   const isMatch = await verifyPassword(currentPassword, userRecord.password);
   if (!isMatch) return c.json({ message: 'Current password incorrect' }, 400);
 
-  if (!PASSWORD_REGEX.test(newPassword)) {
-    return c.json({ message: 'Password complexity requirements not met' }, 400);
-  }
+  validatePassword(newPassword);
 
   const hashedPassword = await hashPassword(newPassword);
-  await c.env.DB.prepare('UPDATE users SET password = ? WHERE id = ?')
+  await db
+    .prepare('UPDATE users SET password = ? WHERE id = ?')
     .bind(hashedPassword, user.id)
     .run();
 
@@ -373,10 +453,12 @@ app.put('/api/user/password', authenticateUser, async (c) => {
 });
 
 app.get('/api/user/sessions', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const sessions = await c.env.DB.prepare(
-    'SELECT id as sessionId, userAgent, ipAddress, lastActive FROM sessions WHERE userId = ?'
-  )
+  const sessions = await db
+    .prepare(
+      'SELECT id as sessionId, userAgent, ipAddress, lastActive FROM sessions WHERE userId = ?'
+    )
     .bind(user.id)
     .all();
 
@@ -389,17 +471,21 @@ app.get('/api/user/sessions', authenticateUser, async (c) => {
 });
 
 app.delete('/api/user/sessions/:sessionId', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const sessionId = c.req.param('sessionId');
-  await c.env.DB.prepare('DELETE FROM sessions WHERE id = ? AND userId = ?')
+  const sessionId = validateUuid(c.req.param('sessionId'), 'session id');
+  await db
+    .prepare('DELETE FROM sessions WHERE id = ? AND userId = ?')
     .bind(sessionId, user.id)
     .run();
   return c.json({ message: 'Session revoked' });
 });
 
 app.delete('/api/user/sessions', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  await c.env.DB.prepare('DELETE FROM sessions WHERE userId = ? AND id != ?')
+  await db
+    .prepare('DELETE FROM sessions WHERE userId = ? AND id != ?')
     .bind(user.id, user.sessionId)
     .run();
   return c.json({ message: 'All other sessions revoked' });
@@ -410,29 +496,32 @@ app.delete('/api/user/sessions', authenticateUser, async (c) => {
 // -------------------------------------------------------------
 
 app.get('/api/documents', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const page = parseInt(c.req.query('page') || '1', 10);
-  const limit = parseInt(c.req.query('limit') || '20', 10);
+  const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
   const offset = (page - 1) * limit;
 
   // Count total matching documents
-  const countRes = await c.env.DB.prepare(
-    `
+  const countRes = await db
+    .prepare(
+      `
     SELECT COUNT(d.id) as count
     FROM documents d
     WHERE d.owner = ?
        OR d.id IN (SELECT documentId FROM document_permissions WHERE userId = ?)
        OR (d.isPublic = 1 AND d.id IN (SELECT documentId FROM recent_documents WHERE userId = ?))
   `
-  )
+    )
     .bind(user.id, user.id, user.id)
     .first();
 
   const totalDocuments = countRes ? countRes.count : 0;
 
   // Retrieve documents with owner names
-  const docsRes = await c.env.DB.prepare(
-    `
+  const docsRes = await db
+    .prepare(
+      `
     SELECT d.id, d.title, d.owner, d.lastModified, d.lastModifiedBy, u.username as ownerUsername, l.username as lastModifiedByUsername
     FROM documents d
     LEFT JOIN users u ON d.owner = u.id
@@ -443,7 +532,7 @@ app.get('/api/documents', authenticateUser, async (c) => {
     ORDER BY d.lastModified DESC
     LIMIT ? OFFSET ?
   `
-  )
+    )
     .bind(user.id, user.id, user.id, limit, offset)
     .all();
 
@@ -468,34 +557,35 @@ app.get('/api/documents', authenticateUser, async (c) => {
 });
 
 app.post('/api/documents', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const body = await c.req.json().catch(() => ({}));
-  const title = body.title || 'Untitled document';
-  const pages = body.pages || [{ content: '' }];
+  const body = await readJson(c, LIMITS.documentBody);
+  const title = validateTitle(body.title);
+  const pages = Array.isArray(body.pages) && body.pages.length > 0 ? body.pages : [{ content: '' }];
+  const firstPageContent = validatePageContent(pages[0] && pages[0].content);
   const docId = crypto.randomUUID();
 
   // Create document
-  await c.env.DB.prepare(
-    'INSERT INTO documents (id, title, owner, lastModifiedBy) VALUES (?, ?, ?, ?)'
-  )
+  await db
+    .prepare('INSERT INTO documents (id, title, owner, lastModifiedBy) VALUES (?, ?, ?, ?)')
     .bind(docId, title, user.id, user.id)
     .run();
 
   // Create initial page
   if (pages.length > 0) {
-    await c.env.DB.prepare(
-      'INSERT INTO document_pages (documentId, pageIndex, content) VALUES (?, 0, ?)'
-    )
-      .bind(docId, pages[0].content || '')
+    await db
+      .prepare('INSERT INTO document_pages (documentId, pageIndex, content) VALUES (?, 0, ?)')
+      .bind(docId, firstPageContent)
       .run();
   }
 
   // Create recent entry
-  await c.env.DB.prepare('INSERT INTO recent_documents (userId, documentId) VALUES (?, ?)')
+  await db
+    .prepare('INSERT INTO recent_documents (userId, documentId) VALUES (?, ?)')
     .bind(user.id, docId)
     .run();
 
-  await logHistory(c.env.DB, docId, user.id, user.username, 'Created Document');
+  await logHistory(db, docId, user.id, user.username, 'Created Document');
 
   return c.json(
     {
@@ -503,50 +593,98 @@ app.post('/api/documents', authenticateUser, async (c) => {
       _id: docId,
       title,
       owner: user.id,
-      pages,
+      pages: [{ content: firstPageContent }],
     },
     201
   );
 });
 
-app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
+app.patch('/api/documents/:id', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
+  const docId = validateUuid(c.req.param('id'), 'document id');
+  const body = await readJson(c, LIMITS.documentBody);
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentEditable(access);
 
-  // Verify access permissions
-  const doc = await c.env.DB.prepare('SELECT owner, isPublic FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) return c.json({ message: 'Document not found' }, 404);
+  const updates = ["lastModified = datetime('now')", 'lastModifiedBy = ?'];
+  const bindings = [user.id];
+  let title;
+  let firstPageContent;
 
-  const isOwner = doc.owner === user.id;
-  const permission = await c.env.DB.prepare(
-    'SELECT role FROM document_permissions WHERE documentId = ? AND userId = ?'
-  )
-    .bind(docId, user.id)
-    .first();
-
-  if (!isOwner && !permission && doc.isPublic !== 1) {
-    return c.json({ message: 'Access denied' }, 403);
+  if (body.title !== undefined) {
+    title = validateTitle(body.title);
+    updates.push('title = ?');
+    bindings.push(title);
   }
 
+  if (body.pages !== undefined) {
+    if (!Array.isArray(body.pages)) {
+      throw new AppError(400, 'Pages must be an array', 'invalid_pages');
+    }
+    firstPageContent = validatePageContent(body.pages[0] && body.pages[0].content);
+  }
+
+  if (updates.length > 2) {
+    bindings.push(docId);
+    await db
+      .prepare(`UPDATE documents SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...bindings)
+      .run();
+  } else {
+    await db
+      .prepare(
+        "UPDATE documents SET lastModified = datetime('now'), lastModifiedBy = ? WHERE id = ?"
+      )
+      .bind(user.id, docId)
+      .run();
+  }
+
+  if (firstPageContent !== undefined) {
+    await db.prepare('DELETE FROM document_pages WHERE documentId = ?').bind(docId).run();
+    await db
+      .prepare('INSERT INTO document_pages (documentId, pageIndex, content) VALUES (?, 0, ?)')
+      .bind(docId, firstPageContent)
+      .run();
+  }
+
+  await logHistory(db, docId, user.id, user.username, 'Updated Document');
+
+  return c.json({
+    id: docId,
+    _id: docId,
+    title: title || access.doc.title,
+    pages: firstPageContent === undefined ? undefined : [{ content: firstPageContent }],
+  });
+});
+
+app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
+  const user = c.get('user');
+  const docId = validateUuid(c.req.param('id'), 'document id');
+
+  // Verify access permissions
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentReadable(access);
+
   // Upsert in recent_documents
-  await c.env.DB.prepare(
-    "INSERT OR REPLACE INTO recent_documents (userId, documentId, accessedAt) VALUES (?, ?, datetime('now'))"
-  )
+  await db
+    .prepare(
+      "INSERT OR REPLACE INTO recent_documents (userId, documentId, accessedAt) VALUES (?, ?, datetime('now'))"
+    )
     .bind(user.id, docId)
     .run();
 
   // Keep only last 20 recent docs
-  const recents = await c.env.DB.prepare(
-    'SELECT documentId FROM recent_documents WHERE userId = ? ORDER BY accessedAt DESC'
-  )
+  const recents = await db
+    .prepare('SELECT documentId FROM recent_documents WHERE userId = ? ORDER BY accessedAt DESC')
     .bind(user.id)
     .all();
 
   if (recents.results && recents.results.length > 20) {
     const thresholdDate = recents.results[19].accessedAt;
-    await c.env.DB.prepare('DELETE FROM recent_documents WHERE userId = ? AND accessedAt < ?')
+    await db
+      .prepare('DELETE FROM recent_documents WHERE userId = ? AND accessedAt < ?')
       .bind(user.id, thresholdDate)
       .run();
   }
@@ -555,50 +693,31 @@ app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
 });
 
 app.get('/api/documents/:id/settings', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
+  const docId = validateUuid(c.req.param('id'), 'document id');
 
-  const doc = await c.env.DB.prepare('SELECT owner, isPublic FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) return c.json({ message: 'Document not found' }, 404);
-
-  const isOwner = doc.owner === user.id;
-  const permission = await c.env.DB.prepare(
-    'SELECT role FROM document_permissions WHERE documentId = ? AND userId = ?'
-  )
-    .bind(docId, user.id)
-    .first();
-
-  if (!isOwner && !permission && doc.isPublic !== 1) {
-    return c.json({ message: 'Access denied' }, 403);
-  }
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentReadable(access);
 
   return c.json({
-    isPublic: doc.isPublic === 1,
-    isOwner,
-    isShared: permission && permission.role === 'editor',
+    isPublic: access.isPublic,
+    isOwner: access.isOwner,
+    isShared: access.role === 'editor',
   });
 });
 
 app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
-  const { isPublic } = await c.req.json();
+  const docId = validateUuid(c.req.param('id'), 'document id');
+  const { isPublic } = await readJson(c, LIMITS.authBody);
 
-  const doc = await c.env.DB.prepare('SELECT owner FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) return c.json({ message: 'Document not found' }, 404);
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentOwner(access);
 
-  if (doc.owner !== user.id) {
-    return c.json({ message: 'Access denied. Only owner can change settings.' }, 403);
-  }
-
-  const isPublicVal = isPublic === true || isPublic === 'true' ? 1 : 0;
-  await c.env.DB.prepare('UPDATE documents SET isPublic = ? WHERE id = ?')
-    .bind(isPublicVal, docId)
-    .run();
+  const isPublicVal = validateBoolean(isPublic, 'isPublic') ? 1 : 0;
+  await db.prepare('UPDATE documents SET isPublic = ? WHERE id = ?').bind(isPublicVal, docId).run();
 
   return c.json({
     message: 'Settings updated',
@@ -607,72 +726,63 @@ app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
 });
 
 app.delete('/api/documents/:id', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
+  const docId = validateUuid(c.req.param('id'), 'document id');
 
-  const doc = await c.env.DB.prepare('SELECT owner FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) {
+  let access;
+  try {
+    access = await getDocumentAccess(db, docId, user.id);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.status !== 404) throw err;
     // Try to remove from recent list anyway if it is there
-    await c.env.DB.prepare('DELETE FROM recent_documents WHERE userId = ? AND documentId = ?')
+    await db
+      .prepare('DELETE FROM recent_documents WHERE userId = ? AND documentId = ?')
       .bind(user.id, docId)
       .run();
     return c.json({ message: 'Document not found', action: 'removed' }, 404);
   }
 
-  const isOwner = doc.owner === user.id;
-  const permission = await c.env.DB.prepare(
-    'SELECT role FROM document_permissions WHERE documentId = ? AND userId = ?'
-  )
-    .bind(docId, user.id)
-    .first();
-
-  if (!isOwner && permission && permission.role === 'editor') {
+  if (!access.isOwner && access.role === 'editor') {
     // If collaborator, just remove shared permission and from recent
-    await c.env.DB.prepare('DELETE FROM document_permissions WHERE documentId = ? AND userId = ?')
+    await db
+      .prepare('DELETE FROM document_permissions WHERE documentId = ? AND userId = ?')
       .bind(docId, user.id)
       .run();
-    await c.env.DB.prepare('DELETE FROM recent_documents WHERE userId = ? AND documentId = ?')
+    await db
+      .prepare('DELETE FROM recent_documents WHERE userId = ? AND documentId = ?')
       .bind(user.id, docId)
       .run();
     return c.json({ message: 'Removed from your drive', action: 'removed' });
   }
 
-  if (!isOwner) {
+  if (!access.isOwner) {
     return c.json({ message: 'Only the document owner can delete this document' }, 403);
   }
 
   // Permanently delete document and all cascade references
-  await c.env.DB.prepare('DELETE FROM documents WHERE id = ?').bind(docId).run();
-  await c.env.DB.prepare('DELETE FROM document_pages WHERE documentId = ?').bind(docId).run();
-  await c.env.DB.prepare('DELETE FROM document_permissions WHERE documentId = ?').bind(docId).run();
-  await c.env.DB.prepare('DELETE FROM recent_documents WHERE documentId = ?').bind(docId).run();
-  await c.env.DB.prepare('DELETE FROM document_history WHERE documentId = ?').bind(docId).run();
+  await db.prepare('DELETE FROM documents WHERE id = ?').bind(docId).run();
+  await db.prepare('DELETE FROM document_pages WHERE documentId = ?').bind(docId).run();
+  await db.prepare('DELETE FROM document_permissions WHERE documentId = ?').bind(docId).run();
+  await db.prepare('DELETE FROM recent_documents WHERE documentId = ?').bind(docId).run();
+  await db.prepare('DELETE FROM document_history WHERE documentId = ?').bind(docId).run();
 
   return c.json({ message: 'Document deleted', action: 'deleted' });
 });
 
 app.post('/api/documents/:id/transfer', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
-  const { newOwnerUsername } = await c.req.json();
+  const docId = validateUuid(c.req.param('id'), 'document id');
+  const { newOwnerUsername } = await readJson(c, LIMITS.authBody);
+  const trimmedNewOwnerUsername = validateUsername(newOwnerUsername);
 
-  if (!newOwnerUsername) {
-    return c.json({ message: 'New owner username is required' }, 400);
-  }
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentOwner(access);
 
-  const doc = await c.env.DB.prepare('SELECT owner FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) return c.json({ message: 'Document not found' }, 404);
-
-  if (doc.owner !== user.id) {
-    return c.json({ message: 'Access denied. Only the owner can transfer ownership.' }, 403);
-  }
-
-  const newOwner = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?')
-    .bind(newOwnerUsername.trim())
+  const newOwner = await db
+    .prepare('SELECT id FROM users WHERE username = ?')
+    .bind(trimmedNewOwnerUsername)
     .first();
   if (!newOwner) {
     return c.json({ message: 'User not found' }, 404);
@@ -683,56 +793,46 @@ app.post('/api/documents/:id/transfer', authenticateUser, async (c) => {
   }
 
   // Transfer ownership
-  await c.env.DB.prepare('UPDATE documents SET owner = ? WHERE id = ?')
-    .bind(newOwner.id, docId)
-    .run();
+  await db.prepare('UPDATE documents SET owner = ? WHERE id = ?').bind(newOwner.id, docId).run();
 
   // Add old owner to permissions so they retain editor access
-  await c.env.DB.prepare(
-    "INSERT OR REPLACE INTO document_permissions (documentId, userId, role) VALUES (?, ?, 'editor')"
-  )
+  await db
+    .prepare(
+      "INSERT OR REPLACE INTO document_permissions (documentId, userId, role) VALUES (?, ?, 'editor')"
+    )
     .bind(docId, user.id)
     .run();
 
   // Remove new owner from permissions list
-  await c.env.DB.prepare('DELETE FROM document_permissions WHERE documentId = ? AND userId = ?')
+  await db
+    .prepare('DELETE FROM document_permissions WHERE documentId = ? AND userId = ?')
     .bind(docId, newOwner.id)
     .run();
 
   await logHistory(
-    c.env.DB,
+    db,
     docId,
     user.id,
     user.username,
-    `Transferred ownership to ${newOwnerUsername}`
+    `Transferred ownership to ${trimmedNewOwnerUsername}`
   );
 
-  return c.json({ message: `Ownership transferred to ${newOwnerUsername}` });
+  return c.json({
+    message: `Ownership transferred to ${trimmedNewOwnerUsername}`,
+  });
 });
 
 app.get('/api/documents/:id/history', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
+  const docId = validateUuid(c.req.param('id'), 'document id');
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentReadable(access);
 
-  const doc = await c.env.DB.prepare('SELECT owner, isPublic FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) return c.json({ message: 'Document not found' }, 404);
-
-  const isOwner = doc.owner === user.id;
-  const permission = await c.env.DB.prepare(
-    'SELECT role FROM document_permissions WHERE documentId = ? AND userId = ?'
-  )
-    .bind(docId, user.id)
-    .first();
-
-  if (!isOwner && !permission && doc.isPublic !== 1) {
-    return c.json({ message: 'Access denied' }, 403);
-  }
-
-  const history = await c.env.DB.prepare(
-    'SELECT id, documentId, userId, username, action, details, timestamp FROM document_history WHERE documentId = ? ORDER BY timestamp DESC LIMIT 50'
-  )
+  const history = await db
+    .prepare(
+      'SELECT id, documentId, userId, username, action, details, timestamp FROM document_history WHERE documentId = ? ORDER BY timestamp DESC LIMIT 50'
+    )
     .bind(docId)
     .all();
 
@@ -740,29 +840,16 @@ app.get('/api/documents/:id/history', authenticateUser, async (c) => {
 });
 
 app.get('/api/documents/:id/info', authenticateUser, async (c) => {
+  const db = requireDb(c.env);
   const user = c.get('user');
-  const docId = c.req.param('id');
-
-  const doc = await c.env.DB.prepare('SELECT owner, title, isPublic FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-  if (!doc) return c.json({ message: 'Document not found' }, 404);
-
-  const isOwner = doc.owner === user.id;
-  const permission = await c.env.DB.prepare(
-    'SELECT role FROM document_permissions WHERE documentId = ? AND userId = ?'
-  )
-    .bind(docId, user.id)
-    .first();
-
-  if (!isOwner && !permission && doc.isPublic !== 1) {
-    return c.json({ message: 'Access denied' }, 403);
-  }
+  const docId = validateUuid(c.req.param('id'), 'document id');
+  const access = await getDocumentAccess(db, docId, user.id);
+  assertDocumentReadable(access);
 
   return c.json({
-    title: doc.title,
-    isOwner,
-    isShared: permission && permission.role === 'editor',
+    title: access.doc.title,
+    isOwner: access.isOwner,
+    isShared: access.role === 'editor',
   });
 });
 
@@ -770,9 +857,11 @@ app.get('/api/documents/:id/info', authenticateUser, async (c) => {
 // WebSocket Routing
 // -------------------------------------------------------------
 app.get('/ws/:id', (c) => {
-  const docId = c.req.param('id');
-  const id = c.env.DOCUMENT_SYNC_OBJECT.idFromName(docId);
-  const stub = c.env.DOCUMENT_SYNC_OBJECT.get(id);
+  requireDb(c.env);
+  const docId = validateUuid(c.req.param('id'), 'document id');
+  const binding = requireDurableObject(c.env, 'DOCUMENT_SYNC_OBJECT');
+  const id = binding.idFromName(docId);
+  const stub = binding.get(id);
   return stub.fetch(c.req.raw);
 });
 

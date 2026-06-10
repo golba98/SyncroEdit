@@ -3,9 +3,29 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { verify } from 'hono/jwt';
+import {
+  AppError,
+  LIMITS,
+  assertDocumentReadable,
+  getDocumentAccess,
+  requireDb,
+  requireJwtSecret,
+  validateTitle,
+  validateUuid,
+} from './security.js';
 
 const messageSync = 0;
 const messageAwareness = 1;
+
+function textResponse(message, status) {
+  return new Response(message, {
+    status,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
 
 function uint8ArrayToBase64(arr) {
   let binary = '';
@@ -38,12 +58,14 @@ export class DocumentSyncObject {
   async getDoc(docId) {
     if (this.doc) return this.doc;
 
+    const db = requireDb(this.env);
     this.doc = new Y.Doc();
     this.doc.conns = this.conns;
 
     // Load initial state from D1
     try {
-      const row = await this.env.DB.prepare('SELECT yjsState FROM documents WHERE id = ?')
+      const row = await db
+        .prepare('SELECT yjsState FROM documents WHERE id = ?')
         .bind(docId)
         .first();
 
@@ -90,6 +112,7 @@ export class DocumentSyncObject {
   }
 
   async saveNow(docId) {
+    const db = requireDb(this.env);
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
@@ -101,7 +124,12 @@ export class DocumentSyncObject {
       const stateBase64 = uint8ArrayToBase64(state);
 
       const meta = this.doc.getMap('meta');
-      const title = meta.get('title') || 'Untitled document';
+      let title = 'Untitled document';
+      try {
+        title = validateTitle(meta.get('title') || 'Untitled document');
+      } catch {
+        title = 'Untitled document';
+      }
 
       const pages = this.doc.getArray('pages');
       let previewContent = '';
@@ -115,19 +143,17 @@ export class DocumentSyncObject {
         }
       }
 
-      await this.env.DB.prepare(
-        "UPDATE documents SET yjsState = ?, title = ?, lastModified = datetime('now') WHERE id = ?"
-      )
+      await db
+        .prepare(
+          "UPDATE documents SET yjsState = ?, title = ?, lastModified = datetime('now') WHERE id = ?"
+        )
         .bind(stateBase64, title, docId)
         .run();
 
       if (previewContent !== '') {
-        await this.env.DB.prepare('DELETE FROM document_pages WHERE documentId = ?')
-          .bind(docId)
-          .run();
-        await this.env.DB.prepare(
-          'INSERT INTO document_pages (documentId, pageIndex, content) VALUES (?, 0, ?)'
-        )
+        await db.prepare('DELETE FROM document_pages WHERE documentId = ?').bind(docId).run();
+        await db
+          .prepare('INSERT INTO document_pages (documentId, pageIndex, content) VALUES (?, 0, ?)')
           .bind(docId, previewContent.substring(0, 500))
           .run();
       }
@@ -139,7 +165,7 @@ export class DocumentSyncObject {
 
   async verifyWsTicket(ticket) {
     try {
-      const jwtSecret = this.env.JWT_SECRET || 'dev-secret-key';
+      const jwtSecret = requireJwtSecret(this.env);
       const decoded = await verify(ticket, jwtSecret, 'HS256');
       if (decoded.type !== 'ws-ticket') return null;
       return { userId: decoded.sub, username: decoded.username };
@@ -149,57 +175,47 @@ export class DocumentSyncObject {
   }
 
   async fetch(request) {
-    const url = new URL(request.url);
-    const docId = url.pathname.split('/').pop();
+    let docId;
+    try {
+      const url = new URL(request.url);
+      docId = validateUuid(url.pathname.split('/').pop(), 'document id');
 
-    const ticket = url.searchParams.get('ticket');
-    if (!ticket) {
-      return new Response('Unauthorized: Ticket missing', { status: 401 });
+      const ticket = url.searchParams.get('ticket');
+      if (!ticket) {
+        return textResponse('Unauthorized: Ticket missing', 401);
+      }
+
+      const ticketInfo = await this.verifyWsTicket(ticket);
+      if (!ticketInfo) {
+        return textResponse('Unauthorized: Invalid or expired ticket', 401);
+      }
+
+      const { userId, username } = ticketInfo;
+      const db = requireDb(this.env);
+      const access = await getDocumentAccess(db, docId, userId);
+      assertDocumentReadable(access);
+
+      const readOnly = !access.canEdit;
+
+      // Upgrade connection
+      const webSocketPair = new WebSocketPair();
+      const [client, server] = Object.values(webSocketPair);
+
+      await this.handleConnection(server, docId, userId, username, readOnly);
+
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+      });
+    } catch (err) {
+      if (err instanceof AppError) {
+        return textResponse(err.message, err.status);
+      }
+      console.error('[DO] Failed to establish websocket:', {
+        message: err && err.message ? err.message : 'Unknown error',
+      });
+      return textResponse('Internal Server Error', 500);
     }
-
-    const ticketInfo = await this.verifyWsTicket(ticket);
-    if (!ticketInfo) {
-      return new Response('Unauthorized: Invalid or expired ticket', { status: 401 });
-    }
-
-    const { userId, username } = ticketInfo;
-
-    // Check permissions
-    const docInfo = await this.env.DB.prepare('SELECT owner, isPublic FROM documents WHERE id = ?')
-      .bind(docId)
-      .first();
-
-    if (!docInfo) {
-      return new Response('Document not found', { status: 404 });
-    }
-
-    const isOwner = docInfo.owner === userId;
-    const permission = await this.env.DB.prepare(
-      'SELECT role FROM document_permissions WHERE documentId = ? AND userId = ?'
-    )
-      .bind(docId, userId)
-      .first();
-
-    const isShared = permission && permission.role === 'editor';
-    const isViewer = permission && permission.role === 'viewer';
-    const isPublic = docInfo.isPublic === 1;
-
-    if (!isOwner && !isShared && !isViewer && !isPublic) {
-      return new Response('Forbidden', { status: 403 });
-    }
-
-    const readOnly = isViewer && !isOwner && !isShared;
-
-    // Upgrade connection
-    const webSocketPair = new WebSocketPair();
-    const [client, server] = Object.values(webSocketPair);
-
-    await this.handleConnection(server, docId, userId, username, readOnly);
-
-    return new Response(null, {
-      status: 101,
-      webSocket: client,
-    });
   }
 
   async handleConnection(ws, docId, userId, username, readOnly) {
@@ -218,7 +234,21 @@ export class DocumentSyncObject {
     // Handle messages
     ws.addEventListener('message', async (event) => {
       try {
-        const message = new Uint8Array(event.data);
+        let message;
+        if (event.data instanceof ArrayBuffer) {
+          message = new Uint8Array(event.data);
+        } else if (event.data instanceof Uint8Array) {
+          message = event.data;
+        } else {
+          ws.close(1003, 'Unsupported message type');
+          return;
+        }
+
+        if (message.byteLength === 0 || message.byteLength > LIMITS.websocketMessage) {
+          ws.close(1009, 'Message too large');
+          return;
+        }
+
         const decoder = decoding.createDecoder(message);
         const messageType = decoding.readVarUint(decoder);
 
@@ -254,9 +284,17 @@ export class DocumentSyncObject {
             });
             break;
           }
+          default:
+            ws.close(1003, 'Unknown message type');
+            break;
         }
       } catch (err) {
-        console.error('[DO] Error handling message:', err);
+        console.error('[DO] Error handling message:', {
+          message: err && err.message ? err.message : 'Unknown error',
+        });
+        try {
+          ws.close(1003, 'Malformed message');
+        } catch {}
       }
     });
 

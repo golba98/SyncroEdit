@@ -7,18 +7,16 @@ This file explains where project files belong and what should not be committed.
 - `package.json` and `package-lock.json`: Node dependencies and npm scripts.
 - `README.md`: practical setup and run instructions.
 - `SECURITY.md`: public vulnerability reporting policy.
-- `Dockerfile`, `docker-compose.yml`, `.dockerignore`: container support.
-- `.env.example`, `.env.docker.example`: safe environment templates.
+- `.env.example`: local Worker secret template guidance.
 - `config/`: tool configuration that does not need to live at the root.
 
 ## Source Code
 
-- `src/`: Express backend code.
-  - `src/auth/`: authentication, sessions, and auth routes.
-  - `src/documents/`: document models, controllers, routes, and WebSocket sync.
-  - `src/users/`: user model, profile routes, and user controller.
-  - `src/middleware/`: Express middleware.
-  - `src/utils/`: backend helpers such as logging, email, CSRF, and shutdown handling.
+- `src-worker/`: Cloudflare Worker and Durable Object backend.
+  - `index.js`: Hono routes for auth, users, documents, config, and WebSocket routing.
+  - `auth.js`: Worker-compatible password hashing and token/session helpers.
+  - `syncObject.js`: Durable Object realtime document rooms.
+  - `security.js`: validation, env binding guards, CORS, and security headers.
 - `public/`: browser app and static assets.
   - `public/index.html`: main app shell.
   - `public/pages/`: login, verification, and password reset pages.
@@ -44,13 +42,10 @@ This file explains where project files belong and what should not be committed.
 - `docs/architecture/`: architecture context and performance notes.
 - `docs/testing/`: test-running guidance.
 - `docs/design/`: design explorations that are still worth keeping.
-- `docs/archive/`: old planning notes, historical cleanup reports, and retired experiments.
 
 ## Scripts
 
 - `scripts/dev/`: local development launch helpers.
-- `scripts/test/`: helpers that prepare test data.
-- `scripts/maintenance/`: manual diagnostics and one-off maintenance helpers.
 
 ## Do Not Commit
 

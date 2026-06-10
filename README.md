@@ -18,7 +18,7 @@ graph TD
 ```
 
 - **Cloudflare Worker (Hono):** Handles all HTTP routing, user authentication, profile details, and document CRUD API endpoints.
-- **Cloudflare D1:** Acts as the primary SQL relational database (replacing MongoDB) to store users, sessions, documents, and permissions.
+- **Cloudflare D1:** Acts as the primary SQL relational database to store users, sessions, documents, and permissions.
 - **Durable Objects (`DocumentSyncObject`):** Represents individual document collaboration rooms. Manages WebSocket connections, state vectors, Yjs sync steps, cursor awareness propagation, and debounces state flushes back to D1.
 - **Static Assets:** Served directly from the `./public` directory via Wrangler's assets binding.
 
@@ -107,13 +107,9 @@ npm test
 
 ---
 
-## What Was Removed / Replaced
+## Production Boundary
 
-1. **MongoDB / Mongoose:** Replaced with Cloudflare D1 (relational SQLite database).
-2. **Node.js / Express Server:** Replaced with Cloudflare Workers (Hono framework).
-3. **Local Tunnel Tunnels / trycloudflare:** Removed completely. Development and production both run direct endpoints.
-4. **Hybrid Proxy Config:** Removed all Worker-to-Node proxy routes. The worker now directly handles all API routes.
-5. **Old test files:** Archival copy of old MongoDB/Express integration and unit tests moved to `tests/archive/`.
+SyncroEdit's production backend is the Cloudflare Worker in `src-worker/`. API routes, D1 access, session handling, and Durable Object realtime rooms all run in Cloudflare. Static assets are served from `./public` through Wrangler's assets binding.
 
 ---
 

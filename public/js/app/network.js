@@ -1,7 +1,5 @@
 import { Auth } from '/js/features/auth/auth.js';
 
-let _csrfToken = null;
-let _csrfPromise = null;
 let _refreshPromise = null;
 
 function getRuntimeConfig() {
@@ -44,39 +42,10 @@ function getConfiguredWebSocketBaseUrl() {
 }
 
 export const Network = {
-  async fetchCsrfToken() {
-    if (_csrfPromise) return _csrfPromise;
-
-    _csrfPromise = (async () => {
-      try {
-        const response = await fetch(buildApiUrl('/api/auth/csrf-token'), {
-          credentials: 'include',
-        });
-        if (!response.ok) throw new Error(response.statusText);
-        const data = await response.json();
-        _csrfToken = data.csrfToken;
-        return _csrfToken;
-      } catch (err) {
-        console.error('Failed to fetch CSRF token:', err);
-        _csrfToken = null;
-        return null;
-      } finally {
-        _csrfPromise = null;
-      }
-    })();
-
-    return _csrfPromise;
-  },
-
   async fetchAPI(url, options = {}) {
-    if (!_csrfToken && !url.includes('/csrf-token')) {
-      await this.fetchCsrfToken();
-    }
-
     let token = Auth.getToken();
     const headers = {
       'Content-Type': 'application/json',
-      'X-CSRF-Token': _csrfToken,
       ...options.headers,
     };
 
@@ -84,20 +53,13 @@ export const Network = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Debug CSRF
-    // console.log(`[Network] Fetching ${url} with CSRF: ${_csrfToken ? _csrfToken.substring(0,10)+'...' : 'null'}`);
-
     const requestUrl = buildApiUrl(url);
 
-    let response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
-
-    // Interceptor: Check for 403 (Forbidden) - could be CSRF failure
-    if (response.status === 403 && !url.includes('/csrf-token')) {
-      console.warn('Potential CSRF failure or access denied, retrying with fresh token...');
-      await this.fetchCsrfToken();
-      headers['X-CSRF-Token'] = _csrfToken;
-      response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
-    }
+    let response = await fetch(requestUrl, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
 
     // Interceptor: Check for 401 (Unauthorized)
     // Don't try to refresh if we are explicitly trying to login/signup/verify/logout or if we are already refreshing
@@ -118,7 +80,6 @@ export const Network = {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'X-CSRF-Token': _csrfToken,
                 },
                 credentials: 'include',
               });
@@ -131,7 +92,7 @@ export const Network = {
                 await Auth.logout();
                 return null;
               }
-            } catch (e) {
+            } catch {
               await Auth.logout();
               return null;
             } finally {
@@ -144,11 +105,15 @@ export const Network = {
         if (newToken) {
           // Retry original request with new token
           headers.Authorization = `Bearer ${newToken}`;
-          response = await fetch(requestUrl, { ...options, headers, credentials: 'include' });
+          response = await fetch(requestUrl, {
+            ...options,
+            headers,
+            credentials: 'include',
+          });
         } else {
           return;
         }
-      } catch (e) {
+      } catch {
         return;
       }
     }
@@ -158,7 +123,7 @@ export const Network = {
       try {
         const errData = await response.json();
         if (errData && errData.message) message = errData.message;
-      } catch (_) {}
+      } catch {}
       throw new Error(message);
     }
     return response.json();
@@ -233,7 +198,7 @@ export const Network = {
         const { ticket } = await this.fetchAPI('/api/auth/ws-ticket');
 
         const config = getRuntimeConfig();
-        const realtimeBackend = config.REALTIME_BACKEND || 'node';
+        const realtimeBackend = config.REALTIME_BACKEND || 'durable-object';
         let wsFullUrl;
         if (realtimeBackend === 'durable-object') {
           let base = wsUrl;

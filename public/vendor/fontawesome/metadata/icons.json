@@ -20307,7 +20307,7 @@
     "changes": ["5.6.0"],
     "ligatures": [],
     "search": {
-      "terms": ["Federal Express", "package", "shipping"]
+      "terms": ["package", "shipping"]
     },
     "styles": ["brands"],
     "unicode": "f797",

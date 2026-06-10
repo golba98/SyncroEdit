@@ -2,15 +2,16 @@
   "name": "1-synchroedit",
   "version": "1.0.0",
   "description": "",
-  "main": "src/server.js",
+  "main": "src-worker/index.js",
   "scripts": {
+    "start": "wrangler dev",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "test": "npm run test:unit",
+    "test": "npm run test:unit && npm run test:integration",
     "test:unit": "cross-env SKIP_DB_SETUP=true jest tests/unit",
-    "test:integration": "echo 'Integration tests migrated to unit worker suite'",
+    "test:integration": "cross-env SKIP_DB_SETUP=true jest tests/integration",
     "test:e2e": "playwright test --config=config/playwright.config.js",
     "lint": "eslint . --config config/eslint.config.cjs",
     "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore"
@@ -51,24 +52,8 @@
   },
   "homepage": "https://github.com/golba98-dev/SynchroEdit#readme",
   "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "cookie-parser": "^1.4.7",
-    "csrf-csrf": "^4.0.3",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.2.2",
-    "geoip-lite": "^2.0.1",
-    "helmet": "^8.1.0",
     "hono": "^4.12.25",
     "idb-keyval": "^6.2.2",
-    "jsonwebtoken": "^9.0.3",
-    "mongodb": "^7.1.1",
-    "mongoose": "^9.6.2",
-    "nodemailer": "^8.0.7",
-    "speakeasy": "^2.0.0",
-    "ua-parser-js": "^2.0.7",
-    "winston": "^3.19.0",
-    "ws": "^8.18.3",
     "y-protocols": "^1.0.7",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.30"
@@ -84,8 +69,6 @@
     "eslint-plugin-prettier": "^5.5.4",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
-    "mongodb-memory-server": "^11.0.1",
-    "prettier": "^3.8.3",
-    "supertest": "^7.1.4"
+    "prettier": "^3.8.3"
   }
 }

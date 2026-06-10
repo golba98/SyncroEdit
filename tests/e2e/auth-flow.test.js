@@ -30,7 +30,9 @@ test.describe('Auth and Basic Document Flow', () => {
 
     // Quill editor
     const editor = page.locator('.ql-editor');
-    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 30000 });
+    await expect(editor).toHaveAttribute('contenteditable', 'true', {
+      timeout: 30000,
+    });
     await editor.click({ force: true });
     await editor.fill('Hello, this is a test collaborative document!');
 
@@ -52,13 +54,8 @@ test.describe('Auth and Basic Document Flow', () => {
   test('should keep session verification hidden during startup reloads', async ({ page }) => {
     await page.goto('/pages/login.html');
     const testUser = `startup_${test.info().project.name}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const csrfResponse = await page.request.get('/api/auth/csrf-token');
-    const { csrfToken } = await csrfResponse.json();
 
     const signupResponse = await page.request.post('/api/auth/signup', {
-      headers: {
-        'X-CSRF-Token': csrfToken,
-      },
       data: {
         username: testUser,
         email: `${testUser}@example.com`,

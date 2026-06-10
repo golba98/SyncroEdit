@@ -15592,7 +15592,6 @@ fedex:
   label: FedEx
   search:
     terms:
-      - Federal Express
       - package
       - shipping
   styles:

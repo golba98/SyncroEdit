@@ -64,11 +64,11 @@ describe('Network Module', () => {
       expect(Network.getApiUrl('/api/auth/login')).toBe('https://api.example.com/api/auth/login');
     });
 
-    it('supports Worker proxy API base URLs with a path', () => {
-      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/api/node';
+    it('supports Worker API base URLs with a path', () => {
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/app';
 
       expect(Network.getApiUrl('/api/auth/login')).toBe(
-        'https://syncroedit.example.com/api/node/auth/login'
+        'https://syncroedit.example.com/app/api/auth/login'
       );
     });
 
@@ -78,8 +78,8 @@ describe('Network Module', () => {
       expect(Network.getWebSocketBaseUrl()).toBe('wss://syncroedit.example.com/ws');
     });
 
-    it('strips /api/node when REALTIME_BACKEND is durable-object', () => {
-      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/api/node';
+    it('derives WebSocket origin from API base URL when no explicit URL is configured', () => {
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com';
       window.SYNCROEDIT_CONFIG.REALTIME_BACKEND = 'durable-object';
 
       expect(Network.getWebSocketBaseUrl()).toBe('wss://syncroedit.example.com');
@@ -121,7 +121,7 @@ describe('Network Module', () => {
       mockWebSocket.onopen();
       expect(onStatusChange).toHaveBeenCalledWith('connected');
       expect(global.WebSocket).toHaveBeenCalledWith(
-        expect.stringContaining('?documentId=doc1&ticket=mock-ticket')
+        expect.stringContaining('/ws/doc1?ticket=mock-ticket')
       );
       expect(mockWebSocket.send).not.toHaveBeenCalled();
     });
@@ -148,7 +148,7 @@ describe('Network Module', () => {
     it('should initialize WebSocket connection for durable-object backend', async () => {
       const onMessage = jest.fn();
       window.SYNCROEDIT_CONFIG.REALTIME_BACKEND = 'durable-object';
-      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com/api/node';
+      window.SYNCROEDIT_CONFIG.API_BASE_URL = 'https://syncroedit.example.com';
 
       global.fetch.mockResolvedValue({
         ok: true,

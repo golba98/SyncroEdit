@@ -135,6 +135,13 @@ export class MockD1 {
       return { success: true };
     }
 
+    if (sql.includes('SELECT password FROM users WHERE id = ?')) {
+      const [id] = args;
+      const found = this.users.find((u) => u.id === id);
+      const result = found ? { password: found.password } : null;
+      return firstOnly ? result : result ? [result] : [];
+    }
+
     // 10. UPDATE sessions SET lastActive = datetime('now') WHERE id = ?
     if (sql.includes("UPDATE sessions SET lastActive = datetime('now') WHERE id = ?")) {
       const [id] = args;
@@ -278,7 +285,11 @@ export class MockD1 {
       this.recent_documents = this.recent_documents.filter(
         (r) => !(r.userId === userId && r.documentId === documentId)
       );
-      this.recent_documents.push({ userId, documentId, accessedAt: new Date().toISOString() });
+      this.recent_documents.push({
+        userId,
+        documentId,
+        accessedAt: new Date().toISOString(),
+      });
       return { success: true };
     }
 
@@ -361,7 +372,11 @@ export class MockD1 {
       this.document_permissions = this.document_permissions.filter(
         (p) => !(p.documentId === documentId && p.userId === userId)
       );
-      this.document_permissions.push({ documentId, userId, role });
+      this.document_permissions.push({
+        documentId,
+        userId,
+        role: role || 'editor',
+      });
       return { success: true };
     }
 
@@ -401,6 +416,59 @@ export class MockD1 {
       };
       this.document_history.push(entry);
       return entry;
+    }
+
+    if (sql.includes('SELECT yjsState FROM documents WHERE id = ?')) {
+      const [id] = args;
+      const found = this.documents.find((d) => d.id === id);
+      const result = found ? { yjsState: found.yjsState || '' } : null;
+      return firstOnly ? result : result ? [result] : [];
+    }
+
+    if (sql.includes('UPDATE documents SET yjsState = ?, title = ?, lastModified = datetime')) {
+      const [yjsState, title, id] = args;
+      const doc = this.documents.find((d) => d.id === id);
+      if (doc) {
+        doc.yjsState = yjsState;
+        doc.title = title;
+        doc.lastModified = new Date().toISOString();
+      }
+      return { success: true };
+    }
+
+    if (sql.includes('UPDATE documents SET lastModified = datetime')) {
+      const id = args[args.length - 1];
+      const doc = this.documents.find((d) => d.id === id);
+      if (doc) {
+        doc.lastModified = new Date().toISOString();
+        doc.lastModifiedBy = args[0];
+        if (sql.includes('title = ?')) {
+          doc.title = args[1];
+        }
+      }
+      return { success: true };
+    }
+
+    if (sql.includes('DELETE FROM recent_documents WHERE userId = ? AND documentId = ?')) {
+      const [userId, documentId] = args;
+      this.recent_documents = this.recent_documents.filter(
+        (r) => !(r.userId === userId && r.documentId === documentId)
+      );
+      return { success: true };
+    }
+
+    if (sql.includes('SELECT documentId FROM recent_documents WHERE userId = ?')) {
+      const [userId] = args;
+      const filtered = this.recent_documents.filter((r) => r.userId === userId);
+      return firstOnly ? filtered[0] : filtered;
+    }
+
+    if (sql.includes('DELETE FROM recent_documents WHERE userId = ? AND accessedAt < ?')) {
+      const [userId, accessedAt] = args;
+      this.recent_documents = this.recent_documents.filter(
+        (r) => r.userId !== userId || r.accessedAt >= accessedAt
+      );
+      return { success: true };
     }
 
     // Default fallback
