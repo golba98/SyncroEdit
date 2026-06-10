@@ -87,10 +87,6 @@ export class ImageManager extends Plugin {
     const targetQuill = this.editor.pageQuillInstances.get(targetPageId);
     if (!targetQuill) return;
 
-    // Calculate drop index in target Quill
-    const range = targetQuill.getSelection(true);
-    const dropIndex = range ? range.index : targetQuill.getLength() - 1;
-
     this.editor.doc.transact(() => {
       // 1. Remove from origin
       const originQuill = this.editor.pageQuillInstances.get(data.originPageId);
@@ -103,8 +99,6 @@ export class ImageManager extends Plugin {
     });
 
     // Reflow both pages
-    const pages = this.editor.yPages.toArray();
-    const targetIdx = pages.findIndex((p) => p.get('id') === targetPageId);
     this.editor.pageManager.performReflowCheck();
   }
 
@@ -269,7 +263,6 @@ export class ImageManager extends Plugin {
     this.overlay.style.height = `${rect.height}px`;
 
     // Position handles
-    const size = 12;
     const offset = -6;
 
     this.handles.nw.style.top = `${offset}px`;

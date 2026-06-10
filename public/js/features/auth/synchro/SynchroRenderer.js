@@ -12,7 +12,7 @@ export class SynchroRenderer {
   /**
    * Create and manage particle effects
    */
-  createParticle(type, options = {}) {
+  createParticle(type) {
     const particle = document.createElement('div');
     particle.className = `synchro-particle particle-${type}`;
 

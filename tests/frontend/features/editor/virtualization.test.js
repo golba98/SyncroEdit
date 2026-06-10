@@ -29,7 +29,7 @@ jest.mock('y-quill');
 
 // Mock Quill
 global.Quill = class {
-  constructor(el, opts) {
+  constructor() {
     this.root = document.createElement('div');
     this.on = jest.fn();
     this.getLength = jest.fn().mockReturnValue(0);

@@ -16,6 +16,7 @@ import { debounce } from '/js/app/utils.js';
 
 export class Editor {
   constructor(containerId, options = {}) {
+    this.debug = Boolean(options.debug || window.SYNCROEDIT_CONFIG?.DEBUG);
     this.container = document.getElementById(containerId);
     if (this.container) this.container.innerHTML = ''; // Clear static content
     this.quill = null; // Current active quill
@@ -122,6 +123,12 @@ export class Editor {
     this.createPlaceholderPage();
   }
 
+  _log(...args) {
+    if (this.debug) {
+      console.log(...args);
+    }
+  }
+
   setupIntersectionObserver() {
     const options = {
       root: document.getElementById('pagesContainer'),
@@ -198,11 +205,11 @@ export class Editor {
 
   async loadFromCache(docId) {
     if (!docId) return;
-    console.log('[Editor] loadFromCache docId=', docId);
+    this._log('[Editor] loadFromCache docId=', docId);
     try {
       const cachedUpdate = await get(`doc-store-${docId}`);
       if (cachedUpdate) {
-        console.log('[Editor] cache hit for docId=', docId);
+        this._log('[Editor] cache hit for docId=', docId);
         Y.applyUpdate(this.doc, cachedUpdate);
         this.renderAllPages();
         this._hasLoadedDocumentContent = this.yPages.length > 0;
@@ -238,7 +245,7 @@ export class Editor {
           }, 100);
         }
       } else {
-        console.log('[Editor] cache miss for docId=', docId);
+        this._log('[Editor] cache miss for docId=', docId);
       }
     } catch (err) {
       console.warn('[Editor] Failed to load from IndexedDB:', err);
@@ -353,10 +360,7 @@ export class Editor {
     const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000);
     this._reconnectAttempts += 1;
     this.onStatusChange('reconnecting');
-    if (this._readyForUser) {
-      console.log('[SYNC] reconnecting after ready');
-      console.log('[SYNC] preserving editor view');
-    }
+
     console.warn('[Editor] Scheduling WebSocket reconnect', {
       docId,
       reason,
@@ -430,7 +434,7 @@ export class Editor {
   }
 
   async connectWebSocket(docId, user) {
-    console.log('[Editor] connectWebSocket docId=', docId);
+    this._log('[Editor] connectWebSocket docId=', docId);
     if (!docId || this._destroyed) return null;
     if (!this._readyForUser) this._emitLifecycle('connecting');
     if (user) this.user = user;
@@ -475,7 +479,7 @@ export class Editor {
     let ticket;
     try {
       ticket = await this._fetchWsTicket();
-      console.log('[Editor] WS ticket received');
+      this._log('[Editor] WS ticket received');
     } catch (err) {
       console.error('[Editor] Failed to get WS ticket:', err);
       this._scheduleReconnect(docId, generation, 'initial-ticket-fetch-failed');
@@ -497,7 +501,7 @@ export class Editor {
     this.providerDocId = docId;
     this.updateUser(this.user);
 
-    console.log('[Editor] WebsocketProvider created for docId=', docId);
+    this._log('[Editor] WebsocketProvider created for docId=', docId);
 
     if (!this._readyForUser) this._startSyncTimeout(docId, generation);
 
@@ -506,10 +510,7 @@ export class Editor {
       this.onStatusChange(status);
       if (status === 'connected') {
         this._reconnectAttempts = 0;
-        if (this._readyForUser) {
-          console.log('[SYNC] reconnected after ready');
-          console.log('[SYNC] preserving editor view');
-        } else {
+        if (!this._readyForUser) {
           this._emitLifecycle('syncing');
         }
       }
@@ -540,10 +541,6 @@ export class Editor {
 
       const details = this._describeProviderClose(event, provider);
       console.warn('[Editor] WebSocket connection closed', details);
-      if (this._readyForUser) {
-        console.log('[SYNC] connection lost after ready');
-        console.log('[SYNC] preserving editor view');
-      }
 
       if (this._intentionalProviderClose || provider.shouldConnect === false) {
         return;
@@ -555,10 +552,9 @@ export class Editor {
 
     this.provider.on('sync', (isSynced) => {
       if (this._destroyed || generation !== this._connectionGeneration) return;
-      console.log('[Editor] sync isSynced=', isSynced, 'docId=', docId);
+      this._log('[Editor] sync isSynced=', isSynced, 'docId=', docId);
       if (!isSynced) return;
 
-      console.log('[OPEN] initial sync received');
       this._hasReceivedInitialSync = true;
       this._clearSyncTimeout();
       if (isSynced) {
@@ -613,7 +609,7 @@ export class Editor {
   }
 
   destroy() {
-    console.log('[Editor] destroy docId=', this.currentDocId);
+    this._log('[Editor] destroy docId=', this.currentDocId);
     this._destroyed = true;
     this._connectionGeneration++;
     if (this._readySafetyTimer) {
@@ -830,7 +826,7 @@ export class Editor {
       placeholders.forEach((p) => p.remove());
     }
 
-    console.log('[Editor] renderAllPages pages=', this.yPages.length, 'event=', !!event);
+    this._log('[Editor] renderAllPages pages=', this.yPages.length, 'event=', !!event);
 
     const pages = this.yPages.toArray();
 
@@ -922,10 +918,6 @@ export class Editor {
   _emitLifecycle(state, detail = {}) {
     if (this._destroyed) return;
     if (this._readyForUser && (state === 'connecting' || state === 'syncing')) {
-      console.log('[SYNC] blocked full loading because editor already ready', {
-        requestedState: state,
-      });
-      console.log('[LOAD] full loading suppressed after ready', { requestedState: state });
       return;
     }
     this.onLifecycleChange(state, detail);
@@ -1057,7 +1049,6 @@ export class Editor {
 
     pageQuill.on('text-change', (delta, oldDelta, source) => {
       if (source === 'user' && !this._hasLoggedTyping) {
-        console.log('[EDIT] user typing');
         this._hasLoggedTyping = true;
       }
       const currentIndex = this.yPages.toArray().findIndex((p) => p.get('id') === pageId);

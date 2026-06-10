@@ -4,7 +4,6 @@
 
 import { Profile } from '/js/features/profile/profile.js';
 import { Auth } from '/js/features/auth/auth.js';
-import { Network } from '/js/app/network.js';
 
 jest.mock('/js/features/auth/auth.js');
 jest.mock('/js/app/network.js');

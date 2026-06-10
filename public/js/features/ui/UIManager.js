@@ -242,7 +242,6 @@ export class UIManager {
     // FAB Logic
     const fabCreate = document.getElementById('fabCreateDoc');
     const fabEdit = document.getElementById('fabEditDoc');
-    const mobileToolbar = document.getElementById('mobileContextualToolbar');
 
     if (fabCreate) {
       fabCreate.addEventListener('click', () => {
@@ -328,10 +327,6 @@ export class UIManager {
   applyViewState(state) {
     document.body.dataset.viewState = state;
 
-    if (state === 'dashboard') {
-      console.log('[BOOT] dashboard reveal');
-    }
-
     const bootLoader = document.getElementById('bootLoader');
     if (bootLoader) {
       if (state === 'booting') {
@@ -415,13 +410,9 @@ export class UIManager {
 
   setOpeningDocumentState() {
     if (this.hasShownEditorReady && this.app?.isEditorReadyForCurrentDocument?.()) {
-      console.log('[LOAD] full loading suppressed after ready', {
-        requestedState: 'loading-document',
-      });
       return;
     }
 
-    console.log('[LOAD] full loading shown');
     this.showSkeleton(true);
     this.showSkeletonMessage(false);
     this.setDocumentOpenState('loading-document');
@@ -478,10 +469,6 @@ export class UIManager {
       loadingStates.has(state) &&
       this.app?.isEditorReadyForCurrentDocument?.()
     ) {
-      console.log('[SYNC] blocked full loading because editor already ready', {
-        requestedState: state,
-      });
-      console.log('[LOAD] full loading suppressed after ready', { requestedState: state });
       return;
     }
 
@@ -594,7 +581,7 @@ export class UIManager {
             `;
         })
         .join('');
-    } catch (err) {
+    } catch {
       list.innerHTML = 'Failed to load history';
     }
   }

@@ -18,7 +18,7 @@ export class SelectionManager extends Plugin {
   setupGlobalListeners() {
     // Global tracking
     this.addDisposableListener(document, 'mousemove', (e) => this.handleMouseMove(e));
-    this.addDisposableListener(document, 'mouseup', (e) => this.handleMouseUp(e));
+    this.addDisposableListener(document, 'mouseup', () => this.handleMouseUp());
 
     // Intercept Copy/Cut
     this.addDisposableListener(document, 'copy', (e) => this.handleCopy(e));
@@ -68,7 +68,7 @@ export class SelectionManager extends Plugin {
     this.renderVisuals();
   }
 
-  handleMouseUp(e) {
+  handleMouseUp() {
     this.isSelecting = false;
   }
 

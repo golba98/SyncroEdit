@@ -234,7 +234,7 @@ export class NavigationManager extends Plugin {
     if (e.detail === 3) {
       const range = this.editor.quill?.getSelection();
       if (range) {
-        const [line, offset] = this.editor.quill.getLine(range.index);
+        const [line] = this.editor.quill.getLine(range.index);
         const index = this.editor.quill.getIndex(line);
         const length = line.length();
         this.editor.quill.setSelection(index, length, 'user');

@@ -41,7 +41,6 @@ export const UI = {
 
     container.innerHTML = documents
       .map((doc) => {
-        const isActive = doc._id === currentDocId;
         const date = new Date(doc.lastModified);
         const today = new Date();
         const isToday = date.toDateString() === today.toDateString();

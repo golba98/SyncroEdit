@@ -4,7 +4,6 @@
 
 import { App } from '/js/app/app.js';
 import { Network } from '/js/app/network.js';
-import { Auth } from '/js/features/auth/auth.js';
 import { Profile } from '/js/features/profile/profile.js';
 import { Editor } from '/js/features/editor/editor.js';
 import * as Utils from '/js/app/utils.js';
@@ -105,7 +104,7 @@ describe('App Core Initialization', () => {
       get: jest.fn().mockReturnValue(null),
     }));
 
-    const app = new App();
+    new App();
 
     // Wait for async init
     await new Promise(process.nextTick);
@@ -123,7 +122,7 @@ describe('App Core Initialization', () => {
       get: jest.fn().mockReturnValue('123'),
     }));
 
-    const app = new App();
+    new App();
 
     // Wait for async init
     await new Promise(process.nextTick);
@@ -140,7 +139,7 @@ describe('App Core Initialization', () => {
   it('should redirect to login if profile load fails', async () => {
     Profile.prototype.loadProfile = jest.fn().mockResolvedValue(null);
 
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
 
     expect(Utils.navigateTo).toHaveBeenCalledWith('pages/login.html');
@@ -153,7 +152,7 @@ describe('App Core Initialization', () => {
     }));
     Profile.prototype.loadProfile = jest.fn().mockResolvedValue(null);
 
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
 
     expect(Utils.navigateTo).toHaveBeenCalledWith('pages/login.html?doc=doc-42');
@@ -192,7 +191,7 @@ describe('App Core Initialization', () => {
   });
 
   it('should recheck session silently when tab becomes visible', async () => {
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
 
     Profile.prototype.loadProfile.mockClear();
@@ -490,13 +489,13 @@ describe('App Core Initialization', () => {
   });
 
   it('should initialize with booting view state', () => {
-    const app = new App();
+    new App();
     expect(document.body.dataset.viewState).toBe('booting');
     expect(document.getElementById('bootLoader').style.display).toBe('flex');
   });
 
   it('should transition to dashboard if profile load succeeds and no document ID', async () => {
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
     expect(document.body.dataset.viewState).toBe('dashboard');
     expect(document.getElementById('bootLoader').style.display).toBe('none');
@@ -506,7 +505,7 @@ describe('App Core Initialization', () => {
     global.URLSearchParams = jest.fn(() => ({
       get: jest.fn().mockReturnValue('doc-123'),
     }));
-    const app = new App();
+    new App();
     // Synchronously it is in booting state
     expect(document.body.dataset.viewState).toBe('booting');
 
@@ -518,7 +517,7 @@ describe('App Core Initialization', () => {
 
   it('should transition to auth state if profile load fails', async () => {
     Profile.prototype.loadProfile = jest.fn().mockResolvedValue(null);
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
     expect(document.body.dataset.viewState).toBe('auth');
     expect(document.getElementById('bootLoader').style.display).toBe('none');
@@ -585,7 +584,7 @@ describe('App Core Initialization', () => {
       get: jest.fn().mockReturnValue('doc-xyz'),
     }));
 
-    const app = new App();
+    new App();
     // At construction, must be booting
     expect(document.body.dataset.viewState).toBe('booting');
 

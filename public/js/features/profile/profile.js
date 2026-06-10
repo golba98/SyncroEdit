@@ -341,7 +341,11 @@ export class Profile {
 
       container.innerHTML = '';
       sessions
-        .sort((a, b) => (a.isCurrent ? -1 : 1))
+        .sort((a, b) => {
+          if (a.isCurrent) return -1;
+          if (b.isCurrent) return 1;
+          return 0;
+        })
         .forEach((session) => {
           const sessionEl = document.createElement('div');
           sessionEl.className = 'session-item';
@@ -458,7 +462,7 @@ export class Profile {
     try {
       await Network.fetchAPI(`/api/user/sessions/${sessionId}`, { method: 'DELETE' });
       this.loadSessions();
-    } catch (err) {
+    } catch {
       alert('Failed to revoke session');
     }
   }
@@ -468,7 +472,7 @@ export class Profile {
     try {
       await Network.fetchAPI('/api/user/sessions', { method: 'DELETE' });
       this.loadSessions();
-    } catch (err) {
+    } catch {
       alert('Failed to revoke sessions');
     }
   }
