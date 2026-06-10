@@ -1,12 +1,38 @@
 import { escapeHTML } from '/js/app/utils.js';
 
 export const UI = {
+  renderDocumentSkeleton(container, count = 5) {
+    if (!container) return;
+    container.innerHTML = Array.from({ length: count })
+      .map(
+        () => `
+          <tr class="doc-skeleton-row" aria-hidden="true">
+            <td>
+              <div style="display:flex;align-items:center;gap:16px;">
+                <span class="doc-skeleton-icon skeleton-page"></span>
+                <span>
+                  <span class="doc-skeleton-name skeleton-page"></span>
+                  <span class="doc-skeleton-meta skeleton-page"></span>
+                </span>
+              </div>
+            </td>
+            <td><span class="doc-skeleton-meta skeleton-page"></span></td>
+            <td><span class="doc-skeleton-meta skeleton-page"></span></td>
+            <td></td>
+          </tr>
+        `
+      )
+      .join('');
+  },
+
   renderDocumentList(container, documents, currentDocId, onOpen, onDelete, currentUserId) {
+    if (!container) return;
     if (!documents || documents.length === 0) {
       container.innerHTML = `
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 40px; color: #b0b0b0;">
-                        No documents yet. Create your first document!
+                    <td colspan="4" class="doc-empty-state">
+                        <div class="doc-empty-title">No documents yet</div>
+                        <div class="doc-empty-copy">Create a blank document to start writing.</div>
                     </td>
                 </tr>
             `;

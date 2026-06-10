@@ -154,8 +154,9 @@
             <i class="fas fa-file-export"></i> Save As
           </button>
         </div>
+        <div id="saveStatusIndicator" class="save-status-indicator" data-status="saved">Saved</div>
         <div id="connectionBadge" class="connection-badge" data-status="connecting" hidden>
-          Connecting...
+          Connecting
         </div>
 
         <div
@@ -2373,6 +2374,13 @@
           <div class="skeleton-toolbar-item skeleton-page"></div>
           <div class="skeleton-toolbar-item skeleton-page"></div>
         </div>
+        <div class="editor-loading-card">
+          <div id="editorSkeletonStatus" class="editor-loading-status">Opening document...</div>
+          <div id="editorSkeletonTitle" class="editor-loading-title">Opening document...</div>
+          <div id="editorSkeletonDescription" class="editor-loading-description">
+            Loading document content.
+          </div>
+        </div>
         <div id="editorSkeletonMessage" class="editor-skeleton-message" hidden>
           Still loading document...
         </div>
@@ -2388,7 +2396,10 @@
             <i class="fas fa-triangle-exclamation"></i>
           </div>
           <div id="editorOpenErrorMessage">Could not load this document.</div>
-          <button id="editorOpenRetry" class="toolbar-btn">Retry</button>
+          <div class="editor-open-error-actions">
+            <button id="editorOpenRetry" class="toolbar-btn">Retry</button>
+            <button id="editorOpenBack" class="toolbar-btn">Back to dashboard</button>
+          </div>
         </div>
       </div>
 

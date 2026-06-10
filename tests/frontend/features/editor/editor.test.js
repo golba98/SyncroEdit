@@ -153,6 +153,24 @@ describe('Editor Lifecycle & Resilience', () => {
     expect(mockQuillBinding).not.toHaveBeenCalled();
   });
 
+  it('does not configure Start typing placeholder before editor is ready', async () => {
+    const editor = new Editor('editor-container');
+    editor.provider = null;
+
+    const pageMap = new Y.Map();
+    pageMap.set('id', 'page-ready-test');
+    pageMap.set('content', new Y.Text(''));
+    editor.yPages.push([pageMap]);
+    editor.createPageContainer('page-ready-test', 0);
+    editor.mountPage('page-ready-test');
+
+    const lastQuillCall = global.Quill.mock.calls.at(-1);
+    expect(lastQuillCall[1].placeholder).toBe('');
+    expect(document.body.textContent).not.toContain('Start typing...');
+
+    editor.destroy();
+  });
+
   it('should respect showOnlineStatus in awareness', async () => {
     const editor = new Editor('editor-container');
 

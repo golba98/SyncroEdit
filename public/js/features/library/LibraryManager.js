@@ -1,10 +1,15 @@
 import { Network } from '/js/app/network.js';
 import { UI } from '/js/features/ui/ui.js';
+import { debounce } from '/js/app/utils.js';
 
 export class LibraryManager {
   constructor(app) {
     this.app = app;
     this.isTransitioning = false;
+    this.openLock = false;
+    this.documents = [];
+    this.searchTerm = '';
+    this.searchHandlerBound = false;
   }
 
   async showLibrary() {
@@ -61,24 +66,25 @@ export class LibraryManager {
     }
 
     const renderList = (docs) => {
+      this.documents = Array.isArray(docs) ? docs : [];
+      const filteredDocs = this.filterDocuments(this.documents);
       UI.renderDocumentList(
         document.getElementById('documentList'),
-        docs,
+        filteredDocs,
         this.app.documentId,
         (id) => {
           this.openDocument(id);
         },
         async (id) => {
           if (confirm('Delete this document?')) {
-            await Network.deleteDocument(id);
-            // After deletion, clear cache to force fresh fetch or update it
-            localStorage.removeItem('syncroedit_library_cache');
-            this.showLibrary();
+            await this.deleteDocument(id);
           }
         },
         this.app.user._id
       );
     };
+
+    this.bindSearch(renderList);
 
     // 1. Instant Cache Render
     const cachedData = localStorage.getItem('syncroedit_library_cache');
@@ -94,6 +100,10 @@ export class LibraryManager {
       } catch (e) {
         console.warn('Failed to parse library cache', e);
       }
+    }
+
+    if (!hasRenderedCache) {
+      UI.renderDocumentSkeleton(document.getElementById('documentList'));
     }
 
     // 2. Network Refresh (Stale-While-Revalidate)
@@ -130,17 +140,77 @@ export class LibraryManager {
     }
   }
 
-  async createNewDocument() {
-    // Prevent rapid clicks
-    if (this.isTransitioning) return;
-    this.isTransitioning = true;
+  bindSearch(renderList) {
+    if (this.searchHandlerBound) return;
+    const search = document.getElementById('docSearch');
+    if (!search) return;
+
+    search.addEventListener(
+      'input',
+      debounce((event) => {
+        this.searchTerm = event.target.value || '';
+        renderList(this.documents);
+      }, 180)
+    );
+    this.searchHandlerBound = true;
+  }
+
+  filterDocuments(docs) {
+    const term = this.searchTerm.trim().toLowerCase();
+    if (!term) return docs;
+    return docs.filter((doc) => {
+      const title = String(doc.title || '').toLowerCase();
+      const preview = String(doc.pages?.[0]?.content || '').toLowerCase();
+      return title.includes(term) || preview.includes(term);
+    });
+  }
+
+  async deleteDocument(id) {
+    const previousDocs = this.documents;
+    const nextDocs = previousDocs.filter((doc) => doc._id !== id);
+    this.documents = nextDocs;
+    localStorage.setItem('syncroedit_library_cache', JSON.stringify(nextDocs));
+    UI.renderDocumentList(
+      document.getElementById('documentList'),
+      this.filterDocuments(nextDocs),
+      this.app.documentId,
+      (docId) => this.openDocument(docId),
+      async (docId) => {
+        if (confirm('Delete this document?')) await this.deleteDocument(docId);
+      },
+      this.app.user._id
+    );
 
     try {
-      // Quick visual feedback - close library immediately
-      const library = document.getElementById('docLibrary');
-      const overlay = document.getElementById('libraryOverlay');
-      if (library) library.classList.remove('view-visible');
-      if (overlay) overlay.classList.remove('view-visible');
+      await Network.deleteDocument(id);
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      this.documents = previousDocs;
+      localStorage.setItem('syncroedit_library_cache', JSON.stringify(previousDocs));
+      UI.renderDocumentList(
+        document.getElementById('documentList'),
+        this.filterDocuments(previousDocs),
+        this.app.documentId,
+        (docId) => this.openDocument(docId),
+        async (docId) => {
+          if (confirm('Delete this document?')) await this.deleteDocument(docId);
+        },
+        this.app.user._id
+      );
+      alert('Failed to delete document. Please try again.');
+    }
+  }
+
+  async createNewDocument() {
+    // Prevent rapid clicks
+    if (this.openLock) return;
+    this.openLock = true;
+    this.isTransitioning = true;
+    this.markCreateOpening(true);
+
+    try {
+      this.app.setDocumentLifecycleState?.('creating-document');
+      await this.startEditorTransition();
 
       // Create document in background
       const doc = await Network.createDocument();
@@ -154,12 +224,16 @@ export class LibraryManager {
 
       // Load document inline (same as openDocument does)
       this.app.documentId = doc._id;
-      await this.app.loadDocument();
+      await this.app.loadDocument({ mode: 'creating-document', isNewDocument: true });
 
+      this.openLock = false;
       this.isTransitioning = false;
+      this.markCreateOpening(false);
     } catch (err) {
       console.error('Failed to create document:', err);
+      this.openLock = false;
       this.isTransitioning = false;
+      this.markCreateOpening(false);
       // Re-show library on error
       const library = document.getElementById('docLibrary');
       const overlay = document.getElementById('libraryOverlay');
@@ -177,31 +251,65 @@ export class LibraryManager {
 
   async openDocument(docId) {
     // Prevent rapid transitions
-    if (this.isTransitioning) return;
+    if (this.openLock) return;
+    this.openLock = true;
     this.isTransitioning = true;
 
     try {
-      const library = document.getElementById('docLibrary');
-      const overlay = document.getElementById('libraryOverlay');
-
       this.app.openingDocumentId = docId;
       this.markDocumentOpening(docId);
-
-      if (library) library.classList.remove('view-visible');
-      if (overlay) overlay.classList.remove('view-visible');
+      this.app.setDocumentLifecycleState?.('loading-document');
+      await this.startEditorTransition();
 
       const newUrl = `${window.location.pathname}?doc=${docId}`;
       window.history.pushState({ view: 'editor', docId }, '', newUrl);
 
       this.app.documentId = docId;
-      await this.app.loadDocument();
+      await this.app.loadDocument({ mode: 'loading-document', isNewDocument: false });
 
+      this.openLock = false;
       this.isTransitioning = false;
     } catch (err) {
       console.error('Failed to open document:', err);
+      this.openLock = false;
       this.isTransitioning = false;
       alert('Failed to open document');
     }
+  }
+
+  async startEditorTransition() {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const run = () => {
+      const library = document.getElementById('docLibrary');
+      const overlay = document.getElementById('libraryOverlay');
+      if (library) library.classList.remove('view-visible');
+      if (overlay) overlay.classList.remove('view-visible');
+    };
+
+    if (!reduceMotion && document.startViewTransition) {
+      const transition = document.startViewTransition(run);
+      await transition.ready.catch(() => {});
+      return;
+    }
+
+    run();
+    if (!reduceMotion) {
+      await new Promise((resolve) => setTimeout(resolve, 160));
+    }
+  }
+
+  markCreateOpening(isOpening) {
+    const card = document.getElementById('createNewDoc');
+    if (!card) return;
+
+    card.classList.toggle('is-opening', isOpening);
+    card.setAttribute('aria-busy', String(isOpening));
+    card.setAttribute('aria-disabled', String(isOpening));
+    const icon = card.querySelector('i');
+    if (!icon) return;
+    icon.classList.toggle('fa-plus', !isOpening);
+    icon.classList.toggle('fa-spinner', isOpening);
+    icon.classList.toggle('fa-spin', isOpening);
   }
 
   markDocumentOpening(docId) {
