@@ -153,995 +153,1018 @@
 
     <!-- Editor Skeleton (shown during document load) -->
     <div id="editorSkeleton" class="editor-skeleton hidden">
-      <div class="skeleton-shell">
-        <div class="skeleton-header-row">
-          <div class="skeleton-title skeleton-page"></div>
-          <div class="skeleton-status-pill skeleton-page"></div>
-        </div>
-        <div class="skeleton-toolbar">
-          <div class="skeleton-toolbar-item skeleton-page"></div>
-          <div class="skeleton-toolbar-item skeleton-page"></div>
-          <div class="skeleton-toolbar-item skeleton-page"></div>
-          <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
-          <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
-          <div class="skeleton-toolbar-item skeleton-page"></div>
-          <div class="skeleton-toolbar-item skeleton-page"></div>
-        </div>
-        <div class="skeleton-workspace">
-          <div class="skeleton-sidebar skeleton-page"></div>
-          <div class="skeleton-paper">
-            <div class="skeleton-line skeleton-page"></div>
-            <div class="skeleton-line skeleton-page"></div>
-            <div class="skeleton-line skeleton-page"></div>
-            <div class="skeleton-line skeleton-page"></div>
-            <div class="skeleton-line skeleton-page"></div>
-          </div>
-          <div class="skeleton-sidebar skeleton-page"></div>
-        </div>
+      <div class="skeleton-toolbar">
+        <div class="skeleton-toolbar-item skeleton-page"></div>
+        <div class="skeleton-toolbar-item skeleton-page"></div>
+        <div class="skeleton-toolbar-item skeleton-page"></div>
+        <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
+        <div class="skeleton-toolbar-item skeleton-page" style="width: 60px"></div>
+        <div class="skeleton-toolbar-item skeleton-page"></div>
+        <div class="skeleton-toolbar-item skeleton-page"></div>
       </div>
-      <div id="editorOpenError" class="editor-open-error" hidden>
-        <div class="editor-open-error-icon">
-          <i class="fas fa-triangle-exclamation"></i>
-        </div>
-        <div id="editorOpenErrorMessage">Could not load this document.</div>
-        <button id="editorOpenRetry" class="toolbar-btn">Retry</button>
+      <div class="skeleton-paper">
+        <div class="skeleton-line skeleton-page"></div>
+        <div class="skeleton-line skeleton-page"></div>
+        <div class="skeleton-line skeleton-page"></div>
+        <div class="skeleton-line skeleton-page"></div>
+        <div class="skeleton-line skeleton-page"></div>
       </div>
     </div>
 
-    <div id="editorShell" class="editor-shell">
-      <div
-        id="authGuard"
-        style="
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: #000000;
-          z-index: 100000;
-          display: none;
-          align-items: center;
-          justify-content: center;
-          transition: opacity 0.3s ease-out;
-          opacity: 0;
-          pointer-events: none;
-          will-change: opacity;
-        "
-      >
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px">
-          <div style="font-size: 40px; animation: pulse 2s infinite">📄</div>
-          <div
-            id="authGuardText"
-            style="
-              color: var(--accent-color-light);
-              font-size: 14px;
-              letter-spacing: 1px;
-              font-weight: 500;
-            "
-          >
-            Verifying Session...
-          </div>
-          <div
-            style="
-              width: 40px;
-              height: 40px;
-              border: 3px solid rgba(var(--accent-color-rgb), 0.1);
-              border-top-color: var(--accent-color);
-              border-radius: 50%;
-              animation: spin 1s linear infinite;
-            "
-          ></div>
+    <div
+      id="authGuard"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000000;
+        z-index: 100000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.3s ease-out;
+        opacity: 0;
+        pointer-events: none;
+        will-change: opacity;
+      "
+    >
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 20px">
+        <div style="font-size: 40px; animation: pulse 2s infinite">📄</div>
+        <div
+          id="authGuardText"
+          style="
+            color: var(--accent-color-light);
+            font-size: 14px;
+            letter-spacing: 1px;
+            font-weight: 500;
+          "
+        >
+          Verifying Session...
+        </div>
+        <div
+          style="
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(var(--accent-color-rgb), 0.1);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          "
+        ></div>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <button class="toolbar-btn" id="menuBtn" title="Document Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+        <input
+          type="text"
+          class="doc-title"
+          id="docTitle"
+          name="docTitle"
+          placeholder="Untitled document"
+          autocomplete="off"
+          aria-label="Document Title"
+          title="Document Title"
+          style="margin: 0; width: auto; flex: 1; max-width: 400px"
+        />
+        <div
+          id="localModeBadge"
+          style="
+            display: none;
+            background: rgba(var(--accent-color-rgb), 0.2);
+            color: var(--accent-color-light);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            border: 1px solid var(--accent-color);
+            margin-left: 15px;
+            letter-spacing: 0.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+          "
+        >
+          Local Mode
         </div>
       </div>
+      <div class="header-right" style="display: flex; align-items: center; gap: 16px">
+        <div id="activeCollaborators" style="display: none; align-items: center">
+          <!-- Active users will appear here -->
+        </div>
 
-      <!-- Header -->
-      <div class="header">
-        <div class="header-left">
-          <button class="toolbar-btn" id="menuBtn" title="Document Menu">
-            <i class="fas fa-bars"></i>
+        <div style="display: flex; gap: 10px; align-items: center">
+          <button
+            class="toolbar-btn"
+            id="saveBtn"
+            title="Save Document"
+            style="background: var(--accent-color); color: white; padding: 3px 6px; font-size: 12px"
+          >
+            <i class="fas fa-save"></i> Save
           </button>
-          <input
-            type="text"
-            class="doc-title"
-            id="docTitle"
-            name="docTitle"
-            placeholder="Untitled document"
-            autocomplete="off"
-            aria-label="Document Title"
-            title="Document Title"
-            style="margin: 0; width: auto; flex: 1; max-width: 400px"
+          <button
+            class="toolbar-btn header-save-as-btn"
+            id="saveAsBtn"
+            title="Save As"
+            style="padding: 3px 6px; font-size: 12px"
+          >
+            <i class="fas fa-file-export"></i> Save As
+          </button>
+        </div>
+
+        <div
+          id="userProfileTrigger"
+          style="cursor: pointer; display: flex; align-items: center; gap: 8px"
+          title="View Profile"
+        >
+          <img
+            id="headerPfp"
+            src=""
+            alt=""
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              background: #ddd;
+              display: none;
+              object-fit: cover;
+            "
           />
           <div
-            id="localModeBadge"
+            id="headerInitials"
+            class="avatar-initials"
             style="
+              width: 32px;
+              height: 32px;
+              font-size: 14px;
+              border-radius: 50%;
               display: none;
-              background: rgba(var(--accent-color-rgb), 0.2);
-              color: var(--accent-color-light);
-              padding: 4px 10px;
-              border-radius: 20px;
-              font-size: 11px;
-              border: 1px solid var(--accent-color);
-              margin-left: 15px;
-              letter-spacing: 0.5px;
-              font-weight: bold;
-              text-transform: uppercase;
+              align-items: center;
+              justify-content: center;
             "
-          >
-            Local Mode
+          ></div>
+          <i
+            id="headerUserIcon"
+            class="fas fa-user-circle"
+            style="font-size: 24px; color: var(--accent-color-light)"
+          ></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Library Sidebar -->
+    <div
+      id="docLibrary"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000000;
+        z-index: 9999;
+        overflow-y: auto;
+      "
+    >
+      <div style="max-width: 1400px; margin: 0 auto; padding: 40px">
+        <!-- Header -->
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 16px">
+            <div style="font-size: 32px">📄</div>
+            <h1
+              style="
+                margin: 0;
+                color: var(--accent-color-light);
+                font-size: 28px;
+                text-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.5);
+              "
+            >
+              SynchroEdit
+            </h1>
+          </div>
+          <div style="display: flex; align-items: center; gap: 20px">
+            <div
+              id="libraryUserProfileTrigger"
+              style="cursor: pointer; display: flex; align-items: center; gap: 8px"
+              title="View Profile"
+            >
+              <img
+                id="libraryHeaderPfp"
+                src=""
+                alt=""
+                style="
+                  width: 32px;
+                  height: 32px;
+                  border-radius: 50%;
+                  background: #1a1a1a;
+                  display: none;
+                  object-fit: cover;
+                "
+              />
+              <div
+                id="libraryHeaderInitials"
+                class="avatar-initials"
+                style="
+                  width: 32px;
+                  height: 32px;
+                  font-size: 14px;
+                  border-radius: 50%;
+                  display: none;
+                  align-items: center;
+                  justify-content: center;
+                "
+              ></div>
+              <i
+                id="libraryHeaderUserIcon"
+                class="fas fa-user-circle"
+                style="font-size: 32px; color: var(--accent-color-light)"
+              ></i>
+            </div>
+            <button
+              id="closeLibrary"
+              class="toolbar-btn close-btn-gradient"
+              style="padding: 10px 20px; border-radius: 6px; display: none"
+            >
+              <i class="fas fa-times"></i> Close
+            </button>
           </div>
         </div>
-        <div class="header-right" style="display: flex; align-items: center; gap: 16px">
-          <div id="activeCollaborators" style="display: none; align-items: center">
-            <!-- Active users will appear here -->
-          </div>
-          <div id="connectionBadge" class="connection-badge" data-status="connecting" hidden>
-            Connecting...
-          </div>
 
-          <div style="display: flex; gap: 10px; align-items: center">
-            <button
-              class="toolbar-btn"
-              id="saveBtn"
-              title="Save Document"
-              style="
-                background: var(--accent-color);
-                color: white;
-                padding: 3px 6px;
-                font-size: 12px;
-              "
-            >
-              <i class="fas fa-save"></i> Save
-            </button>
-            <button
-              class="toolbar-btn header-save-as-btn"
-              id="saveAsBtn"
-              title="Save As"
-              style="padding: 3px 6px; font-size: 12px"
-            >
-              <i class="fas fa-file-export"></i> Save As
-            </button>
-          </div>
-
+        <!-- New Document Section -->
+        <div style="margin-bottom: 40px">
+          <h2 style="font-size: 20px; margin-bottom: 20px" class="section-title">New</h2>
           <div
-            id="userProfileTrigger"
-            style="cursor: pointer; display: flex; align-items: center; gap: 8px"
-            title="View Profile"
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+              gap: 20px;
+            "
           >
-            <img
-              id="headerPfp"
-              src=""
-              alt=""
-              style="
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                background: #ddd;
-                display: none;
-                object-fit: cover;
-              "
-            />
-            <div
-              id="headerInitials"
-              class="avatar-initials"
-              style="
-                width: 32px;
-                height: 32px;
-                font-size: 14px;
-                border-radius: 50%;
-                display: none;
-                align-items: center;
-                justify-content: center;
-              "
-            ></div>
-            <i
-              id="headerUserIcon"
-              class="fas fa-user-circle"
-              style="font-size: 24px; color: var(--accent-color-light)"
-            ></i>
+            <div id="createNewDoc" class="create-doc-card">
+              <div
+                style="
+                  width: 120px;
+                  height: 150px;
+                  background: #1a1a1a;
+                  border: 2px solid #333;
+                  border-radius: 4px;
+                  margin-bottom: 16px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 48px;
+                  color: var(--accent-color-light);
+                "
+              >
+                <i class="fas fa-plus"></i>
+              </div>
+              <div style="color: #e0e0e0; font-weight: 500">Blank document</div>
+            </div>
+
+            <!-- Redundant inline styles removed -->
+          </div>
+        </div>
+
+        <!-- Search and Filter -->
+        <div style="margin-bottom: 24px">
+          <input type="text" id="docSearch" placeholder="Search documents..." />
+        </div>
+
+        <!-- Redundant inline styles removed -->
+
+        <!-- Recent Documents -->
+        <div>
+          <h2 style="font-size: 20px; margin-bottom: 20px" class="section-title">Recent</h2>
+          <div class="doc-list-container" style="border-radius: 8px; overflow: hidden">
+            <table style="width: 100%; border-collapse: collapse">
+              <thead>
+                <tr class="doc-list-header">
+                  <th
+                    style="
+                      text-align: left;
+                      padding: 16px 24px;
+                      font-size: 12px;
+                      font-weight: 500;
+                      text-transform: uppercase;
+                    "
+                  >
+                    Name
+                  </th>
+                  <th
+                    style="
+                      text-align: left;
+                      padding: 16px 24px;
+                      font-size: 12px;
+                      font-weight: 500;
+                      text-transform: uppercase;
+                    "
+                  >
+                    Location
+                  </th>
+                  <th
+                    style="
+                      text-align: left;
+                      padding: 16px 24px;
+                      font-size: 12px;
+                      font-weight: 500;
+                      text-transform: uppercase;
+                    "
+                  >
+                    Date Modified
+                  </th>
+                  <th style="width: 60px; padding: 16px 24px"></th>
+                </tr>
+              </thead>
+              <tbody id="documentList">
+                <!-- Documents will be listed here -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Document Library Sidebar -->
+    <!-- Overlay for sidebar -->
+    <div
+      id="libraryOverlay"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 9998;
+      "
+    ></div>
+
+    <!-- Share Modal -->
+    <div
+      id="shareModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
       <div
-        id="docLibrary"
         style="
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
           background: #000000;
-          z-index: 9999;
-          overflow-y: auto;
+          padding: 32px;
+          border-radius: 8px;
+          max-width: 500px;
+          width: 90%;
+          border: 2px solid var(--accent-color);
+          box-shadow:
+            0 0 40px rgba(var(--accent-color-rgb), 0.5),
+            inset 0 0 20px rgba(var(--accent-color-rgb), 0.1);
         "
       >
-        <div style="max-width: 1400px; margin: 0 auto; padding: 40px">
-          <!-- Header -->
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 40px;
-            "
-          >
-            <div style="display: flex; align-items: center; gap: 16px">
-              <div style="font-size: 32px">📄</div>
-              <h1
+        <h2
+          style="
+            margin: 0 0 16px 0;
+            color: var(--accent-color-light);
+            text-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.8);
+            font-size: 24px;
+            letter-spacing: 0.5px;
+          "
+        >
+          Share this document
+        </h2>
+
+        <div
+          style="
+            margin-bottom: 24px;
+            background: rgba(var(--accent-color-rgb), 0.05);
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(var(--accent-color-rgb), 0.1);
+          "
+        >
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <div>
+              <div
                 style="
-                  margin: 0;
                   color: var(--accent-color-light);
-                  font-size: 28px;
-                  text-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.5);
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 4px;
                 "
               >
-                SynchroEdit
-              </h1>
+                Link Sharing
+              </div>
+              <div style="color: #888; font-size: 11px">
+                When enabled, anyone with the link can access this document.
+              </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 20px">
-              <div
-                id="libraryUserProfileTrigger"
-                style="cursor: pointer; display: flex; align-items: center; gap: 8px"
-                title="View Profile"
-              >
+            <label
+              class="switch"
+              style="position: relative; display: inline-block; width: 40px; height: 24px"
+            >
+              <input
+                type="checkbox"
+                id="linkSharingToggle"
+                style="opacity: 0; width: 0; height: 0"
+              />
+              <span
+                class="slider"
+                style="
+                  position: absolute;
+                  cursor: pointer;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  bottom: 0;
+                  background-color: #333;
+                  transition: 0.4s;
+                  border-radius: 24px;
+                "
+              ></span>
+            </label>
+          </div>
+          <div
+            id="linkSharingStatus"
+            style="font-size: 11px; margin-top: 8px; color: #aaa; display: none"
+          >
+            <i class="fas fa-spinner fa-spin"></i> Updating...
+          </div>
+        </div>
+
+        <p style="color: #d0d0d0; margin-bottom: 8px; font-size: 12px; padding-left: 4px">
+          Share link:
+        </p>
+        <div
+          id="shareLinkContainer"
+          style="display: flex; gap: 8px; margin-bottom: 24px; transition: opacity 0.3s ease"
+        >
+          <input
+            type="text"
+            id="shareLink"
+            readonly
+            style="
+              flex: 1;
+              padding: 12px;
+              border: 1px solid var(--accent-color);
+              border-radius: 4px;
+              font-size: 14px;
+              background: #1a1a1a;
+              color: var(--accent-color-lighter);
+              box-shadow: inset 0 0 10px rgba(var(--accent-color-rgb), 0.1);
+            "
+          />
+          <button
+            id="copyLinkBtn"
+            class="toolbar-btn"
+            style="
+              padding: 12px 24px;
+              background: var(--accent-color);
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.4);
+              transition: all 0.3s ease;
+            "
+            onmouseover="
+              this.style.background = 'var(--accent-color-light)';
+              this.style.boxShadow = '0 0 30px rgba(var(--accent-color-rgb), 0.6)';
+            "
+            onmouseout="
+              this.style.background = 'var(--accent-color)';
+              this.style.boxShadow = '0 0 20px rgba(var(--accent-color-rgb), 0.4)';
+            "
+          >
+            <i class="fas fa-copy"></i> Copy
+          </button>
+        </div>
+
+        <p
+          style="
+            font-size: 12px;
+            color: var(--accent-color-lighter);
+            margin-bottom: 24px;
+            background: rgba(var(--accent-color-rgb), 0.1);
+            padding: 8px 12px;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-color);
+          "
+        >
+          <i class="fas fa-info-circle" style="color: var(--accent-color); margin-right: 8px"></i>
+          Your friend will need to log in or create an account to start editing.
+        </p>
+        <button
+          id="closeShareModal"
+          class="toolbar-btn close-btn-gradient"
+          style="width: 100%; padding: 12px; border-radius: 4px; cursor: pointer"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- History Modal -->
+    <div
+      id="historyModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        overflow-y: auto;
+        padding: 20px;
+      "
+    >
+      <div
+        style="
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a0f2e 50%, #0d0d0d 100%);
+          padding: 0;
+          border-radius: 12px;
+          width: 100%;
+          max-width: 600px;
+          box-shadow:
+            0 0 40px rgba(var(--accent-color-rgb), 0.4),
+            0 10px 30px rgba(0, 0, 0, 0.7);
+          border: 1px solid var(--accent-color);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          max-height: 80vh;
+        "
+      >
+        <!-- Header -->
+        <div
+          style="
+            background: linear-gradient(
+              90deg,
+              rgba(var(--accent-color-rgb), 0.15) 0%,
+              transparent 50%,
+              rgba(var(--accent-color-rgb), 0.1) 100%
+            );
+            padding: 24px 24px 20px;
+            border-bottom: 1px solid rgba(var(--accent-color-rgb), 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <h2
+            style="
+              margin: 0;
+              color: var(--accent-color-light);
+              text-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
+              font-size: 18px;
+              letter-spacing: 0.5px;
+            "
+          >
+            Document History
+          </h2>
+          <button
+            id="closeHistoryModal"
+            class="toolbar-btn close-btn-gradient"
+            style="padding: 4px 12px; border-radius: 6px; cursor: pointer"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div id="historyList" style="padding: 20px; overflow-y: auto; flex: 1">
+          <!-- History items will be injected here -->
+          <div style="text-align: center; color: #666; padding: 20px">Loading history...</div>
+        </div>
+
+        <!-- Footer -->
+        <div
+          style="
+            padding: 16px 24px;
+            border-top: 1px solid rgba(var(--accent-color-rgb), 0.2);
+            background: rgba(var(--accent-color-rgb), 0.05);
+            text-align: center;
+          "
+        >
+          <span style="font-size: 12px; color: #666">Showing recent activity</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div
+      id="profileModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        overflow-y: auto;
+        padding: 20px;
+      "
+    >
+      <div
+        style="
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a0f2e 50%, #0d0d0d 100%);
+          padding: 0;
+          border-radius: 12px;
+          width: 100%;
+          max-width: 500px;
+          box-shadow:
+            0 0 40px rgba(var(--accent-color-rgb), 0.4),
+            0 10px 30px rgba(0, 0, 0, 0.7);
+          border: 1px solid var(--accent-color);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        "
+      >
+        <!-- Header (simplified) -->
+        <div
+          style="
+            background: linear-gradient(
+              90deg,
+              rgba(var(--accent-color-rgb), 0.15) 0%,
+              transparent 50%,
+              rgba(var(--accent-color-rgb), 0.1) 100%
+            );
+            padding: 24px 24px 20px;
+            border-bottom: 1px solid rgba(var(--accent-color-rgb), 0.2);
+            text-align: center;
+          "
+        >
+          <h2
+            style="
+              margin: 0;
+              color: var(--accent-color-light);
+              text-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
+              font-size: 18px;
+              letter-spacing: 0.5px;
+            "
+          >
+            User Profile
+          </h2>
+        </div>
+
+        <!-- Profile Tabs -->
+        <div
+          style="
+            display: flex;
+            gap: 8px;
+            padding: 16px 24px 0;
+            margin-top: 0;
+            justify-content: center;
+            border-bottom: 1px solid #2a2a2a;
+          "
+        >
+          <button
+            class="profile-tab active"
+            data-tab="general"
+            style="
+              flex: 1;
+              height: 36px;
+              background: transparent;
+              color: var(--accent-color-lighter);
+              border: none;
+              border-bottom: 2px solid var(--accent-color);
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.6px;
+              transition: all 0.3s ease;
+            "
+          >
+            General
+          </button>
+          <button
+            class="profile-tab"
+            data-tab="appearance"
+            style="
+              flex: 1;
+              height: 36px;
+              background: transparent;
+              color: #6b7280;
+              border: none;
+              border-bottom: 2px solid transparent;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.6px;
+              transition: all 0.3s ease;
+            "
+          >
+            Appearance
+          </button>
+          <button
+            class="profile-tab"
+            data-tab="security"
+            style="
+              flex: 1;
+              height: 36px;
+              background: transparent;
+              color: #6b7280;
+              border: none;
+              border-bottom: 2px solid transparent;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.6px;
+              transition: all 0.3s ease;
+            "
+          >
+            Security
+          </button>
+        </div>
+
+        <!-- Tab Content Container -->
+        <div style="padding: 24px; flex: 1; overflow-y: auto">
+          <!-- General Tab Content -->
+          <div class="profile-tab-content active" id="general-content" style="display: block">
+            <!-- Photo Management Section -->
+            <div
+              style="
+                margin-bottom: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+              "
+            >
+              <div style="position: relative; width: 80px; height: 80px; margin-bottom: 12px">
                 <img
-                  id="libraryHeaderPfp"
+                  id="profilePfp"
                   src=""
-                  alt=""
+                  alt="Profile"
                   style="
-                    width: 32px;
-                    height: 32px;
+                    width: 80px;
+                    height: 80px;
                     border-radius: 50%;
                     background: #1a1a1a;
-                    display: none;
                     object-fit: cover;
+                    border: 3px solid var(--accent-color);
+                    box-shadow:
+                      0 0 20px rgba(var(--accent-color-rgb), 0.5),
+                      inset 0 0 15px rgba(var(--accent-color-rgb), 0.1);
+                    display: none;
                   "
                 />
                 <div
-                  id="libraryHeaderInitials"
+                  id="profileInitials"
                   class="avatar-initials"
                   style="
-                    width: 32px;
-                    height: 32px;
-                    font-size: 14px;
+                    width: 80px;
+                    height: 80px;
+                    font-size: 32px;
                     border-radius: 50%;
+                    border: 3px solid var(--accent-color);
+                    box-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.5);
                     display: none;
                     align-items: center;
                     justify-content: center;
                   "
                 ></div>
-                <i
-                  id="libraryHeaderUserIcon"
-                  class="fas fa-user-circle"
-                  style="font-size: 32px; color: var(--accent-color-light)"
-                ></i>
+                <div
+                  id="profilePfpPlaceholder"
+                  style="
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 50%;
+                    background: #1a1a1a;
+                    border: 3px solid var(--accent-color);
+                    box-shadow:
+                      0 0 20px rgba(var(--accent-color-rgb), 0.5),
+                      inset 0 0 15px rgba(var(--accent-color-rgb), 0.1);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <i
+                    class="fas fa-user"
+                    style="font-size: 40px; color: var(--accent-color-light)"
+                  ></i>
+                </div>
+                <label
+                  for="pfpUpload"
+                  style="
+                    position: absolute;
+                    bottom: -2px;
+                    right: -2px;
+                    background: linear-gradient(
+                      135deg,
+                      var(--accent-color),
+                      var(--accent-color-light)
+                    );
+                    color: white;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    border: 2px solid #000000;
+                    box-shadow: 0 0 12px rgba(var(--accent-color-rgb), 0.6);
+                    transition: all 0.3s ease;
+                    font-size: 10px;
+                  "
+                  title="Upload new photo (Max 1MB)"
+                >
+                  <i class="fas fa-camera"></i>
+                </label>
+                <input type="file" id="pfpUpload" accept="image/*" style="display: none" />
               </div>
-              <button
-                id="closeLibrary"
-                class="toolbar-btn close-btn-gradient"
-                style="padding: 10px 20px; border-radius: 6px; display: none"
+              <span style="font-size: 9px; color: #666; margin-top: -8px; margin-bottom: 12px"
+                >Max 1MB</span
               >
-                <i class="fas fa-times"></i> Close
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px">
+              <div>
+                <label
+                  for="profileEmailInput"
+                  class="profile-label"
+                  style="
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    display: block;
+                    margin-bottom: 6px;
+                  "
+                  >Email Address</label
+                >
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <input
+                    type="text"
+                    id="profileEmailInput"
+                    name="email"
+                    readonly
+                    class="profile-input"
+                  />
+                  <div
+                    id="emailVerificationBadge"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 4px;
+                      font-size: 10px;
+                      font-weight: 600;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                    "
+                  >
+                    <!-- Will be populated by JS -->
+                  </div>
+                </div>
+                <div id="resendVerificationContainer" style="display: none; margin-top: 8px">
+                  <button
+                    id="resendVerificationBtn"
+                    style="
+                      background: none;
+                      border: none;
+                      color: var(--accent-color-light);
+                      font-size: 10px;
+                      cursor: pointer;
+                      text-decoration: underline;
+                      padding: 0;
+                    "
+                  >
+                    Resend verification code
+                  </button>
+                  <span
+                    id="resendTimer"
+                    style="font-size: 10px; color: #666; margin-left: 8px; display: none"
+                  ></span>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  for="profileUsernameInput"
+                  class="profile-label"
+                  style="
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    display: block;
+                    margin-bottom: 6px;
+                  "
+                  >Username</label
+                >
+                <input
+                  type="text"
+                  id="profileUsernameInput"
+                  name="username"
+                  readonly
+                  class="profile-input"
+                />
+              </div>
+
+              <div>
+                <label
+                  for="profileBioInput"
+                  class="profile-label"
+                  style="
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    display: block;
+                    margin-bottom: 6px;
+                  "
+                  >Bio</label
+                >
+                <textarea
+                  id="profileBioInput"
+                  name="bio"
+                  rows="4"
+                  placeholder="Tell us about yourself..."
+                  class="profile-input"
+                  style="resize: none"
+                ></textarea>
+              </div>
+
+              <button
+                id="saveGeneralBtn"
+                style="
+                  padding: 10px 12px;
+                  background: linear-gradient(
+                    135deg,
+                    var(--accent-color),
+                    var(--accent-color-light)
+                  );
+                  color: white;
+                  border: none;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-weight: 600;
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.3px;
+                  box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
+                "
+              >
+                Save Changes
               </button>
             </div>
           </div>
 
-          <!-- New Document Section -->
-          <div style="margin-bottom: 40px">
-            <h2 style="font-size: 20px; margin-bottom: 20px" class="section-title">New</h2>
-            <div
-              style="
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-                gap: 20px;
-              "
-            >
-              <div id="createNewDoc" class="create-doc-card">
-                <div
-                  style="
-                    width: 120px;
-                    height: 150px;
-                    background: #1a1a1a;
-                    border: 2px solid #333;
-                    border-radius: 4px;
-                    margin-bottom: 16px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 48px;
-                    color: var(--accent-color-light);
-                  "
-                >
-                  <i class="fas fa-plus"></i>
-                </div>
-                <div style="color: #e0e0e0; font-weight: 500">Blank document</div>
-              </div>
-
-              <!-- Redundant inline styles removed -->
-            </div>
-          </div>
-
-          <!-- Search and Filter -->
-          <div style="margin-bottom: 24px">
-            <input type="text" id="docSearch" placeholder="Search documents..." />
-          </div>
-
-          <!-- Redundant inline styles removed -->
-
-          <!-- Recent Documents -->
-          <div>
-            <h2 style="font-size: 20px; margin-bottom: 20px" class="section-title">Recent</h2>
-            <div class="doc-list-container" style="border-radius: 8px; overflow: hidden">
-              <table style="width: 100%; border-collapse: collapse">
-                <thead>
-                  <tr class="doc-list-header">
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 16px 24px;
-                        font-size: 12px;
-                        font-weight: 500;
-                        text-transform: uppercase;
-                      "
-                    >
-                      Name
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 16px 24px;
-                        font-size: 12px;
-                        font-weight: 500;
-                        text-transform: uppercase;
-                      "
-                    >
-                      Location
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 16px 24px;
-                        font-size: 12px;
-                        font-weight: 500;
-                        text-transform: uppercase;
-                      "
-                    >
-                      Date Modified
-                    </th>
-                    <th style="width: 60px; padding: 16px 24px"></th>
-                  </tr>
-                </thead>
-                <tbody id="documentList">
-                  <!-- Documents will be listed here -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Overlay for sidebar -->
-      <div
-        id="libraryOverlay"
-        style="
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.85);
-          z-index: 9998;
-        "
-      ></div>
-
-      <!-- Share Modal -->
-      <div
-        id="shareModal"
-        style="
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.85);
-          z-index: 10000;
-          align-items: center;
-          justify-content: center;
-        "
-      >
-        <div
-          style="
-            background: #000000;
-            padding: 32px;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            border: 2px solid var(--accent-color);
-            box-shadow:
-              0 0 40px rgba(var(--accent-color-rgb), 0.5),
-              inset 0 0 20px rgba(var(--accent-color-rgb), 0.1);
-          "
-        >
-          <h2
-            style="
-              margin: 0 0 16px 0;
-              color: var(--accent-color-light);
-              text-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.8);
-              font-size: 24px;
-              letter-spacing: 0.5px;
-            "
-          >
-            Share this document
-          </h2>
-
-          <div
-            style="
-              margin-bottom: 24px;
-              background: rgba(var(--accent-color-rgb), 0.05);
-              padding: 12px;
-              border-radius: 4px;
-              border: 1px solid rgba(var(--accent-color-rgb), 0.1);
-            "
-          >
-            <div style="display: flex; justify-content: space-between; align-items: center">
-              <div>
-                <div
-                  style="
-                    color: var(--accent-color-light);
-                    font-weight: 600;
-                    font-size: 14px;
-                    margin-bottom: 4px;
-                  "
-                >
-                  Link Sharing
-                </div>
-                <div style="color: #888; font-size: 11px">
-                  When enabled, anyone with the link can access this document.
-                </div>
-              </div>
-              <label
-                class="switch"
-                style="position: relative; display: inline-block; width: 40px; height: 24px"
-              >
-                <input
-                  type="checkbox"
-                  id="linkSharingToggle"
-                  style="opacity: 0; width: 0; height: 0"
-                />
-                <span
-                  class="slider"
-                  style="
-                    position: absolute;
-                    cursor: pointer;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: #333;
-                    transition: 0.4s;
-                    border-radius: 24px;
-                  "
-                ></span>
-              </label>
-            </div>
-            <div
-              id="linkSharingStatus"
-              style="font-size: 11px; margin-top: 8px; color: #aaa; display: none"
-            >
-              <i class="fas fa-spinner fa-spin"></i> Updating...
-            </div>
-          </div>
-
-          <p style="color: #d0d0d0; margin-bottom: 8px; font-size: 12px; padding-left: 4px">
-            Share link:
-          </p>
-          <div
-            id="shareLinkContainer"
-            style="display: flex; gap: 8px; margin-bottom: 24px; transition: opacity 0.3s ease"
-          >
-            <input
-              type="text"
-              id="shareLink"
-              readonly
-              style="
-                flex: 1;
-                padding: 12px;
-                border: 1px solid var(--accent-color);
-                border-radius: 4px;
-                font-size: 14px;
-                background: #1a1a1a;
-                color: var(--accent-color-lighter);
-                box-shadow: inset 0 0 10px rgba(var(--accent-color-rgb), 0.1);
-              "
-            />
-            <button
-              id="copyLinkBtn"
-              class="toolbar-btn"
-              style="
-                padding: 12px 24px;
-                background: var(--accent-color);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                box-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.4);
-                transition: all 0.3s ease;
-              "
-              onmouseover="
-                this.style.background = 'var(--accent-color-light)';
-                this.style.boxShadow = '0 0 30px rgba(var(--accent-color-rgb), 0.6)';
-              "
-              onmouseout="
-                this.style.background = 'var(--accent-color)';
-                this.style.boxShadow = '0 0 20px rgba(var(--accent-color-rgb), 0.4)';
-              "
-            >
-              <i class="fas fa-copy"></i> Copy
-            </button>
-          </div>
-
-          <p
-            style="
-              font-size: 12px;
-              color: var(--accent-color-lighter);
-              margin-bottom: 24px;
-              background: rgba(var(--accent-color-rgb), 0.1);
-              padding: 8px 12px;
-              border-radius: 4px;
-              border-left: 3px solid var(--accent-color);
-            "
-          >
-            <i class="fas fa-info-circle" style="color: var(--accent-color); margin-right: 8px"></i>
-            Your friend will need to log in or create an account to start editing.
-          </p>
-          <button
-            id="closeShareModal"
-            class="toolbar-btn close-btn-gradient"
-            style="width: 100%; padding: 12px; border-radius: 4px; cursor: pointer"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-
-      <!-- History Modal -->
-      <div
-        id="historyModal"
-        style="
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.85);
-          z-index: 10000;
-          align-items: center;
-          justify-content: center;
-          overflow-y: auto;
-          padding: 20px;
-        "
-      >
-        <div
-          style="
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a0f2e 50%, #0d0d0d 100%);
-            padding: 0;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 600px;
-            box-shadow:
-              0 0 40px rgba(var(--accent-color-rgb), 0.4),
-              0 10px 30px rgba(0, 0, 0, 0.7);
-            border: 1px solid var(--accent-color);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            max-height: 80vh;
-          "
-        >
-          <!-- Header -->
-          <div
-            style="
-              background: linear-gradient(
-                90deg,
-                rgba(var(--accent-color-rgb), 0.15) 0%,
-                transparent 50%,
-                rgba(var(--accent-color-rgb), 0.1) 100%
-              );
-              padding: 24px 24px 20px;
-              border-bottom: 1px solid rgba(var(--accent-color-rgb), 0.2);
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-            "
-          >
-            <h2
-              style="
-                margin: 0;
-                color: var(--accent-color-light);
-                text-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
-                font-size: 18px;
-                letter-spacing: 0.5px;
-              "
-            >
-              Document History
-            </h2>
-            <button
-              id="closeHistoryModal"
-              class="toolbar-btn close-btn-gradient"
-              style="padding: 4px 12px; border-radius: 6px; cursor: pointer"
-            >
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-
-          <!-- Content -->
-          <div id="historyList" style="padding: 20px; overflow-y: auto; flex: 1">
-            <!-- History items will be injected here -->
-            <div style="text-align: center; color: #666; padding: 20px">Loading history...</div>
-          </div>
-
-          <!-- Footer -->
-          <div
-            style="
-              padding: 16px 24px;
-              border-top: 1px solid rgba(var(--accent-color-rgb), 0.2);
-              background: rgba(var(--accent-color-rgb), 0.05);
-              text-align: center;
-            "
-          >
-            <span style="font-size: 12px; color: #666">Showing recent activity</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Profile Modal -->
-      <div
-        id="profileModal"
-        style="
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.85);
-          z-index: 10000;
-          align-items: center;
-          justify-content: center;
-          overflow-y: auto;
-          padding: 20px;
-        "
-      >
-        <div
-          style="
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a0f2e 50%, #0d0d0d 100%);
-            padding: 0;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 500px;
-            box-shadow:
-              0 0 40px rgba(var(--accent-color-rgb), 0.4),
-              0 10px 30px rgba(0, 0, 0, 0.7);
-            border: 1px solid var(--accent-color);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-          "
-        >
-          <!-- Header (simplified) -->
-          <div
-            style="
-              background: linear-gradient(
-                90deg,
-                rgba(var(--accent-color-rgb), 0.15) 0%,
-                transparent 50%,
-                rgba(var(--accent-color-rgb), 0.1) 100%
-              );
-              padding: 24px 24px 20px;
-              border-bottom: 1px solid rgba(var(--accent-color-rgb), 0.2);
-              text-align: center;
-            "
-          >
-            <h2
-              style="
-                margin: 0;
-                color: var(--accent-color-light);
-                text-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
-                font-size: 18px;
-                letter-spacing: 0.5px;
-              "
-            >
-              User Profile
-            </h2>
-          </div>
-
-          <!-- Profile Tabs -->
-          <div
-            style="
-              display: flex;
-              gap: 8px;
-              padding: 16px 24px 0;
-              margin-top: 0;
-              justify-content: center;
-              border-bottom: 1px solid #2a2a2a;
-            "
-          >
-            <button
-              class="profile-tab active"
-              data-tab="general"
-              style="
-                flex: 1;
-                height: 36px;
-                background: transparent;
-                color: var(--accent-color-lighter);
-                border: none;
-                border-bottom: 2px solid var(--accent-color);
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.6px;
-                transition: all 0.3s ease;
-              "
-            >
-              General
-            </button>
-            <button
-              class="profile-tab"
-              data-tab="appearance"
-              style="
-                flex: 1;
-                height: 36px;
-                background: transparent;
-                color: #6b7280;
-                border: none;
-                border-bottom: 2px solid transparent;
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.6px;
-                transition: all 0.3s ease;
-              "
-            >
-              Appearance
-            </button>
-            <button
-              class="profile-tab"
-              data-tab="security"
-              style="
-                flex: 1;
-                height: 36px;
-                background: transparent;
-                color: #6b7280;
-                border: none;
-                border-bottom: 2px solid transparent;
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.6px;
-                transition: all 0.3s ease;
-              "
-            >
-              Security
-            </button>
-          </div>
-
-          <!-- Tab Content Container -->
-          <div style="padding: 24px; flex: 1; overflow-y: auto">
-            <!-- General Tab Content -->
-            <div class="profile-tab-content active" id="general-content" style="display: block">
-              <!-- Photo Management Section -->
-              <div
+          <!-- Appearance Tab Content -->
+          <div class="profile-tab-content" id="appearance-content" style="display: none">
+            <!-- Theme Selection -->
+            <div style="margin-bottom: 20px">
+              <h3
+                class="profile-section-title"
                 style="
-                  margin-bottom: 20px;
+                  margin-bottom: 12px;
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
                   display: flex;
-                  flex-direction: column;
                   align-items: center;
+                  gap: 6px;
                 "
               >
-                <div style="position: relative; width: 80px; height: 80px; margin-bottom: 12px">
-                  <img
-                    id="profilePfp"
-                    src=""
-                    alt="Profile"
-                    style="
-                      width: 80px;
-                      height: 80px;
-                      border-radius: 50%;
-                      background: #1a1a1a;
-                      object-fit: cover;
-                      border: 3px solid var(--accent-color);
-                      box-shadow:
-                        0 0 20px rgba(var(--accent-color-rgb), 0.5),
-                        inset 0 0 15px rgba(var(--accent-color-rgb), 0.1);
-                      display: none;
-                    "
-                  />
-                  <div
-                    id="profileInitials"
-                    class="avatar-initials"
-                    style="
-                      width: 80px;
-                      height: 80px;
-                      font-size: 32px;
-                      border-radius: 50%;
-                      border: 3px solid var(--accent-color);
-                      box-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.5);
-                      display: none;
-                      align-items: center;
-                      justify-content: center;
-                    "
-                  ></div>
-                  <div
-                    id="profilePfpPlaceholder"
-                    style="
-                      width: 80px;
-                      height: 80px;
-                      border-radius: 50%;
-                      background: #1a1a1a;
-                      border: 3px solid var(--accent-color);
-                      box-shadow:
-                        0 0 20px rgba(var(--accent-color-rgb), 0.5),
-                        inset 0 0 15px rgba(var(--accent-color-rgb), 0.1);
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                    "
-                  >
-                    <i
-                      class="fas fa-user"
-                      style="font-size: 40px; color: var(--accent-color-light)"
-                    ></i>
-                  </div>
-                  <label
-                    for="pfpUpload"
-                    style="
-                      position: absolute;
-                      bottom: -2px;
-                      right: -2px;
-                      background: linear-gradient(
-                        135deg,
-                        var(--accent-color),
-                        var(--accent-color-light)
-                      );
-                      color: white;
-                      width: 24px;
-                      height: 24px;
-                      border-radius: 50%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      cursor: pointer;
-                      border: 2px solid #000000;
-                      box-shadow: 0 0 12px rgba(var(--accent-color-rgb), 0.6);
-                      transition: all 0.3s ease;
-                      font-size: 10px;
-                    "
-                    title="Upload new photo (Max 1MB)"
-                  >
-                    <i class="fas fa-camera"></i>
-                  </label>
-                  <input type="file" id="pfpUpload" accept="image/*" style="display: none" />
-                </div>
-                <span style="font-size: 9px; color: #666; margin-top: -8px; margin-bottom: 12px"
-                  >Max 1MB</span
-                >
-              </div>
-
-              <div style="display: flex; flex-direction: column; gap: 16px">
-                <div>
-                  <label
-                    for="profileEmailInput"
-                    class="profile-label"
-                    style="
-                      font-size: 10px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.3px;
-                      display: block;
-                      margin-bottom: 6px;
-                    "
-                    >Email Address</label
-                  >
-                  <div style="display: flex; align-items: center; gap: 10px">
-                    <input
-                      type="text"
-                      id="profileEmailInput"
-                      name="email"
-                      readonly
-                      class="profile-input"
-                    />
-                    <div
-                      id="emailVerificationBadge"
-                      style="
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                        font-size: 10px;
-                        font-weight: 600;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                      "
-                    >
-                      <!-- Will be populated by JS -->
-                    </div>
-                  </div>
-                  <div id="resendVerificationContainer" style="display: none; margin-top: 8px">
-                    <button
-                      id="resendVerificationBtn"
-                      style="
-                        background: none;
-                        border: none;
-                        color: var(--accent-color-light);
-                        font-size: 10px;
-                        cursor: pointer;
-                        text-decoration: underline;
-                        padding: 0;
-                      "
-                    >
-                      Resend verification code
-                    </button>
-                    <span
-                      id="resendTimer"
-                      style="font-size: 10px; color: #666; margin-left: 8px; display: none"
-                    ></span>
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    for="profileUsernameInput"
-                    class="profile-label"
-                    style="
-                      font-size: 10px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.3px;
-                      display: block;
-                      margin-bottom: 6px;
-                    "
-                    >Username</label
-                  >
-                  <input
-                    type="text"
-                    id="profileUsernameInput"
-                    name="username"
-                    readonly
-                    class="profile-input"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    for="profileBioInput"
-                    class="profile-label"
-                    style="
-                      font-size: 10px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.3px;
-                      display: block;
-                      margin-bottom: 6px;
-                    "
-                    >Bio</label
-                  >
-                  <textarea
-                    id="profileBioInput"
-                    name="bio"
-                    rows="4"
-                    placeholder="Tell us about yourself..."
-                    class="profile-input"
-                    style="resize: none"
-                  ></textarea>
-                </div>
-
+                <i
+                  class="fas fa-circle-half-stroke"
+                  style="color: var(--accent-color); font-size: 10px"
+                ></i
+                >Theme
+              </h3>
+              <div style="display: flex; gap: 8px">
                 <button
-                  id="saveGeneralBtn"
+                  id="darkThemeBtn"
                   style="
+                    flex: 1;
                     padding: 10px 12px;
                     background: linear-gradient(
                       135deg,
@@ -1153,375 +1176,42 @@
                     border-radius: 6px;
                     cursor: pointer;
                     font-weight: 600;
+                    box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
+                    transition: all 0.3s ease;
                     font-size: 11px;
                     text-transform: uppercase;
                     letter-spacing: 0.3px;
-                    box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
                   "
                 >
-                  Save Changes
+                  🌙 Dark
+                </button>
+                <button
+                  id="lightThemeBtn"
+                  style="
+                    flex: 1;
+                    padding: 10px 12px;
+                    background: #f0f0f0;
+                    color: var(--accent-color);
+                    border: 2px solid var(--accent-color);
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                  "
+                >
+                  ☀️ Light
                 </button>
               </div>
             </div>
 
-            <!-- Appearance Tab Content -->
-            <div class="profile-tab-content" id="appearance-content" style="display: none">
-              <!-- Theme Selection -->
-              <div style="margin-bottom: 20px">
-                <h3
-                  class="profile-section-title"
-                  style="
-                    margin-bottom: 12px;
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.8px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                  "
-                >
-                  <i
-                    class="fas fa-circle-half-stroke"
-                    style="color: var(--accent-color); font-size: 10px"
-                  ></i
-                  >Theme
-                </h3>
-                <div style="display: flex; gap: 8px">
-                  <button
-                    id="darkThemeBtn"
-                    style="
-                      flex: 1;
-                      padding: 10px 12px;
-                      background: linear-gradient(
-                        135deg,
-                        var(--accent-color),
-                        var(--accent-color-light)
-                      );
-                      color: white;
-                      border: none;
-                      border-radius: 6px;
-                      cursor: pointer;
-                      font-weight: 600;
-                      box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
-                      transition: all 0.3s ease;
-                      font-size: 11px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.3px;
-                    "
-                  >
-                    🌙 Dark
-                  </button>
-                  <button
-                    id="lightThemeBtn"
-                    style="
-                      flex: 1;
-                      padding: 10px 12px;
-                      background: #f0f0f0;
-                      color: var(--accent-color);
-                      border: 2px solid var(--accent-color);
-                      border-radius: 6px;
-                      cursor: pointer;
-                      font-weight: 600;
-                      transition: all 0.3s ease;
-                      font-size: 11px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.3px;
-                    "
-                  >
-                    ☀️ Light
-                  </button>
-                </div>
-              </div>
-
-              <!-- Accent Color Selection -->
-              <div style="margin-bottom: 20px">
-                <h3
-                  style="
-                    margin-bottom: 12px;
-                    color: var(--accent-color-lighter);
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.8px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                  "
-                >
-                  <i class="fas fa-palette" style="color: var(--accent-color); font-size: 10px"></i
-                  >Accent Color
-                </h3>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
-                  <button
-                    class="accent-color-btn"
-                    data-color="#8b5cf6"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #8b5cf6;
-                      border: 2px solid #a78bfa;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Purple"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#ec4899"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #ec4899;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Pink"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#3b82f6"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #3b82f6;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Blue"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#10b981"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #10b981;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Green"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#f59e0b"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #f59e0b;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Amber"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#ef4444"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #ef4444;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Red"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#06b6d4"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #06b6d4;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Cyan"
-                  ></button>
-                  <button
-                    class="accent-color-btn"
-                    data-color="#39ff14"
-                    style="
-                      width: 100%;
-                      aspect-ratio: 1;
-                      background: #39ff14;
-                      border: 2px solid transparent;
-                      border-radius: 6px;
-                      cursor: pointer;
-                    "
-                    title="Neon Green"
-                  ></button>
-                </div>
-              </div>
-
-              <!-- Background Theme Selection -->
-              <div style="margin-bottom: 20px">
-                <h3
-                  style="
-                    margin-bottom: 12px;
-                    color: var(--accent-color-lighter);
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.8px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                  "
-                >
-                  <i class="fas fa-magic" style="color: var(--accent-color); font-size: 10px"></i
-                  ><label for="backgroundThemeSelect">Background Theme</label>
-                </h3>
-                <select
-                  id="backgroundThemeSelect"
-                  name="backgroundTheme"
-                  class="profile-input"
-                  style="width: 100%; height: 36px"
-                >
-                  <option value="dots">Connected Dots (Classic)</option>
-                  <option value="math">Floating Math Symbols</option>
-                  <option value="code">Floating Code Blocks</option>
-                  <option value="nature">Floating Nature Elements</option>
-                  <option value="none">None</option>
-                </select>
-              </div>
-
-              <!-- Editor Preferences -->
-              <div>
-                <h3
-                  style="
-                    margin-bottom: 12px;
-                    color: var(--accent-color-lighter);
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.8px;
-                  "
-                >
-                  Editor Preferences
-                </h3>
-                <div
-                  class="preference-row"
-                  style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 10px 12px;
-                    background: rgba(var(--accent-color-rgb), 0.05);
-                    border-radius: 6px;
-                    border: 1px solid rgba(var(--accent-color-rgb), 0.1);
-                  "
-                >
-                  <div style="display: flex; flex-direction: column; gap: 2px">
-                    <span class="preference-label" style="font-size: 12px; font-weight: 500"
-                      >Page Glow</span
-                    >
-                    <span class="preference-desc" style="font-size: 10px"
-                      >Adds a radiant light effect around the document</span
-                    >
-                  </div>
-                  <label
-                    class="switch"
-                    style="position: relative; display: inline-block; width: 34px; height: 20px"
-                  >
-                    <input
-                      type="checkbox"
-                      id="togglePageGlow"
-                      style="opacity: 0; width: 0; height: 0"
-                    />
-                    <span
-                      class="slider"
-                      style="
-                        position: absolute;
-                        cursor: pointer;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background-color: #333;
-                        transition: 0.4s;
-                        border-radius: 20px;
-                      "
-                    ></span>
-                  </label>
-                </div>
-
-                <div
-                  class="preference-row"
-                  style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 10px 12px;
-                    background: rgba(var(--accent-color-rgb), 0.05);
-                    border-radius: 6px;
-                    border: 1px solid rgba(var(--accent-color-rgb), 0.1);
-                    margin-top: 8px;
-                  "
-                >
-                  <div style="display: flex; flex-direction: column; gap: 2px">
-                    <span class="preference-label" style="font-size: 12px; font-weight: 500"
-                      >Page Border Accent</span
-                    >
-                    <span class="preference-desc" style="font-size: 10px"
-                      >Shows your accent color around the page perimeter</span
-                    >
-                  </div>
-                  <label
-                    class="switch"
-                    style="position: relative; display: inline-block; width: 34px; height: 20px"
-                  >
-                    <input
-                      type="checkbox"
-                      id="togglePageBorder"
-                      style="opacity: 0; width: 0; height: 0"
-                    />
-                    <span
-                      class="slider"
-                      style="
-                        position: absolute;
-                        cursor: pointer;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background-color: #333;
-                        transition: 0.4s;
-                        border-radius: 20px;
-                      "
-                    ></span>
-                  </label>
-                </div>
-              </div>
-
-              <style>
-                .switch input:checked + .slider {
-                  background-color: var(--accent-color);
-                }
-                .slider:before {
-                  position: absolute;
-                  content: '';
-                  height: 14px;
-                  width: 14px;
-                  left: 3px;
-                  bottom: 3px;
-                  background-color: white;
-                  transition: 0.4s;
-                  border-radius: 50%;
-                }
-                .switch input:checked + .slider:before {
-                  transform: translateX(14px);
-                }
-              </style>
-            </div>
-
-            <!-- Security Tab Content -->
-            <div class="profile-tab-content" id="security-content" style="display: none">
+            <!-- Accent Color Selection -->
+            <div style="margin-bottom: 20px">
               <h3
                 style="
-                  margin-bottom: 16px;
+                  margin-bottom: 12px;
                   color: var(--accent-color-lighter);
                   font-size: 11px;
                   text-transform: uppercase;
@@ -1531,153 +1221,484 @@
                   gap: 6px;
                 "
               >
-                <i class="fas fa-lock" style="color: var(--accent-color); font-size: 10px"></i
-                >Change Password
+                <i class="fas fa-palette" style="color: var(--accent-color); font-size: 10px"></i
+                >Accent Color
               </h3>
-              <div style="display: flex; flex-direction: column; gap: 10px">
-                <div style="position: relative">
-                  <label
-                    for="newPassword"
-                    class="profile-label"
-                    style="
-                      font-size: 10px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.3px;
-                      display: block;
-                      margin-bottom: 6px;
-                    "
-                    >New Password</label
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
+                <button
+                  class="accent-color-btn"
+                  data-color="#8b5cf6"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #8b5cf6;
+                    border: 2px solid #a78bfa;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Purple"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#ec4899"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #ec4899;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Pink"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#3b82f6"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #3b82f6;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Blue"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#10b981"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #10b981;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Green"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#f59e0b"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #f59e0b;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Amber"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#ef4444"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #ef4444;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Red"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#06b6d4"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #06b6d4;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Cyan"
+                ></button>
+                <button
+                  class="accent-color-btn"
+                  data-color="#39ff14"
+                  style="
+                    width: 100%;
+                    aspect-ratio: 1;
+                    background: #39ff14;
+                    border: 2px solid transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                  title="Neon Green"
+                ></button>
+              </div>
+            </div>
+
+            <!-- Background Theme Selection -->
+            <div style="margin-bottom: 20px">
+              <h3
+                style="
+                  margin-bottom: 12px;
+                  color: var(--accent-color-lighter);
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                "
+              >
+                <i class="fas fa-magic" style="color: var(--accent-color); font-size: 10px"></i
+                ><label for="backgroundThemeSelect">Background Theme</label>
+              </h3>
+              <select
+                id="backgroundThemeSelect"
+                name="backgroundTheme"
+                class="profile-input"
+                style="width: 100%; height: 36px"
+              >
+                <option value="dots">Connected Dots (Classic)</option>
+                <option value="math">Floating Math Symbols</option>
+                <option value="code">Floating Code Blocks</option>
+                <option value="nature">Floating Nature Elements</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+
+            <!-- Editor Preferences -->
+            <div>
+              <h3
+                style="
+                  margin-bottom: 12px;
+                  color: var(--accent-color-lighter);
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                Editor Preferences
+              </h3>
+              <div
+                class="preference-row"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 10px 12px;
+                  background: rgba(var(--accent-color-rgb), 0.05);
+                  border-radius: 6px;
+                  border: 1px solid rgba(var(--accent-color-rgb), 0.1);
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 2px">
+                  <span class="preference-label" style="font-size: 12px; font-weight: 500"
+                    >Page Glow</span
                   >
+                  <span class="preference-desc" style="font-size: 10px"
+                    >Adds a radiant light effect around the document</span
+                  >
+                </div>
+                <label
+                  class="switch"
+                  style="position: relative; display: inline-block; width: 34px; height: 20px"
+                >
                   <input
-                    type="password"
-                    id="newPassword"
-                    name="newPassword"
-                    class="profile-input"
-                    placeholder="Enter new password"
-                    style="
-                      width: 100%;
-                      padding: 10px 12px;
-                      border-radius: 6px;
-                      font-size: 11px;
-                      transition: all 0.3s ease;
-                    "
+                    type="checkbox"
+                    id="togglePageGlow"
+                    style="opacity: 0; width: 0; height: 0"
                   />
-                  <!-- Password Strength Meter -->
-                  <div style="margin-top: 8px">
-                    <div class="entropy-bar" style="margin-bottom: 8px">
-                      <div
-                        id="passwordStrengthBar"
-                        style="
-                          height: 100%;
-                          width: 0%;
-                          transition: all 0.3s ease;
-                          background: #ef4444;
-                        "
-                      ></div>
-                    </div>
-                    <ul
-                      id="passwordRequirements"
+                  <span
+                    class="slider"
+                    style="
+                      position: absolute;
+                      cursor: pointer;
+                      top: 0;
+                      left: 0;
+                      right: 0;
+                      bottom: 0;
+                      background-color: #333;
+                      transition: 0.4s;
+                      border-radius: 20px;
+                    "
+                  ></span>
+                </label>
+              </div>
+
+              <div
+                class="preference-row"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 10px 12px;
+                  background: rgba(var(--accent-color-rgb), 0.05);
+                  border-radius: 6px;
+                  border: 1px solid rgba(var(--accent-color-rgb), 0.1);
+                  margin-top: 8px;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 2px">
+                  <span class="preference-label" style="font-size: 12px; font-weight: 500"
+                    >Page Border Accent</span
+                  >
+                  <span class="preference-desc" style="font-size: 10px"
+                    >Shows your accent color around the page perimeter</span
+                  >
+                </div>
+                <label
+                  class="switch"
+                  style="position: relative; display: inline-block; width: 34px; height: 20px"
+                >
+                  <input
+                    type="checkbox"
+                    id="togglePageBorder"
+                    style="opacity: 0; width: 0; height: 0"
+                  />
+                  <span
+                    class="slider"
+                    style="
+                      position: absolute;
+                      cursor: pointer;
+                      top: 0;
+                      left: 0;
+                      right: 0;
+                      bottom: 0;
+                      background-color: #333;
+                      transition: 0.4s;
+                      border-radius: 20px;
+                    "
+                  ></span>
+                </label>
+              </div>
+            </div>
+
+            <style>
+              .switch input:checked + .slider {
+                background-color: var(--accent-color);
+              }
+              .slider:before {
+                position: absolute;
+                content: '';
+                height: 14px;
+                width: 14px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: 0.4s;
+                border-radius: 50%;
+              }
+              .switch input:checked + .slider:before {
+                transform: translateX(14px);
+              }
+            </style>
+          </div>
+
+          <!-- Security Tab Content -->
+          <div class="profile-tab-content" id="security-content" style="display: none">
+            <h3
+              style="
+                margin-bottom: 16px;
+                color: var(--accent-color-lighter);
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              "
+            >
+              <i class="fas fa-lock" style="color: var(--accent-color); font-size: 10px"></i>Change
+              Password
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <div style="position: relative">
+                <label
+                  for="newPassword"
+                  class="profile-label"
+                  style="
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    display: block;
+                    margin-bottom: 6px;
+                  "
+                  >New Password</label
+                >
+                <input
+                  type="password"
+                  id="newPassword"
+                  name="newPassword"
+                  class="profile-input"
+                  placeholder="Enter new password"
+                  style="
+                    width: 100%;
+                    padding: 10px 12px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    transition: all 0.3s ease;
+                  "
+                />
+                <!-- Password Strength Meter -->
+                <div style="margin-top: 8px">
+                  <div class="entropy-bar" style="margin-bottom: 8px">
+                    <div
+                      id="passwordStrengthBar"
                       style="
-                        list-style: none;
-                        padding: 0;
-                        margin: 0;
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
+                        height: 100%;
+                        width: 0%;
+                        transition: all 0.3s ease;
+                        background: #ef4444;
+                      "
+                    ></div>
+                  </div>
+                  <ul
+                    id="passwordRequirements"
+                    style="
+                      list-style: none;
+                      padding: 0;
+                      margin: 0;
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 4px;
+                    "
+                  >
+                    <li
+                      data-req="length"
+                      style="
+                        font-size: 9px;
+                        color: #666;
+                        display: flex;
+                        align-items: center;
                         gap: 4px;
                       "
                     >
-                      <li
-                        data-req="length"
-                        style="
-                          font-size: 9px;
-                          color: #666;
-                          display: flex;
-                          align-items: center;
-                          gap: 4px;
-                        "
-                      >
-                        <i class="fas fa-circle" style="font-size: 4px"></i> 8+ Characters
-                      </li>
-                      <li
-                        data-req="upper"
-                        style="
-                          font-size: 9px;
-                          color: #666;
-                          display: flex;
-                          align-items: center;
-                          gap: 4px;
-                        "
-                      >
-                        <i class="fas fa-circle" style="font-size: 4px"></i>
-                        Uppercase
-                      </li>
-                      <li
-                        data-req="number"
-                        style="
-                          font-size: 9px;
-                          color: #666;
-                          display: flex;
-                          align-items: center;
-                          gap: 4px;
-                        "
-                      >
-                        <i class="fas fa-circle" style="font-size: 4px"></i>
-                        Number
-                      </li>
-                      <li
-                        data-req="symbol"
-                        style="
-                          font-size: 9px;
-                          color: #666;
-                          display: flex;
-                          align-items: center;
-                          gap: 4px;
-                        "
-                      >
-                        <i class="fas fa-circle" style="font-size: 4px"></i>
-                        Symbol
-                      </li>
-                    </ul>
-                  </div>
+                      <i class="fas fa-circle" style="font-size: 4px"></i> 8+ Characters
+                    </li>
+                    <li
+                      data-req="upper"
+                      style="
+                        font-size: 9px;
+                        color: #666;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                      "
+                    >
+                      <i class="fas fa-circle" style="font-size: 4px"></i>
+                      Uppercase
+                    </li>
+                    <li
+                      data-req="number"
+                      style="
+                        font-size: 9px;
+                        color: #666;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                      "
+                    >
+                      <i class="fas fa-circle" style="font-size: 4px"></i>
+                      Number
+                    </li>
+                    <li
+                      data-req="symbol"
+                      style="
+                        font-size: 9px;
+                        color: #666;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                      "
+                    >
+                      <i class="fas fa-circle" style="font-size: 4px"></i>
+                      Symbol
+                    </li>
+                  </ul>
                 </div>
-                <button
-                  id="updatePasswordBtn"
+              </div>
+              <button
+                id="updatePasswordBtn"
+                style="
+                  padding: 10px 12px;
+                  background: linear-gradient(
+                    135deg,
+                    var(--accent-color),
+                    var(--accent-color-light)
+                  );
+                  color: white;
+                  border: none;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-weight: 600;
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.3px;
+                  box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
+                  transition: all 0.3s ease;
+                  margin-top: 4px;
+                "
+              >
+                Update Password
+              </button>
+            </div>
+
+            <div style="margin-top: 24px">
+              <div
+                class="collapsible-header"
+                id="toggleLoginHistory"
+                style="
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  margin-bottom: 8px;
+                "
+              >
+                <h3
+                  class="profile-section-title"
                   style="
-                    padding: 10px 12px;
-                    background: linear-gradient(
-                      135deg,
-                      var(--accent-color),
-                      var(--accent-color-light)
-                    );
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-weight: 600;
+                    margin: 0;
                     font-size: 11px;
                     text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                    box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
-                    transition: all 0.3s ease;
-                    margin-top: 4px;
+                    letter-spacing: 0.8px;
                   "
                 >
-                  Update Password
-                </button>
+                  Login History
+                </h3>
+                <i
+                  class="fas fa-chevron-down"
+                  style="font-size: 10px; color: #666; transition: transform 0.3s"
+                ></i>
               </div>
+              <div
+                id="loginHistoryContainer"
+                style="
+                  display: none;
+                  background: #0d0520;
+                  border-radius: 6px;
+                  border: 1px solid #2a2a2a;
+                  overflow: hidden;
+                "
+              >
+                <table style="width: 100%; border-collapse: collapse; font-size: 10px">
+                  <tbody id="loginHistoryTableBody">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-              <div style="margin-top: 24px">
-                <div
-                  class="collapsible-header"
-                  id="toggleLoginHistory"
-                  style="
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 8px;
-                  "
-                >
+            <div style="margin-top: 24px">
+              <div
+                class="collapsible-header"
+                id="toggleSessions"
+                style="
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  margin-bottom: 12px;
+                "
+              >
+                <div style="display: flex; align-items: center; gap: 10px">
                   <h3
                     class="profile-section-title"
                     style="
@@ -1687,879 +1708,829 @@
                       letter-spacing: 0.8px;
                     "
                   >
-                    Login History
+                    Sessions
                   </h3>
-                  <i
-                    class="fas fa-chevron-down"
-                    style="font-size: 10px; color: #666; transition: transform 0.3s"
-                  ></i>
+                  <button
+                    id="revokeAllOthersBtn"
+                    style="
+                      background: none;
+                      border: none;
+                      color: #ef4444;
+                      font-size: 9px;
+                      text-transform: uppercase;
+                      cursor: pointer;
+                      letter-spacing: 0.5px;
+                      font-weight: 600;
+                    "
+                  >
+                    Revoke Others
+                  </button>
                 </div>
-                <div
-                  id="loginHistoryContainer"
-                  style="
-                    display: none;
-                    background: #0d0520;
-                    border-radius: 6px;
-                    border: 1px solid #2a2a2a;
-                    overflow: hidden;
-                  "
-                >
-                  <table style="width: 100%; border-collapse: collapse; font-size: 10px">
-                    <tbody id="loginHistoryTableBody">
-                      <!-- Populated by JS -->
-                    </tbody>
-                  </table>
-                </div>
+                <i
+                  class="fas fa-chevron-down"
+                  style="font-size: 10px; color: #666; transition: transform 0.3s"
+                ></i>
               </div>
-
-              <div style="margin-top: 24px">
-                <div
-                  class="collapsible-header"
-                  id="toggleSessions"
-                  style="
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 12px;
-                  "
-                >
-                  <div style="display: flex; align-items: center; gap: 10px">
-                    <h3
-                      class="profile-section-title"
-                      style="
-                        margin: 0;
-                        font-size: 11px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.8px;
-                      "
-                    >
-                      Sessions
-                    </h3>
-                    <button
-                      id="revokeAllOthersBtn"
-                      style="
-                        background: none;
-                        border: none;
-                        color: #ef4444;
-                        font-size: 9px;
-                        text-transform: uppercase;
-                        cursor: pointer;
-                        letter-spacing: 0.5px;
-                        font-weight: 600;
-                      "
-                    >
-                      Revoke Others
-                    </button>
-                  </div>
-                  <i
-                    class="fas fa-chevron-down"
-                    style="font-size: 10px; color: #666; transition: transform 0.3s"
-                  ></i>
-                </div>
-                <div
-                  id="sessionListContainer"
-                  style="display: none; flex-direction: column; gap: 8px"
-                >
-                  <!-- Dynamically populated -->
-                </div>
-              </div>
-
-              <div style="margin-top: 24px">
-                <h3
-                  style="
-                    margin-bottom: 12px;
-                    color: var(--accent-color-lighter);
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.8px;
-                  "
-                >
-                  Privacy
-                </h3>
-                <div
-                  class="privacy-row"
-                  style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    background: #0d0520;
-                    padding: 12px;
-                    border-radius: 6px;
-                    border: 1px solid #2a2a2a;
-                  "
-                >
-                  <div style="display: flex; flex-direction: column">
-                    <span style="font-size: 12px; color: #e0e0e0" class="privacy-text-main"
-                      >Show my online status to others</span
-                    >
-                    <span class="preference-desc" style="font-size: 10px; margin-top: 2px"
-                      >When off, your cursor and presence are hidden from collaborators.</span
-                    >
-                  </div>
-                  <i
-                    id="privacyToggle"
-                    class="fas fa-toggle-on"
-                    style="color: var(--accent-color-light); font-size: 20px; cursor: pointer"
-                  ></i>
-                </div>
+              <div
+                id="sessionListContainer"
+                style="display: none; flex-direction: column; gap: 8px"
+              >
+                <!-- Dynamically populated -->
               </div>
             </div>
-          </div>
 
-          <!-- Footer with Buttons -->
-          <div
-            style="
-              padding: 16px 24px;
-              border-top: 1px solid rgba(var(--accent-color-rgb), 0.2);
-              background: rgba(var(--accent-color-rgb), 0.05);
-              display: flex;
-              gap: 12px;
-            "
-          >
-            <button
-              id="logoutBtnProfile"
-              class="toolbar-btn"
-              style="
-                flex: 1;
-                padding: 10px 12px;
-                background: rgba(239, 68, 68, 0.1);
-                border: 2px solid #ef4444;
-                border-radius: 6px;
-                cursor: pointer;
-                color: #ef4444;
-                transition: all 0.3s ease;
-                font-weight: 600;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.3px;
-              "
-              onmouseover="
-                this.style.background = 'rgba(239, 68, 68, 0.2)';
-                this.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.25)';
-              "
-              onmouseout="
-                this.style.background = 'rgba(239, 68, 68, 0.1)';
-                this.style.boxShadow = 'none';
-              "
-            >
-              <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-            <button
-              id="closeProfileModal"
-              class="toolbar-btn close-btn-gradient"
-              style="
-                flex: 1;
-                padding: 10px 12px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 11px;
-              "
-            >
-              ✕ Close
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <input type="file" id="fileInput" accept=".json,.txt,.docx,.pdf" style="display: none" />
-
-      <!-- Toolbar (hidden - zoom moved to status bar) -->
-      <div class="toolbar" style="display: none">
-        <!-- Document Info -->
-        <div class="toolbar-group">
-          <span style="color: #5f6368; font-size: 12px" id="pageInfo">Page 1</span>
-        </div>
-
-        <!-- Zoom Controls -->
-        <div class="zoom-level">
-          <button class="toolbar-btn" id="zoomOutBtn-toolbar" title="Zoom out">
-            <i class="fas fa-minus"></i>
-          </button>
-          <span id="zoomPercent-toolbar">100%</span>
-          <button class="toolbar-btn" id="zoomInBtn-toolbar" title="Zoom in">
-            <i class="fas fa-plus"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Ribbon Tabs -->
-      <div class="ribbon-tabs">
-        <button class="ribbon-tab active" data-tab="home">Home</button>
-        <button class="ribbon-tab" data-tab="insert">Insert</button>
-        <button class="ribbon-tab" data-tab="design">Design</button>
-        <button class="ribbon-tab" data-tab="layout">Layout</button>
-        <button class="ribbon-tab" data-tab="view">View</button>
-        <button class="ribbon-tab" data-tab="history">History</button>
-        <button class="ribbon-tab" data-tab="share">Share</button>
-      </div>
-
-      <!-- Ribbon Content Areas -->
-      <!-- Home Tab -->
-      <div class="ribbon-content active" id="home-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Font</div>
-          <div class="ribbon-section-tools" id="editor-toolbar">
-            <select class="ql-font" title="Font Family">
-              <option value="arial" selected>Arial</option>
-              <option value="roboto">Roboto</option>
-              <option value="open-sans">Open Sans</option>
-              <option value="lato">Lato</option>
-              <option value="montserrat">Montserrat</option>
-              <option value="oswald">Oswald</option>
-              <option value="merriweather">Merriweather</option>
-              <option value="times-new-roman">New York (Times)</option>
-              <option value="courier-new">Courier New</option>
-              <option value="georgia">Georgia</option>
-              <option value="verdana">Verdana</option>
-              <option value="lobster">Lobster</option>
-              <option value="pacifico">Pacifico</option>
-              <option value="bebas-neue">Bebas Neue</option>
-              <option value="anton">Anton</option>
-              <option value="dancing-script">Dancing Script</option>
-              <option value="shadows-into-light">Shadows Into Light</option>
-              <option value="abril-fatface">Abril Fatface</option>
-              <option value="playfair-display">Playfair Display</option>
-              <option value="indie-flower">Indie Flower</option>
-              <option value="amatic-sc">Amatic SC</option>
-              <option value="caveat">Caveat</option>
-              <option value="comfortaa">Comfortaa</option>
-              <option value="righteous">Righteous</option>
-              <option value="cinzel">Cinzel</option>
-              <option value="poppins">Poppins</option>
-              <option value="raleway">Raleway</option>
-              <option value="nunito">Nunito</option>
-              <option value="quicksand">Quicksand</option>
-              <option value="inconsolata">Inconsolata</option>
-              <option value="ubuntu">Ubuntu</option>
-              <option value="bitter">Bitter</option>
-              <option value="dosis">Dosis</option>
-              <option value="josefin-sans">Josefin Sans</option>
-              <option value="libre-baskerville">Libre Baskerville</option>
-              <option value="mulish">Mulish</option>
-              <option value="pt-sans">PT Sans</option>
-              <option value="pt-serif">PT Serif</option>
-              <option value="titillium-web">Titillium Web</option>
-              <option value="varela-round">Varela Round</option>
-              <option value="zilla-slab">Zilla Slab</option>
-              <option value="fira-sans">Fira Sans</option>
-              <option value="work-sans">Work Sans</option>
-              <option value="dm-sans">DM Sans</option>
-              <option value="ibm-plex-sans">IBM Plex Sans</option>
-              <option value="karla">Karla</option>
-              <option value="crimson-text">Crimson Text</option>
-              <option value="source-sans-pro">Source Sans Pro</option>
-              <option value="source-serif-pro">Source Serif Pro</option>
-              <option value="space-mono">Space Mono</option>
-              <option value="exo-2">Exo 2</option>
-              <option value="kanit">Kanit</option>
-              <option value="maven-pro">Maven Pro</option>
-              <option value="signika">Signika</option>
-              <option value="bree-serif">Bree Serif</option>
-              <option value="fjalla-one">Fjalla One</option>
-              <option value="patua-one">Patua One</option>
-              <option value="arvo">Arvo</option>
-              <option value="vollkorn">Vollkorn</option>
-              <option value="old-standard-tt">Old Standard TT</option>
-              <option value="great-vibes">Great Vibes</option>
-            </select>
-            <select class="ql-size" title="Font Size">
-              <option value="8px">8</option>
-              <option value="9px">9</option>
-              <option value="10px">10</option>
-              <option value="11px">11</option>
-              <option value="12px">12</option>
-              <option value="14px">14</option>
-              <option value="16px" selected>16</option>
-              <option value="18px">18</option>
-              <option value="20px">20</option>
-              <option value="22px">22</option>
-              <option value="24px">24</option>
-              <option value="26px">26</option>
-              <option value="28px">28</option>
-              <option value="36px">36</option>
-              <option value="48px">48</option>
-              <option value="72px">72</option>
-            </select>
-            <button class="ql-bold toolbar-btn" title="Bold">
-              <i class="fas fa-bold"></i>
-            </button>
-            <button class="ql-italic toolbar-btn" title="Italic">
-              <i class="fas fa-italic"></i>
-            </button>
-            <button class="ql-underline toolbar-btn" title="Underline">
-              <i class="fas fa-underline"></i>
-            </button>
-            <button class="ql-strike toolbar-btn" title="Strikethrough">
-              <i class="fas fa-strikethrough"></i>
-            </button>
-            <div
-              style="position: relative; display: flex; align-items: center"
-              class="color-dropdown-container"
-            >
-              <button class="ql-color toolbar-btn" id="textColorBtn" title="Text Color">
-                <i class="fas fa-font"></i>
-                <div
-                  id="textColorIndicator"
-                  style="
-                    position: absolute;
-                    bottom: 2px;
-                    left: 4px;
-                    right: 4px;
-                    height: 3px;
-                    background: #ffffff;
-                    border-radius: 1px;
-                  "
-                ></div>
-              </button>
-              <div
-                id="textColorMenu"
-                class="color-menu"
+            <div style="margin-top: 24px">
+              <h3
                 style="
-                  display: none;
-                  position: absolute;
-                  top: 100%;
-                  left: 0;
-                  background: #1a1a1a;
-                  border: 1px solid var(--accent-color);
-                  padding: 8px;
-                  border-radius: 4px;
-                  z-index: 1000;
-                  grid-template-columns: repeat(5, 1fr);
-                  gap: 4px;
-                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                  margin-bottom: 12px;
+                  color: var(--accent-color-lighter);
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
                 "
               >
-                <div
-                  class="color-option"
-                  data-color="#ffffff"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #ffffff;
-                    cursor: pointer;
-                    border-radius: 2px;
-                    border: 1px solid #333;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#000000"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #000000;
-                    cursor: pointer;
-                    border-radius: 2px;
-                    border: 1px solid #333;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#ff0000"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #ff0000;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#00ff00"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #00ff00;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#0000ff"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #0000ff;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#ffff00"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #ffff00;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#00ffff"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #00ffff;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#ff00ff"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #ff00ff;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#ffa500"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #ffa500;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  class="color-option"
-                  data-color="#800080"
-                  style="
-                    width: 20px;
-                    height: 20px;
-                    background: #800080;
-                    cursor: pointer;
-                    border-radius: 2px;
-                  "
-                ></div>
-                <div
-                  id="customColorBtn"
-                  style="
-                    grid-column: span 5;
-                    font-size: 10px;
-                    color: #b0b0b0;
-                    text-align: center;
-                    margin-top: 4px;
-                    cursor: pointer;
-                    border-top: 1px solid #333;
-                    padding-top: 4px;
-                  "
-                >
-                  More colors...
+                Privacy
+              </h3>
+              <div
+                class="privacy-row"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  background: #0d0520;
+                  padding: 12px;
+                  border-radius: 6px;
+                  border: 1px solid #2a2a2a;
+                "
+              >
+                <div style="display: flex; flex-direction: column">
+                  <span style="font-size: 12px; color: #e0e0e0" class="privacy-text-main"
+                    >Show my online status to others</span
+                  >
+                  <span class="preference-desc" style="font-size: 10px; margin-top: 2px"
+                    >When off, your cursor and presence are hidden from collaborators.</span
+                  >
                 </div>
+                <i
+                  id="privacyToggle"
+                  class="fas fa-toggle-on"
+                  style="color: var(--accent-color-light); font-size: 20px; cursor: pointer"
+                ></i>
               </div>
-              <input
-                type="color"
-                id="textColorPicker"
-                style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none"
-              />
-            </div>
-            <div style="width: 1px; height: 24px; background: #333; margin: 0 8px"></div>
-            <button class="toolbar-btn" id="toggleSearchBtn" title="Find and Replace (Ctrl+F)">
-              <i class="fas fa-search"></i>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Paragraph</div>
-          <div class="ribbon-section-tools">
-            <select class="ql-align">
-              <option value="" selected>Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-              <option value="justify">Justify</option>
-            </select>
-            <button class="ql-list toolbar-btn" value="ordered" title="Numbered List">
-              <i class="fas fa-list-ol"></i>
-            </button>
-            <button class="ql-list toolbar-btn" value="bullet" title="Bullet List">
-              <i class="fas fa-list-ul"></i>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Editing</div>
-          <div class="ribbon-section-tools">
-            <button class="ql-clean toolbar-btn" title="Clear Format">
-              <i class="fas fa-eraser"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Insert Tab -->
-      <div class="ribbon-content" id="insert-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Media</div>
-          <div class="ribbon-section-tools">
-            <button class="ql-image toolbar-btn" title="Insert Image">
-              <i class="fas fa-image"></i>
-            </button>
-            <button class="ql-video toolbar-btn" title="Insert Video">
-              <i class="fas fa-video"></i>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Links</div>
-          <div class="ribbon-section-tools">
-            <button class="ql-link toolbar-btn" title="Insert Link">
-              <i class="fas fa-link"></i>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Blocks</div>
-          <div class="ribbon-section-tools">
-            <button class="ql-blockquote toolbar-btn" title="Quote">
-              <i class="fas fa-quote-right"></i>
-            </button>
-            <button class="ql-code-block toolbar-btn" title="Code Block">
-              <i class="fas fa-code"></i>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Pages</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="insertPageBtn" title="Insert New Page">
-              <i class="fas fa-file-alt"></i> New Page
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Design Tab -->
-      <div class="ribbon-content" id="design-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Highlights</div>
-          <div class="ribbon-section-tools">
-            <div style="position: relative; display: flex; align-items: center">
-              <button class="ql-background toolbar-btn" id="highlightColorBtn" title="Highlight">
-                <i class="fas fa-highlighter"></i>
-                <div
-                  id="highlightColorIndicator"
-                  style="
-                    position: absolute;
-                    bottom: 2px;
-                    left: 4px;
-                    right: 4px;
-                    height: 3px;
-                    background: #ffff00;
-                    border-radius: 1px;
-                  "
-                ></div>
-              </button>
-              <input
-                type="color"
-                id="highlightColorPicker"
-                value="#ffff00"
-                style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Layout Tab -->
-      <div class="ribbon-content" id="layout-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Page Setup</div>
-          <div class="ribbon-section-tools">
-            <select id="pageSizeSelect">
-              <option value="a4" selected>A4</option>
-              <option value="letter">Letter</option>
-              <option value="legal">Legal</option>
-            </select>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Spacing</div>
-          <div class="ribbon-section-tools">
-            <select id="lineSpacingSelect">
-              <option value="1">Single</option>
-              <option value="1.15">1.15</option>
-              <option value="1.5">1.5</option>
-              <option value="2">Double</option>
-            </select>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Indent</div>
-          <div class="ribbon-section-tools">
-            <button class="ql-indent toolbar-btn" value="-1" title="Decrease Indent">
-              <i class="fas fa-indent"></i>
-            </button>
-            <button class="ql-indent toolbar-btn" value="+1" title="Increase Indent">
-              <i class="fas fa-outdent"></i>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Border Setting</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="borderNone" title="No Border">
-              <i class="fas fa-ban"></i> None
-            </button>
-            <button class="toolbar-btn" id="borderBox" title="Box Border">
-              <i class="fas fa-square"></i> Box
-            </button>
-            <button class="toolbar-btn" id="borderShadow" title="Shadow Border">
-              <i class="fas fa-clone"></i> Shadow
-            </button>
-            <button class="toolbar-btn" id="border3D" title="3D Border">
-              <i class="fas fa-cube"></i> 3-D
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Border Style</div>
-          <div class="ribbon-section-tools">
-            <select id="borderStyleSelect">
-              <option value="solid">Solid ________</option>
-              <option value="dotted">Dotted ............</option>
-              <option value="dashed">Dashed - - - - -</option>
-              <option value="double">Double ========</option>
-              <option value="groove">Groove</option>
-              <option value="ridge">Ridge</option>
-              <option value="inset">Inset</option>
-              <option value="outset">Outset</option>
-            </select>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Width</div>
-          <div class="ribbon-section-tools">
-            <select id="borderWidthSelect">
-              <option value="0.5pt">½ pt</option>
-              <option value="0.75pt">¾ pt</option>
-              <option value="1pt" selected>1 pt</option>
-              <option value="1.5pt">1½ pt</option>
-              <option value="2.25pt">2¼ pt</option>
-              <option value="3pt">3 pt</option>
-              <option value="4.5pt">4½ pt</option>
-              <option value="6pt">6 pt</option>
-            </select>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Color</div>
-          <div class="ribbon-section-tools">
-            <div style="position: relative; display: flex; align-items: center">
-              <button class="toolbar-btn" id="borderColorBtn" title="Border Color">
-                <i class="fas fa-border-style"></i>
-                <div
-                  id="borderColorIndicator"
-                  style="
-                    position: absolute;
-                    bottom: 2px;
-                    left: 4px;
-                    right: 4px;
-                    height: 3px;
-                    background: #333333;
-                    border-radius: 1px;
-                  "
-                ></div>
-              </button>
-              <input
-                type="color"
-                id="borderColorPicker"
-                value="#333333"
-                style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none"
-              />
-            </div>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Apply Border</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="borderAll" title="All Sides">
-              <i class="fas fa-border-all"></i> All
-            </button>
-            <button class="toolbar-btn" id="borderTop" title="Top">
-              <i class="fas fa-minus"></i> Top
-            </button>
-            <button class="toolbar-btn" id="borderBottom" title="Bottom">
-              <i class="fas fa-minus"></i> Bottom
-            </button>
-            <button class="toolbar-btn" id="borderLeft" title="Left">
-              <i class="fas fa-grip-lines-vertical"></i> Left
-            </button>
-            <button class="toolbar-btn" id="borderRight" title="Right">
-              <i class="fas fa-grip-lines-vertical"></i> Right
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- View Tab -->
-      <div class="ribbon-content" id="view-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Theme</div>
-          <div class="ribbon-section-tools">
-            <select id="canvasThemeSelect" title="Canvas Theme">
-              <option value="classic">Classic</option>
-              <option value="sepia">Sepia</option>
-              <option value="midnight">Midnight</option>
-              <option value="math">Math</option>
-            </select>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Zoom</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="zoomOutBtn">
-              <i class="fas fa-search-minus"></i>
-            </button>
-            <span id="zoomPercent" style="font-size: 12px; min-width: 40px; text-align: center"
-              >100%</span
-            >
-            <button class="toolbar-btn" id="zoomInBtn">
-              <i class="fas fa-search-plus"></i>
-            </button>
-            <button class="toolbar-btn" id="zoom100">Reset</button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Readability</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="toggleOutline" title="Toggle Outline Sidebar">
-              <i class="fas fa-columns"></i> Sidebar
-            </button>
-            <button class="toolbar-btn" id="toggleMinimap" title="Toggle Minimap">
-              <i class="fas fa-map"></i> Navigator
-            </button>
-            <button class="toolbar-btn" id="toggleLineNumbers" title="Toggle Line Numbers">
-              <i class="fas fa-list-ol"></i> Numbers
-            </button>
-            <button class="toolbar-btn" id="toggleInvisibles" title="Show Whitespace">
-              <i class="fas fa-paragraph"></i> Invisibles
-            </button>
-            <button class="toolbar-btn" id="toggleWordCount" title="Toggle Word Count">
-              <i class="fas fa-calculator"></i> Statistics
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Focus</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="enterFocusMode" title="Enter Focus Mode">
-              <i class="fas fa-expand"></i> Zen Mode
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- History Tab -->
-      <div class="ribbon-content" id="history-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Activity</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="showHistoryBtn" title="View Document History">
-              <i class="fas fa-history"></i> View History
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Share Tab -->
-      <div class="ribbon-content" id="share-ribbon">
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">Share</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="shareBtn" title="Share Document">
-              <i class="fas fa-share-alt"></i> Share
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-section">
-          <div class="ribbon-section-title">File</div>
-          <div class="ribbon-section-tools">
-            <button class="toolbar-btn" id="newDocBtn" title="New Document">
-              <i class="fas fa-file"></i> New
-            </button>
-            <button class="toolbar-btn" id="saveFileBtn" title="Export to File">
-              <i class="fas fa-download"></i> Export
-            </button>
-            <button class="toolbar-btn" id="loadFileBtn" title="Import from File">
-              <i class="fas fa-upload"></i> Import
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Page Navigator (hidden - auto-paging enabled) -->
-      <div class="page-navigator" style="display: none">
-        <button class="new-page-btn" id="newPageBtn"><i class="fas fa-plus"></i> New Page</button>
-        <div id="pageTabsContainer"></div>
-      </div>
-
-      <!-- Main Workspace -->
-      <div class="main-workspace">
-        <!-- Left Sidebar: Outline -->
-        <div class="sidebar" id="outlineSidebar">
-          <div
-            class="sidebar-header"
-            style="display: flex; justify-content: space-between; align-items: center"
-          >
-            <span>Document Outline</span>
-            <button
-              id="closeOutline"
-              style="background: none; border: none; color: #666; cursor: pointer; font-size: 14px"
-            >
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div id="outlineContainer" class="outline-container">
-            <div style="padding: 20px; color: #666; font-size: 12px">
-              Add headings to see them here
             </div>
           </div>
         </div>
 
-        <!-- Pages Container - Shows all pages like Word -->
-        <div class="pages-container" id="pagesContainer"></div>
-
-        <!-- Right Sidebar: Minimap -->
-        <div class="sidebar sidebar-right" id="minimapSidebar">
-          <div
-            class="sidebar-header"
-            style="display: flex; justify-content: space-between; align-items: center"
-          >
-            <span>Navigator</span>
-            <button
-              id="closeMinimap"
-              style="background: none; border: none; color: #666; cursor: pointer; font-size: 14px"
-            >
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div id="minimap">
-            <!-- Canvas will be injected here -->
-          </div>
-        </div>
-      </div>
-
-      <!-- Status Bar -->
-      <div class="status-bar">
+        <!-- Footer with Buttons -->
         <div
-          style="display: flex; justify-content: space-between; align-items: center; width: 100%"
+          style="
+            padding: 16px 24px;
+            border-top: 1px solid rgba(var(--accent-color-rgb), 0.2);
+            background: rgba(var(--accent-color-rgb), 0.05);
+            display: flex;
+            gap: 12px;
+          "
         >
-          <div style="display: flex; gap: 16px">
-            <span id="pageIndicator" style="color: #5f6368; font-size: 12px">Page 1</span>
-            | <span id="charCount">Characters: 0</span> |
-            <span id="wordCount">Words: 0</span>
+          <button
+            id="logoutBtnProfile"
+            class="toolbar-btn"
+            style="
+              flex: 1;
+              padding: 10px 12px;
+              background: rgba(239, 68, 68, 0.1);
+              border: 2px solid #ef4444;
+              border-radius: 6px;
+              cursor: pointer;
+              color: #ef4444;
+              transition: all 0.3s ease;
+              font-weight: 600;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.3px;
+            "
+            onmouseover="
+              this.style.background = 'rgba(239, 68, 68, 0.2)';
+              this.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.25)';
+            "
+            onmouseout="
+              this.style.background = 'rgba(239, 68, 68, 0.1)';
+              this.style.boxShadow = 'none';
+            "
+          >
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </button>
+          <button
+            id="closeProfileModal"
+            class="toolbar-btn close-btn-gradient"
+            style="
+              flex: 1;
+              padding: 10px 12px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 11px;
+            "
+          >
+            ✕ Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".json,.txt,.docx,.pdf" style="display: none" />
+
+    <!-- Toolbar (hidden - zoom moved to status bar) -->
+    <div class="toolbar" style="display: none">
+      <!-- Document Info -->
+      <div class="toolbar-group">
+        <span style="color: #5f6368; font-size: 12px" id="pageInfo">Page 1</span>
+      </div>
+
+      <!-- Zoom Controls -->
+      <div class="zoom-level">
+        <button class="toolbar-btn" id="zoomOutBtn-toolbar" title="Zoom out">
+          <i class="fas fa-minus"></i>
+        </button>
+        <span id="zoomPercent-toolbar">100%</span>
+        <button class="toolbar-btn" id="zoomInBtn-toolbar" title="Zoom in">
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ribbon Tabs -->
+    <div class="ribbon-tabs">
+      <button class="ribbon-tab active" data-tab="home">Home</button>
+      <button class="ribbon-tab" data-tab="insert">Insert</button>
+      <button class="ribbon-tab" data-tab="design">Design</button>
+      <button class="ribbon-tab" data-tab="layout">Layout</button>
+      <button class="ribbon-tab" data-tab="view">View</button>
+      <button class="ribbon-tab" data-tab="history">History</button>
+      <button class="ribbon-tab" data-tab="share">Share</button>
+    </div>
+
+    <!-- Ribbon Content Areas -->
+    <!-- Home Tab -->
+    <div class="ribbon-content active" id="home-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Font</div>
+        <div class="ribbon-section-tools" id="editor-toolbar">
+          <select class="ql-font" title="Font Family">
+            <option value="arial" selected>Arial</option>
+            <option value="roboto">Roboto</option>
+            <option value="open-sans">Open Sans</option>
+            <option value="lato">Lato</option>
+            <option value="montserrat">Montserrat</option>
+            <option value="oswald">Oswald</option>
+            <option value="merriweather">Merriweather</option>
+            <option value="times-new-roman">New York (Times)</option>
+            <option value="courier-new">Courier New</option>
+            <option value="georgia">Georgia</option>
+            <option value="verdana">Verdana</option>
+            <option value="lobster">Lobster</option>
+            <option value="pacifico">Pacifico</option>
+            <option value="bebas-neue">Bebas Neue</option>
+            <option value="anton">Anton</option>
+            <option value="dancing-script">Dancing Script</option>
+            <option value="shadows-into-light">Shadows Into Light</option>
+            <option value="abril-fatface">Abril Fatface</option>
+            <option value="playfair-display">Playfair Display</option>
+            <option value="indie-flower">Indie Flower</option>
+            <option value="amatic-sc">Amatic SC</option>
+            <option value="caveat">Caveat</option>
+            <option value="comfortaa">Comfortaa</option>
+            <option value="righteous">Righteous</option>
+            <option value="cinzel">Cinzel</option>
+            <option value="poppins">Poppins</option>
+            <option value="raleway">Raleway</option>
+            <option value="nunito">Nunito</option>
+            <option value="quicksand">Quicksand</option>
+            <option value="inconsolata">Inconsolata</option>
+            <option value="ubuntu">Ubuntu</option>
+            <option value="bitter">Bitter</option>
+            <option value="dosis">Dosis</option>
+            <option value="josefin-sans">Josefin Sans</option>
+            <option value="libre-baskerville">Libre Baskerville</option>
+            <option value="mulish">Mulish</option>
+            <option value="pt-sans">PT Sans</option>
+            <option value="pt-serif">PT Serif</option>
+            <option value="titillium-web">Titillium Web</option>
+            <option value="varela-round">Varela Round</option>
+            <option value="zilla-slab">Zilla Slab</option>
+            <option value="fira-sans">Fira Sans</option>
+            <option value="work-sans">Work Sans</option>
+            <option value="dm-sans">DM Sans</option>
+            <option value="ibm-plex-sans">IBM Plex Sans</option>
+            <option value="karla">Karla</option>
+            <option value="crimson-text">Crimson Text</option>
+            <option value="source-sans-pro">Source Sans Pro</option>
+            <option value="source-serif-pro">Source Serif Pro</option>
+            <option value="space-mono">Space Mono</option>
+            <option value="exo-2">Exo 2</option>
+            <option value="kanit">Kanit</option>
+            <option value="maven-pro">Maven Pro</option>
+            <option value="signika">Signika</option>
+            <option value="bree-serif">Bree Serif</option>
+            <option value="fjalla-one">Fjalla One</option>
+            <option value="patua-one">Patua One</option>
+            <option value="arvo">Arvo</option>
+            <option value="vollkorn">Vollkorn</option>
+            <option value="old-standard-tt">Old Standard TT</option>
+            <option value="great-vibes">Great Vibes</option>
+          </select>
+          <select class="ql-size" title="Font Size">
+            <option value="8px">8</option>
+            <option value="9px">9</option>
+            <option value="10px">10</option>
+            <option value="11px">11</option>
+            <option value="12px">12</option>
+            <option value="14px">14</option>
+            <option value="16px" selected>16</option>
+            <option value="18px">18</option>
+            <option value="20px">20</option>
+            <option value="22px">22</option>
+            <option value="24px">24</option>
+            <option value="26px">26</option>
+            <option value="28px">28</option>
+            <option value="36px">36</option>
+            <option value="48px">48</option>
+            <option value="72px">72</option>
+          </select>
+          <button class="ql-bold toolbar-btn" title="Bold">
+            <i class="fas fa-bold"></i>
+          </button>
+          <button class="ql-italic toolbar-btn" title="Italic">
+            <i class="fas fa-italic"></i>
+          </button>
+          <button class="ql-underline toolbar-btn" title="Underline">
+            <i class="fas fa-underline"></i>
+          </button>
+          <button class="ql-strike toolbar-btn" title="Strikethrough">
+            <i class="fas fa-strikethrough"></i>
+          </button>
+          <div
+            style="position: relative; display: flex; align-items: center"
+            class="color-dropdown-container"
+          >
+            <button class="ql-color toolbar-btn" id="textColorBtn" title="Text Color">
+              <i class="fas fa-font"></i>
+              <div
+                id="textColorIndicator"
+                style="
+                  position: absolute;
+                  bottom: 2px;
+                  left: 4px;
+                  right: 4px;
+                  height: 3px;
+                  background: #ffffff;
+                  border-radius: 1px;
+                "
+              ></div>
+            </button>
+            <div
+              id="textColorMenu"
+              class="color-menu"
+              style="
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                background: #1a1a1a;
+                border: 1px solid var(--accent-color);
+                padding: 8px;
+                border-radius: 4px;
+                z-index: 1000;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 4px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+              "
+            >
+              <div
+                class="color-option"
+                data-color="#ffffff"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #ffffff;
+                  cursor: pointer;
+                  border-radius: 2px;
+                  border: 1px solid #333;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#000000"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #000000;
+                  cursor: pointer;
+                  border-radius: 2px;
+                  border: 1px solid #333;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#ff0000"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #ff0000;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#00ff00"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #00ff00;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#0000ff"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #0000ff;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#ffff00"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #ffff00;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#00ffff"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #00ffff;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#ff00ff"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #ff00ff;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#ffa500"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #ffa500;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                class="color-option"
+                data-color="#800080"
+                style="
+                  width: 20px;
+                  height: 20px;
+                  background: #800080;
+                  cursor: pointer;
+                  border-radius: 2px;
+                "
+              ></div>
+              <div
+                id="customColorBtn"
+                style="
+                  grid-column: span 5;
+                  font-size: 10px;
+                  color: #b0b0b0;
+                  text-align: center;
+                  margin-top: 4px;
+                  cursor: pointer;
+                  border-top: 1px solid #333;
+                  padding-top: 4px;
+                "
+              >
+                More colors...
+              </div>
+            </div>
+            <input
+              type="color"
+              id="textColorPicker"
+              style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none"
+            />
           </div>
+          <div style="width: 1px; height: 24px; background: #333; margin: 0 8px"></div>
+          <button class="toolbar-btn" id="toggleSearchBtn" title="Find and Replace (Ctrl+F)">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Paragraph</div>
+        <div class="ribbon-section-tools">
+          <select class="ql-align">
+            <option value="" selected>Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+            <option value="justify">Justify</option>
+          </select>
+          <button class="ql-list toolbar-btn" value="ordered" title="Numbered List">
+            <i class="fas fa-list-ol"></i>
+          </button>
+          <button class="ql-list toolbar-btn" value="bullet" title="Bullet List">
+            <i class="fas fa-list-ul"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Editing</div>
+        <div class="ribbon-section-tools">
+          <button class="ql-clean toolbar-btn" title="Clear Format">
+            <i class="fas fa-eraser"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Insert Tab -->
+    <div class="ribbon-content" id="insert-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Media</div>
+        <div class="ribbon-section-tools">
+          <button class="ql-image toolbar-btn" title="Insert Image">
+            <i class="fas fa-image"></i>
+          </button>
+          <button class="ql-video toolbar-btn" title="Insert Video">
+            <i class="fas fa-video"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Links</div>
+        <div class="ribbon-section-tools">
+          <button class="ql-link toolbar-btn" title="Insert Link">
+            <i class="fas fa-link"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Blocks</div>
+        <div class="ribbon-section-tools">
+          <button class="ql-blockquote toolbar-btn" title="Quote">
+            <i class="fas fa-quote-right"></i>
+          </button>
+          <button class="ql-code-block toolbar-btn" title="Code Block">
+            <i class="fas fa-code"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Pages</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="insertPageBtn" title="Insert New Page">
+            <i class="fas fa-file-alt"></i> New Page
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design Tab -->
+    <div class="ribbon-content" id="design-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Highlights</div>
+        <div class="ribbon-section-tools">
+          <div style="position: relative; display: flex; align-items: center">
+            <button class="ql-background toolbar-btn" id="highlightColorBtn" title="Highlight">
+              <i class="fas fa-highlighter"></i>
+              <div
+                id="highlightColorIndicator"
+                style="
+                  position: absolute;
+                  bottom: 2px;
+                  left: 4px;
+                  right: 4px;
+                  height: 3px;
+                  background: #ffff00;
+                  border-radius: 1px;
+                "
+              ></div>
+            </button>
+            <input
+              type="color"
+              id="highlightColorPicker"
+              value="#ffff00"
+              style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Layout Tab -->
+    <div class="ribbon-content" id="layout-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Page Setup</div>
+        <div class="ribbon-section-tools">
+          <select id="pageSizeSelect">
+            <option value="a4" selected>A4</option>
+            <option value="letter">Letter</option>
+            <option value="legal">Legal</option>
+          </select>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Spacing</div>
+        <div class="ribbon-section-tools">
+          <select id="lineSpacingSelect">
+            <option value="1">Single</option>
+            <option value="1.15">1.15</option>
+            <option value="1.5">1.5</option>
+            <option value="2">Double</option>
+          </select>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Indent</div>
+        <div class="ribbon-section-tools">
+          <button class="ql-indent toolbar-btn" value="-1" title="Decrease Indent">
+            <i class="fas fa-indent"></i>
+          </button>
+          <button class="ql-indent toolbar-btn" value="+1" title="Increase Indent">
+            <i class="fas fa-outdent"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Border Setting</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="borderNone" title="No Border">
+            <i class="fas fa-ban"></i> None
+          </button>
+          <button class="toolbar-btn" id="borderBox" title="Box Border">
+            <i class="fas fa-square"></i> Box
+          </button>
+          <button class="toolbar-btn" id="borderShadow" title="Shadow Border">
+            <i class="fas fa-clone"></i> Shadow
+          </button>
+          <button class="toolbar-btn" id="border3D" title="3D Border">
+            <i class="fas fa-cube"></i> 3-D
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Border Style</div>
+        <div class="ribbon-section-tools">
+          <select id="borderStyleSelect">
+            <option value="solid">Solid ________</option>
+            <option value="dotted">Dotted ............</option>
+            <option value="dashed">Dashed - - - - -</option>
+            <option value="double">Double ========</option>
+            <option value="groove">Groove</option>
+            <option value="ridge">Ridge</option>
+            <option value="inset">Inset</option>
+            <option value="outset">Outset</option>
+          </select>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Width</div>
+        <div class="ribbon-section-tools">
+          <select id="borderWidthSelect">
+            <option value="0.5pt">½ pt</option>
+            <option value="0.75pt">¾ pt</option>
+            <option value="1pt" selected>1 pt</option>
+            <option value="1.5pt">1½ pt</option>
+            <option value="2.25pt">2¼ pt</option>
+            <option value="3pt">3 pt</option>
+            <option value="4.5pt">4½ pt</option>
+            <option value="6pt">6 pt</option>
+          </select>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Color</div>
+        <div class="ribbon-section-tools">
+          <div style="position: relative; display: flex; align-items: center">
+            <button class="toolbar-btn" id="borderColorBtn" title="Border Color">
+              <i class="fas fa-border-style"></i>
+              <div
+                id="borderColorIndicator"
+                style="
+                  position: absolute;
+                  bottom: 2px;
+                  left: 4px;
+                  right: 4px;
+                  height: 3px;
+                  background: #333333;
+                  border-radius: 1px;
+                "
+              ></div>
+            </button>
+            <input
+              type="color"
+              id="borderColorPicker"
+              value="#333333"
+              style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Apply Border</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="borderAll" title="All Sides">
+            <i class="fas fa-border-all"></i> All
+          </button>
+          <button class="toolbar-btn" id="borderTop" title="Top">
+            <i class="fas fa-minus"></i> Top
+          </button>
+          <button class="toolbar-btn" id="borderBottom" title="Bottom">
+            <i class="fas fa-minus"></i> Bottom
+          </button>
+          <button class="toolbar-btn" id="borderLeft" title="Left">
+            <i class="fas fa-grip-lines-vertical"></i> Left
+          </button>
+          <button class="toolbar-btn" id="borderRight" title="Right">
+            <i class="fas fa-grip-lines-vertical"></i> Right
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Tab -->
+    <div class="ribbon-content" id="view-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Theme</div>
+        <div class="ribbon-section-tools">
+          <select id="canvasThemeSelect" title="Canvas Theme">
+            <option value="classic">Classic</option>
+            <option value="sepia">Sepia</option>
+            <option value="midnight">Midnight</option>
+            <option value="math">Math</option>
+          </select>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Zoom</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="zoomOutBtn">
+            <i class="fas fa-search-minus"></i>
+          </button>
+          <span id="zoomPercent" style="font-size: 12px; min-width: 40px; text-align: center"
+            >100%</span
+          >
+          <button class="toolbar-btn" id="zoomInBtn">
+            <i class="fas fa-search-plus"></i>
+          </button>
+          <button class="toolbar-btn" id="zoom100">Reset</button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Readability</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="toggleOutline" title="Toggle Outline Sidebar">
+            <i class="fas fa-columns"></i> Sidebar
+          </button>
+          <button class="toolbar-btn" id="toggleMinimap" title="Toggle Minimap">
+            <i class="fas fa-map"></i> Navigator
+          </button>
+          <button class="toolbar-btn" id="toggleLineNumbers" title="Toggle Line Numbers">
+            <i class="fas fa-list-ol"></i> Numbers
+          </button>
+          <button class="toolbar-btn" id="toggleInvisibles" title="Show Whitespace">
+            <i class="fas fa-paragraph"></i> Invisibles
+          </button>
+          <button class="toolbar-btn" id="toggleWordCount" title="Toggle Word Count">
+            <i class="fas fa-calculator"></i> Statistics
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Focus</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="enterFocusMode" title="Enter Focus Mode">
+            <i class="fas fa-expand"></i> Zen Mode
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div class="ribbon-content" id="history-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Activity</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="showHistoryBtn" title="View Document History">
+            <i class="fas fa-history"></i> View History
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share Tab -->
+    <div class="ribbon-content" id="share-ribbon">
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">Share</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="shareBtn" title="Share Document">
+            <i class="fas fa-share-alt"></i> Share
+          </button>
+        </div>
+      </div>
+      <div class="ribbon-section">
+        <div class="ribbon-section-title">File</div>
+        <div class="ribbon-section-tools">
+          <button class="toolbar-btn" id="newDocBtn" title="New Document">
+            <i class="fas fa-file"></i> New
+          </button>
+          <button class="toolbar-btn" id="saveFileBtn" title="Export to File">
+            <i class="fas fa-download"></i> Export
+          </button>
+          <button class="toolbar-btn" id="loadFileBtn" title="Import from File">
+            <i class="fas fa-upload"></i> Import
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page Navigator (hidden - auto-paging enabled) -->
+    <div class="page-navigator" style="display: none">
+      <button class="new-page-btn" id="newPageBtn"><i class="fas fa-plus"></i> New Page</button>
+      <div id="pageTabsContainer"></div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-workspace">
+      <!-- Left Sidebar: Outline -->
+      <div class="sidebar" id="outlineSidebar">
+        <div
+          class="sidebar-header"
+          style="display: flex; justify-content: space-between; align-items: center"
+        >
+          <span>Document Outline</span>
+          <button
+            id="closeOutline"
+            style="background: none; border: none; color: #666; cursor: pointer; font-size: 14px"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div id="outlineContainer" class="outline-container">
+          <div style="padding: 20px; color: #666; font-size: 12px">
+            Add headings to see them here
+          </div>
+        </div>
+      </div>
+
+      <!-- Pages Container - Shows all pages like Word -->
+      <div class="pages-container" id="pagesContainer"></div>
+
+      <!-- Right Sidebar: Minimap -->
+      <div class="sidebar sidebar-right" id="minimapSidebar">
+        <div
+          class="sidebar-header"
+          style="display: flex; justify-content: space-between; align-items: center"
+        >
+          <span>Navigator</span>
+          <button
+            id="closeMinimap"
+            style="background: none; border: none; color: #666; cursor: pointer; font-size: 14px"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div id="minimap">
+          <!-- Canvas will be injected here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+        <div style="display: flex; gap: 16px">
+          <span id="pageIndicator" style="color: #5f6368; font-size: 12px">Page 1</span>
+          | <span id="charCount">Characters: 0</span> |
+          <span id="wordCount">Words: 0</span>
         </div>
       </div>
     </div>
@@ -2950,15 +2921,9 @@
     <!-- Mobile Contextual Toolbar (Fixed above keyboard) -->
     <div id="mobileContextualToolbar" class="mobile-toolbar">
       <div class="mobile-toolbar-scroll">
-        <button class="mobile-tool-btn ql-bold">
-          <i class="fas fa-bold"></i>
-        </button>
-        <button class="mobile-tool-btn ql-italic">
-          <i class="fas fa-italic"></i>
-        </button>
-        <button class="mobile-tool-btn ql-underline">
-          <i class="fas fa-underline"></i>
-        </button>
+        <button class="mobile-tool-btn ql-bold"><i class="fas fa-bold"></i></button>
+        <button class="mobile-tool-btn ql-italic"><i class="fas fa-italic"></i></button>
+        <button class="mobile-tool-btn ql-underline"><i class="fas fa-underline"></i></button>
         <div class="mobile-tool-separator"></div>
         <button class="mobile-tool-btn ql-list" value="ordered">
           <i class="fas fa-list-ol"></i>
@@ -2967,15 +2932,11 @@
           <i class="fas fa-list-ul"></i>
         </button>
         <div class="mobile-tool-separator"></div>
-        <button class="mobile-tool-btn ql-align" value="">
-          <i class="fas fa-align-left"></i>
-        </button>
+        <button class="mobile-tool-btn ql-align" value=""><i class="fas fa-align-left"></i></button>
         <button class="mobile-tool-btn ql-align" value="center">
           <i class="fas fa-align-center"></i>
         </button>
-        <button class="mobile-tool-btn ql-image">
-          <i class="fas fa-image"></i>
-        </button>
+        <button class="mobile-tool-btn ql-image"><i class="fas fa-image"></i></button>
         <div class="mobile-tool-separator"></div>
         <button class="mobile-tool-btn" id="mobileCloseKeyboard">
           <i class="fas fa-keyboard"></i>

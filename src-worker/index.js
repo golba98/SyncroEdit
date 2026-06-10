@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { sign, verify } from 'hono/jwt';
-import * as Y from 'yjs';
 import { hashPassword, verifyPassword, generateTokens, authenticateUser } from './auth.js';
 import { RateLimitObject } from './rateLimitObject.js';
 import {
@@ -70,32 +69,6 @@ const AUTH_RATE_LIMITS = {
   },
   '/api/auth/ws-ticket': { route: 'ws-ticket', limit: 120, windowSeconds: 300 },
 };
-
-function uint8ArrayToBase64(arr) {
-  let binary = '';
-  for (let i = 0; i < arr.byteLength; i++) {
-    binary += String.fromCharCode(arr[i]);
-  }
-  return btoa(binary);
-}
-
-function buildSnapshotState(title, pageContent = '') {
-  const doc = new Y.Doc();
-  const meta = doc.getMap('meta');
-  meta.set('title', validateTitle(title || 'Untitled document'));
-
-  const pages = doc.getArray('pages');
-  const page = new Y.Map();
-  page.set('id', crypto.randomUUID().slice(0, 9));
-  const content = new Y.Text();
-  if (pageContent) {
-    content.insert(0, pageContent);
-  }
-  page.set('content', content);
-  pages.push([page]);
-
-  return uint8ArrayToBase64(Y.encodeStateAsUpdate(doc));
-}
 
 app.use('/api/auth/*', async (c, next) => {
   const config = AUTH_RATE_LIMITS[c.req.path];
@@ -749,40 +722,6 @@ app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
   return c.json({
     message: 'Settings updated',
     isPublic: isPublicVal === 1,
-  });
-});
-
-app.get('/api/documents/:id/snapshot', authenticateUser, async (c) => {
-  const db = requireDb(c.env);
-  const user = c.get('user');
-  const docId = validateUuid(c.req.param('id'), 'document id');
-  const access = await getDocumentAccess(db, docId, user.id);
-  assertDocumentReadable(access);
-  const docRow = await db
-    .prepare('SELECT title, yjsState, lastModified FROM documents WHERE id = ?')
-    .bind(docId)
-    .first();
-
-  const pageRow = await db
-    .prepare(
-      'SELECT content FROM document_pages WHERE documentId = ? ORDER BY pageIndex ASC LIMIT 1'
-    )
-    .bind(docId)
-    .first();
-
-  const yjsState =
-    docRow?.yjsState ||
-    buildSnapshotState(docRow?.title || access.doc.title, pageRow?.content || '');
-
-  return c.json({
-    id: docId,
-    _id: docId,
-    title: docRow?.title || access.doc.title,
-    yjsState,
-    pageContent: pageRow?.content || '',
-    lastModified: docRow?.lastModified || null,
-    isOwner: access.isOwner,
-    isShared: access.role === 'editor',
   });
 });
 
