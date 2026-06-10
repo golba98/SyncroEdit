@@ -28,7 +28,9 @@ function baseEnv() {
     DOCUMENT_SYNC_OBJECT: {
       idFromName: (name) => name,
       get: () => ({
-        fetch: async () => new Response('DO upgraded', { status: 101 }),
+        // Node.js Response rejects status 101 (only valid in CF runtime).
+        // Return 200 in tests to prove the route reached the DO stub.
+        fetch: async () => new Response('DO forwarded', { status: 200 }),
       }),
     },
   };
@@ -311,5 +313,219 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       code: 1003,
       reason: 'Unsupported message type',
     });
+  });
+
+  // -------------------------------------------------------
+  // WebSocket route tests
+  // -------------------------------------------------------
+
+  it('GET /ws/:documentId without Upgrade header returns 426', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
+
+    const res = await app.request(
+      `/ws/${doc.data.id}?ticket=anything`,
+      {
+        // No Upgrade header — plain HTTP GET
+        method: 'GET',
+      },
+      env
+    );
+
+    expect(res.status).toBe(426);
+    const data = await res.json();
+    expect(data.code).toBe('upgrade_required');
+  });
+
+  it('GET /ws/:documentId with missing ticket returns 401', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
+
+    const res = await app.request(
+      `/ws/${doc.data.id}`,
+      {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      },
+      env
+    );
+
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.code).toBe('ticket_required');
+  });
+
+  it('GET /ws/:documentId with invalid ticket returns 401', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
+
+    const res = await app.request(
+      `/ws/${doc.data.id}?ticket=not.a.valid.jwt`,
+      {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      },
+      env
+    );
+
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.code).toBe('invalid_ticket');
+  });
+
+  it('GET /ws/:documentId with wrong-type ticket returns 401', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
+
+    // Sign a valid JWT but with wrong type (access token, not ws-ticket)
+    const wrongTicket = await sign(
+      {
+        sub: alice.user.id,
+        username: 'alice',
+        type: 'access', // not 'ws-ticket'
+        exp: Math.floor(Date.now() / 1000) + 30,
+      },
+      env.JWT_SECRET
+    );
+
+    const res = await app.request(
+      `/ws/${doc.data.id}?ticket=${wrongTicket}`,
+      {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      },
+      env
+    );
+
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.code).toBe('invalid_ticket');
+  });
+
+  it('GET /ws/:documentId with unauthorized user ticket returns 403', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const bob = await signup(env, 'bob', 'bob@example.com');
+    const doc = await createDocument(env, alice.data.token, 'Private WS Doc');
+
+    // Bob has a valid ticket but no access to Alice's document
+    const ticket = await sign(
+      {
+        sub: bob.user.id,
+        username: 'bob',
+        type: 'ws-ticket',
+        exp: Math.floor(Date.now() / 1000) + 30,
+      },
+      env.JWT_SECRET
+    );
+
+    const res = await app.request(
+      `/ws/${doc.data.id}?ticket=${ticket}`,
+      {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      },
+      env
+    );
+
+    expect(res.status).toBe(403);
+    const data = await res.json();
+    expect(data.code).toBe('access_denied');
+  });
+
+  it('GET /ws/:documentId with authorized ticket forwards to Durable Object (101)', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'Authorized WS Doc');
+
+    const ticket = await sign(
+      {
+        sub: alice.user.id,
+        username: 'alice',
+        type: 'ws-ticket',
+        exp: Math.floor(Date.now() / 1000) + 30,
+      },
+      env.JWT_SECRET
+    );
+
+    const res = await app.request(
+      `/ws/${doc.data.id}?ticket=${ticket}`,
+      {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      },
+      env
+    );
+
+    // In CF runtime the DO returns 101; in the Node test harness the mock returns 200
+    // to work around Node's Response constructor rejecting status 101.
+    // A 200 here proves the Worker route successfully passed through to the DO stub.
+    expect(res.status).toBe(200);
+  });
+
+  // -------------------------------------------------------
+  // Security header middleware guard tests
+  // -------------------------------------------------------
+
+  it('normal HTTP routes still receive security headers', async () => {
+    const health = await app.request('/health', {}, env);
+    expect(health.status).toBe(200);
+    expect(health.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(health.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
+    expect(health.headers.get('X-Frame-Options')).toBe('DENY');
+    expect(health.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('/api/config still has security headers', async () => {
+    const res = await app.request('/api/config', {}, env);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Security-Policy')).toContain("connect-src 'self'");
+  });
+
+  it('/ws/:documentId without Upgrade returns 426 JSON with security headers', async () => {
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'Header Guard Doc');
+
+    const res = await app.request(`/ws/${doc.data.id}?ticket=anything`, { method: 'GET' }, env);
+
+    expect(res.status).toBe(426);
+    const data = await res.json();
+    expect(data.code).toBe('upgrade_required');
+    // Non-upgrade responses still get security headers
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('WebSocket upgrade route does not attempt to mutate response headers', async () => {
+    // This test would throw "Can't modify immutable headers" in production if the
+    // middleware guard is missing. In the test harness the mock DO returns 200 (not 101)
+    // so we verify no exception is thrown and the DO response is passed through intact.
+    const alice = await signup(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'Middleware Guard Doc');
+
+    const ticket = await sign(
+      {
+        sub: alice.user.id,
+        username: 'alice',
+        type: 'ws-ticket',
+        exp: Math.floor(Date.now() / 1000) + 30,
+      },
+      env.JWT_SECRET
+    );
+
+    // Should NOT throw — middleware must bail before mutating DO response headers.
+    const res = await app.request(
+      `/ws/${doc.data.id}?ticket=${ticket}`,
+      {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      },
+      env
+    );
+
+    // Mock DO returns 200; importantly no exception was thrown by the middleware.
+    expect(res.status).toBe(200);
+    // Security headers must NOT be present on a WS upgrade forwarded response.
+    // (In production this would be a 101 with immutable headers.)
+    expect(res.headers.get('X-Content-Type-Options')).toBeNull();
+    expect(res.headers.get('Content-Security-Policy')).toBeNull();
   });
 });
