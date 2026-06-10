@@ -204,13 +204,16 @@ export class LibraryManager {
   async createNewDocument() {
     // Prevent rapid clicks
     if (this.openLock) return;
+    console.log('[OPEN] click', { action: 'create' });
     this.openLock = true;
     this.isTransitioning = true;
     this.markCreateOpening(true);
     this.disableLibraryInteraction('create');
 
     try {
-      this.app.setDocumentLifecycleState?.('creating-document');
+      this.app.setDocumentLifecycleState?.('creating');
+      this.app.uiManager?.applyViewState('opening-document');
+      this.app.uiManager?.setOpeningDocumentState();
       await this.startEditorTransition();
 
       // Create document in background
@@ -225,7 +228,7 @@ export class LibraryManager {
 
       // Load document inline (same as openDocument does)
       this.app.documentId = doc._id;
-      await this.app.loadDocument({ mode: 'creating-document', isNewDocument: true });
+      await this.app.loadDocument({ mode: 'creating', isNewDocument: true });
 
       this.openLock = false;
       this.isTransitioning = false;
@@ -251,6 +254,7 @@ export class LibraryManager {
   async openDocument(docId) {
     // Prevent rapid transitions
     if (this.openLock) return;
+    console.log('[OPEN] click', { action: 'open', docId });
     this.openLock = true;
     this.isTransitioning = true;
     this.disableLibraryInteraction('open', docId);
@@ -258,14 +262,16 @@ export class LibraryManager {
     try {
       this.app.openingDocumentId = docId;
       this.markDocumentOpening(docId);
-      this.app.setDocumentLifecycleState?.('loading-document');
+      this.app.setDocumentLifecycleState?.('opening');
+      this.app.uiManager?.applyViewState('opening-document');
+      this.app.uiManager?.setOpeningDocumentState();
       await this.startEditorTransition();
 
       const newUrl = `${window.location.pathname}?doc=${docId}`;
       window.history.pushState({ view: 'editor', docId }, '', newUrl);
 
       this.app.documentId = docId;
-      await this.app.loadDocument({ mode: 'loading-document', isNewDocument: false });
+      await this.app.loadDocument({ mode: 'loading-content', isNewDocument: false });
 
       this.openLock = false;
       this.isTransitioning = false;

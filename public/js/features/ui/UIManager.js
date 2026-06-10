@@ -325,6 +325,7 @@ export class UIManager {
   }
 
   applyViewState(state) {
+    const previousViewState = document.body.dataset.viewState;
     document.body.dataset.viewState = state;
 
     const bootLoader = document.getElementById('bootLoader');
@@ -354,7 +355,11 @@ export class UIManager {
     const overlay = document.getElementById('libraryOverlay');
     const closeBtn = document.getElementById('closeLibrary');
     const showDashboard = state === 'dashboard';
-    const fadingDashboard = state === 'opening-document';
+    const hadDashboardMounted =
+      previousViewState === 'dashboard' ||
+      library?.classList.contains('view-visible') ||
+      library?.style.display === 'block';
+    const fadingDashboard = state === 'opening-document' && hadDashboardMounted;
     const keepDashboardMounted = showDashboard || fadingDashboard;
 
     if (library) {
@@ -414,7 +419,7 @@ export class UIManager {
 
     this.showSkeleton(true);
     this.showSkeletonMessage(false);
-    this.setDocumentOpenState('loading-document');
+    this.setDocumentOpenState(this.app?.documentLoadState || 'loading-content');
 
     const error = document.getElementById('editorOpenError');
     if (error) error.hidden = true;
@@ -454,25 +459,39 @@ export class UIManager {
   }
 
   setDocumentOpenState(state, options = {}) {
+    const normalizedStateMap = {
+      idle: 'idle',
+      opening: 'opening',
+      creating: 'creating',
+      'creating-document': 'creating',
+      'loading-document': 'loading-content',
+      'loading-content': 'loading-content',
+      connecting: 'initial-syncing',
+      syncing: 'initial-syncing',
+      'initial-syncing': 'initial-syncing',
+      ready: 'ready',
+      error: 'failed',
+      failed: 'failed',
+    };
+    const normalizedState = normalizedStateMap[state] || state;
     const loadingStates = new Set([
       'idle',
       'opening',
-      'creating-document',
-      'loading-document',
-      'connecting',
-      'syncing',
+      'creating',
+      'loading-content',
+      'initial-syncing',
     ]);
     if (
       this.documentOpenState === 'ready' &&
       this.hasShownEditorReady &&
-      loadingStates.has(state) &&
+      loadingStates.has(normalizedState) &&
       this.app?.isEditorReadyForCurrentDocument?.()
     ) {
       return;
     }
 
-    this.documentOpenState = state;
-    document.body.dataset.documentOpenState = state;
+    this.documentOpenState = normalizedState;
+    document.body.dataset.documentOpenState = normalizedState;
 
     const skeleton = document.getElementById('editorSkeleton');
     const statusEl = document.getElementById('editorSkeletonStatus');
@@ -480,30 +499,30 @@ export class UIManager {
     const descEl = document.getElementById('editorSkeletonDescription');
 
     const copy = {
-      idle: ['Preparing editor...', 'Getting your workspace ready.'],
-      'creating-document': ['Creating document...', 'Setting up a blank page.'],
-      'loading-document': ['Opening document...', 'Loading document content.'],
-      connecting: ['Connecting...', 'Starting real-time sync.'],
-      syncing: ['Syncing...', 'Applying the latest document state.'],
-      ready: ['Synced', 'Your document is ready.'],
-      error: ['Could not open document', 'Try again or return to the dashboard.'],
+      idle: ['Opening document...', 'Getting your workspace ready.'],
+      opening: ['Opening document...', 'Preparing your workspace.'],
+      creating: ['Creating document...', 'Setting up a blank page.'],
+      'loading-content': ['Opening document...', 'Loading document content.'],
+      'initial-syncing': ['Syncing document...', 'Applying the latest document state.'],
+      ready: ['Saved', 'Your document is ready.'],
+      failed: ['Could not open document', 'Try again or return to the dashboard.'],
     };
 
-    const [title, description] = copy[state] || copy.idle;
+    const [title, description] = copy[normalizedState] || copy.idle;
     if (statusEl) statusEl.textContent = options.status || title;
     if (titleEl) titleEl.textContent = options.title || title;
     if (descEl) descEl.textContent = options.description || description;
 
     if (skeleton) {
-      skeleton.dataset.openState = state;
-      if (state !== 'ready') this.showSkeleton(true);
+      skeleton.dataset.openState = normalizedState;
+      if (normalizedState !== 'ready') this.showSkeleton(true);
     }
   }
 
   showDocumentOpenError({ message, onRetry, onBack }) {
     this.showSkeleton(true);
     this.showSkeletonMessage(false);
-    this.setDocumentOpenState('error', {
+    this.setDocumentOpenState('failed', {
       title: 'Could not open document',
       description: message,
     });
@@ -630,8 +649,8 @@ export class UIManager {
 
     if (!badge) return;
 
-    // Delay warning status display by 850ms
-    const delay = status === 'connected' ? 0 : 850;
+    // Delay reconnect warnings; normal connected/connecting states stay hidden in the top bar.
+    const delay = status === 'reconnecting' || status === 'disconnected' ? 1000 : 0;
 
     if (delay > 0) {
       this.connectionStatusTimer = setTimeout(() => {
@@ -650,24 +669,21 @@ export class UIManager {
     const badge = document.getElementById('connectionBadge');
     if (!badge) return;
 
-    // Do not display badge if not ready OR if already connected
-    if (this.documentOpenState !== 'ready' || status === 'connected') {
+    // Do not display badge if not ready, connected, or initial connecting.
+    if (this.documentOpenState !== 'ready' || status === 'connected' || status === 'connecting') {
       badge.hidden = true;
       return;
     }
 
     const stateMap = {
-      connecting: 'Connecting',
-      connected: 'Synced',
       reconnecting: 'Reconnecting...',
       disconnected: 'Reconnecting...',
-      offline: 'Offline changes saved locally',
-      syncing: 'Syncing...',
-      savingLocal: 'Saving locally',
+      offline: 'Offline',
+      failed: 'Connection issue',
     };
 
     this.connectionCurrentStatus = status;
-    badge.textContent = stateMap[status] || 'Connecting';
+    badge.textContent = stateMap[status] || 'Connection issue';
     badge.dataset.status = status;
     badge.hidden = false;
   }
@@ -686,7 +702,6 @@ export class UIManager {
       saving: 'Saving...',
       unsaved: 'Saving...',
       offline: 'Offline',
-      'offline-saved': 'Offline',
       failed: 'Save failed',
     };
 
@@ -694,7 +709,7 @@ export class UIManager {
     indicator.dataset.status = status;
     indicator.hidden = false;
 
-    if (status === 'saved' || status === 'offline' || status === 'offline-saved') {
+    if (status === 'saved' || status === 'offline') {
       this.saveStatusTimer = setTimeout(() => {
         indicator.hidden = true;
       }, 2000);

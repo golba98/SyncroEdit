@@ -24,7 +24,7 @@ export class App {
     this.openingDocumentId = null;
     this.documentLifecycleState = 'idle';
     this.documentLoadState = 'idle';
-    this.connectionState = 'connecting';
+    this.connectionState = 'idle';
     this.saveState = 'saved';
     this.hasReachedEditorReady = false;
     this.readyDocumentId = null;
@@ -177,7 +177,14 @@ export class App {
 
   setConnectionState(status) {
     const normalized = status === 'disconnected' ? 'reconnecting' : status;
-    const knownStates = new Set(['connecting', 'connected', 'reconnecting', 'offline', 'failed']);
+    const knownStates = new Set([
+      'idle',
+      'connecting',
+      'connected',
+      'reconnecting',
+      'offline',
+      'failed',
+    ]);
     this.connectionState = knownStates.has(normalized) ? normalized : 'connecting';
   }
 
@@ -189,10 +196,13 @@ export class App {
     const stateMap = {
       idle: 'idle',
       opening: 'opening',
-      'creating-document': 'opening',
+      creating: 'creating',
+      'creating-document': 'creating',
       'loading-document': 'loading-content',
+      'loading-content': 'loading-content',
       connecting: 'initial-syncing',
       syncing: 'initial-syncing',
+      'initial-syncing': 'initial-syncing',
       ready: 'ready',
       error: 'failed',
       failed: 'failed',
@@ -207,19 +217,18 @@ export class App {
     );
 
     if (this.isEditorReadyForCurrentDocument() && isFullLoadingState) {
-      console.log('[SYNC] blocked full loading because editor already ready', {
+      console.log('[CONNECTION] suppressed full loader after ready', {
         requestedState: state,
         documentLoadState: this.documentLoadState,
         connectionState: this.connectionState,
       });
-      console.log('[LOAD] full loading suppressed after ready', { requestedState: state });
       return;
     }
 
     this.documentLoadState = nextLoadState;
-    this.documentLifecycleState = state;
+    this.documentLifecycleState = nextLoadState;
     if (this.uiManager?.setDocumentOpenState) {
-      this.uiManager.setDocumentOpenState(state, options);
+      this.uiManager.setDocumentOpenState(nextLoadState, options);
     }
   }
 
@@ -248,22 +257,23 @@ export class App {
       if (status === 'connected') {
         console.log('[SYNC] reconnected after ready');
       } else if (status === 'reconnecting' || status === 'disconnected') {
-        console.log('[SYNC] reconnecting after ready');
+        console.log('[CONNECTION] reconnect after ready - non blocking');
       } else if (status === 'offline') {
         console.log('[SYNC] connection lost after ready');
       }
-      console.log('[SYNC] preserving editor view');
+      console.log('[CONNECTION] suppressed full loader after ready', { status });
       return;
     }
 
     if (status === 'connected') {
       this.logLifecycle('websocket-connected', { docId });
       console.log('[OPEN] websocket connected');
-      this.setDocumentLifecycleState('syncing');
+      console.log('[OPEN] initial sync');
+      this.setDocumentLifecycleState('initial-syncing');
     } else if (status === 'connecting') {
-      this.setDocumentLifecycleState('connecting');
+      this.setDocumentLifecycleState('initial-syncing');
     } else if (status === 'reconnecting' || status === 'disconnected') {
-      this.setDocumentLifecycleState('connecting', {
+      this.setDocumentLifecycleState('initial-syncing', {
         title: 'Reconnecting...',
         description: 'Keeping local edits available while sync reconnects.',
       });
@@ -271,10 +281,12 @@ export class App {
   }
 
   setSaveState(status) {
-    const normalized = status === 'offline' ? 'offline-saved' : status;
-    const knownStates = new Set(['saved', 'saving', 'unsaved', 'offline-saved', 'failed']);
+    const normalized = status === 'offline-saved' ? 'offline' : status;
+    const knownStates = new Set(['saved', 'saving', 'unsaved', 'offline', 'failed']);
     this.saveState = knownStates.has(normalized) ? normalized : 'saved';
-    this.uiManager.setSaveStatus(status);
+    if (this.saveState === 'saving' || this.saveState === 'unsaved') console.log('[SAVE] saving');
+    if (this.saveState === 'saved') console.log('[SAVE] saved');
+    this.uiManager.setSaveStatus(this.saveState);
   }
 
   logLifecycle(event, details = {}) {
@@ -289,7 +301,7 @@ export class App {
     const docId = this.documentId;
     if (!docId) return;
 
-    const mode = options.mode || 'loading-document';
+    const mode = options.mode || 'loading-content';
     const requestToken = ++this.loadDocumentToken;
     const isDifferentDocument =
       this.readyDocumentId !== docId || this.editor?.currentDocId !== docId;
@@ -301,11 +313,11 @@ export class App {
     this.logLifecycle('document-open-start', { docId, mode });
 
     if (!this.isEditorReadyForCurrentDocument()) {
+      this.setDocumentLifecycleState(mode);
       this.uiManager.applyViewState('opening-document');
       this.uiManager.setOpeningDocumentState();
-      this.setDocumentLifecycleState(mode);
     } else {
-      console.log('[LOAD] full loading suppressed after ready', { requestedState: mode });
+      console.log('[CONNECTION] suppressed full loader after ready', { requestedState: mode });
     }
     this.uiManager.handleWSStatusChange('connecting');
 
@@ -391,7 +403,9 @@ export class App {
       ) {
         this.finishDocumentOpen(requestToken);
       } else {
-        this.uiManager.applyViewState('editor-loading');
+        if (!this.isEditorReadyForCurrentDocument()) {
+          this.uiManager.applyViewState('opening-document');
+        }
         this.uiManager.showSkeletonMessage(true);
       }
     } catch (err) {
@@ -436,8 +450,8 @@ export class App {
     this.setSaveState('saved');
     this.libraryManager.clearOpeningStates();
     console.log('[BOOT] editor ready');
-    console.log('[OPEN] editor ready');
-    console.log('[OPEN] transition cleanup');
+    console.log('[OPEN] ready');
+    console.log('[OPEN] cleanup');
     this.logLifecycle('editor-ready', { docId: this.documentId });
   }
 
