@@ -49,7 +49,18 @@ export function applySecurityHeaders(headers) {
 }
 
 export async function securityHeaders(c, next) {
+  // Detect WebSocket upgrades before calling next() so we have the request header.
+  const isWebSocketUpgrade = c.req.header('Upgrade')?.toLowerCase() === 'websocket';
+
   await next();
+
+  // WebSocket 101 upgrade responses from Durable Objects have immutable headers.
+  // Attempting to mutate them throws "Can't modify immutable headers."
+  // Return the DO response completely untouched.
+  if (isWebSocketUpgrade || c.res.status === 101) {
+    return;
+  }
+
   applySecurityHeaders(c.res.headers);
 }
 
@@ -216,6 +227,11 @@ export async function tightCors(c, next) {
   }
 
   await next();
+
+  // Guard against mutating immutable WebSocket 101 upgrade response headers.
+  if (c.res.status === 101) {
+    return;
+  }
 
   if (allowedOrigin) {
     c.res.headers.set('Access-Control-Allow-Origin', allowedOrigin);
