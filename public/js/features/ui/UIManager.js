@@ -327,6 +327,11 @@ export class UIManager {
   applyViewState(state) {
     document.body.dataset.viewState = state;
 
+    const bootLoader = document.getElementById('bootLoader');
+    if (bootLoader) {
+      bootLoader.style.display = state === 'booting' ? 'flex' : 'none';
+    }
+
     const library = document.getElementById('docLibrary');
     const overlay = document.getElementById('libraryOverlay');
     const closeBtn = document.getElementById('closeLibrary');

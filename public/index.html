@@ -26,6 +26,55 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/bitmaks/cm-web-fonts@latest/fonts.css"
     />
+    <style id="critical-boot-styles">
+      /* Initial critical styles to prevent FOUC (Flash of Unstyled Content) */
+      body[data-view-state='booting'] .header,
+      body[data-view-state='booting'] .ribbon-tabs,
+      body[data-view-state='booting'] .ribbon-content,
+      body[data-view-state='booting'] .main-workspace,
+      body[data-view-state='booting'] .page-navigator,
+      body[data-view-state='auth'] .header,
+      body[data-view-state='auth'] .ribbon-tabs,
+      body[data-view-state='auth'] .ribbon-content,
+      body[data-view-state='auth'] .main-workspace,
+      body[data-view-state='auth'] .page-navigator {
+        display: none !important;
+      }
+
+      /* Simple initial styling for bootLoader overlay to show immediately */
+      #bootLoader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        font-family: 'Roboto', 'Arial', sans-serif;
+      }
+
+      body:not([data-view-state='booting']) #bootLoader {
+        display: none !important;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
     <link rel="stylesheet" href="css/styles.css" />
     <!-- File Extraction Libraries -->
     <!-- External Libraries (Deferred for speed) -->
@@ -49,7 +98,75 @@
       }
     </script>
   </head>
-  <body style="margin: 0; padding: 0">
+  <body data-view-state="booting" style="margin: 0; padding: 0">
+    <!-- Boot Loader -->
+    <div id="bootLoader">
+      <div
+        style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 24px;
+          text-align: center;
+          padding: 32px;
+          background: rgba(15, 15, 15, 0.7);
+          border: 1px solid rgba(139, 92, 246, 0.25);
+          border-radius: 16px;
+          backdrop-filter: blur(12px);
+          box-shadow:
+            0 20px 40px rgba(0, 0, 0, 0.5),
+            0 0 30px rgba(139, 92, 246, 0.15);
+          max-width: 320px;
+          width: calc(100% - 32px);
+        "
+      >
+        <div
+          style="
+            font-size: 48px;
+            filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
+            animation: float 3s ease-in-out infinite;
+          "
+        >
+          📄
+        </div>
+        <div>
+          <h1
+            style="
+              color: #ffffff;
+              font-size: 20px;
+              font-weight: 700;
+              margin: 0 0 8px 0;
+              letter-spacing: 0.5px;
+            "
+          >
+            SynchroEdit
+          </h1>
+          <p
+            style="
+              color: #a78bfa;
+              font-size: 13px;
+              font-weight: 500;
+              margin: 0;
+              opacity: 0.8;
+              letter-spacing: 0.5px;
+            "
+          >
+            Loading application...
+          </p>
+        </div>
+        <div
+          style="
+            width: 36px;
+            height: 36px;
+            border: 3.5px solid rgba(139, 92, 246, 0.15);
+            border-top-color: #8b5cf6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+          "
+        ></div>
+      </div>
+    </div>
     <div
       id="authGuard"
       style="

@@ -27,6 +27,7 @@ describe('App Core Initialization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     document.body.innerHTML = `
+      <div id="bootLoader"></div>
       <div id="authGuard" style="display: none; opacity: 0;"></div>
       <div id="authGuardText"></div>
       <div id="docLibrary"></div>
@@ -369,5 +370,40 @@ describe('App Core Initialization', () => {
     expect(document.getElementById('libraryOverlay').classList.contains('view-visible')).toBe(
       false
     );
+  });
+
+  it('should initialize with booting view state', () => {
+    const app = new App();
+    expect(document.body.dataset.viewState).toBe('booting');
+    expect(document.getElementById('bootLoader').style.display).toBe('flex');
+  });
+
+  it('should transition to dashboard if profile load succeeds and no document ID', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    expect(document.body.dataset.viewState).toBe('dashboard');
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
+  });
+
+  it('should transition to opening-document if profile load succeeds and document ID is present', async () => {
+    global.URLSearchParams = jest.fn(() => ({
+      get: jest.fn().mockReturnValue('doc-123'),
+    }));
+    const app = new App();
+    // Synchronously it is in booting state
+    expect(document.body.dataset.viewState).toBe('booting');
+
+    await new Promise(process.nextTick);
+    // After async tasks resolve, it has progressed past opening-document to editor-loading
+    expect(document.body.dataset.viewState).toBe('editor-loading');
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
+  });
+
+  it('should transition to auth state if profile load fails', async () => {
+    Profile.prototype.loadProfile = jest.fn().mockResolvedValue(null);
+    const app = new App();
+    await new Promise(process.nextTick);
+    expect(document.body.dataset.viewState).toBe('auth');
+    expect(document.getElementById('bootLoader').style.display).toBe('none');
   });
 });

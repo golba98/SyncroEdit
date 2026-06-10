@@ -1,4 +1,4 @@
-const CACHE_NAME = 'syncroedit-v3';
+const CACHE_NAME = 'syncroedit-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -79,7 +79,15 @@ self.addEventListener('message', (event) => {
   // Explicitly return nothing to indicate synchronous handling (or no handling)
 });
 
-// Stale-While-Revalidate Strategy
+// Helper to detect navigation / HTML requests
+function isNavigationRequest(request) {
+  return (
+    request.mode === 'navigate' ||
+    (request.method === 'GET' && request.headers.get('Accept')?.includes('text/html'))
+  );
+}
+
+// Fetch strategy
 self.addEventListener('fetch', (event) => {
   const urlString = event.request.url;
 
@@ -113,36 +121,46 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Navigation requests: Network-First
+  if (isNavigationRequest(event.request)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => {
+          console.debug('[SW] Navigation fetch failed, falling back to cache:', event.request.url);
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Static assets: Cache-First
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // If we have a cached response, return it and update in background
       if (cachedResponse) {
-        const fetchPromise = fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseClone = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseClone);
-              });
-            }
-            return networkResponse;
-          })
-          .catch((err) => {
-            console.debug(
-              'Service Worker: Background fetch failed, using cache:',
-              event.request.url
-            );
-            return cachedResponse;
-          });
         return cachedResponse;
       }
 
-      // If NOT in cache, just fetch from network normally
-      return fetch(event.request).catch((err) => {
-        console.warn('Service Worker: Fetch failed:', event.request.url);
-        // Return a 404 or offline page if desired, instead of letting the error bubble up
-        return new Response('Network Error', { status: 404, statusText: 'Network Error' });
-      });
+      return fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch((err) => {
+          console.warn('[SW] Fetch failed:', event.request.url);
+          return new Response('Network Error', { status: 404, statusText: 'Network Error' });
+        });
     })
   );
 });

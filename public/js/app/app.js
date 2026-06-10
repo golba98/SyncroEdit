@@ -86,19 +86,27 @@ export class App {
   }
 
   async init() {
+    console.log('[BOOT] start');
+    this.uiManager.applyViewState('booting');
+
     // If we are on the login page, don't try to load the profile immediately.
     // The login page handles its own authentication flow.
     if (window.location.pathname.includes('login.html')) {
       return;
     }
 
+    console.log('[BOOT] auth resolving');
     this.user = await this.profile.loadProfile({ silent: true });
 
     if (!this.user) {
+      console.log('[BOOT] failed');
+      this.uiManager.applyViewState('auth');
       const params = new URLSearchParams(window.location.search).get('doc');
       navigateTo(params ? `pages/login.html?doc=${params}` : 'pages/login.html');
       return;
     }
+
+    console.log('[BOOT] auth resolved');
 
     // Sync Theme from Profile
     if (this.user.accentColor) {
@@ -119,9 +127,12 @@ export class App {
     this.setupVisibilityListener();
 
     if (this.documentId) {
+      console.log('[BOOT] route resolved document');
       await this.loadDocument();
     } else {
+      console.log('[BOOT] route resolved dashboard');
       await this.libraryManager.showLibrary();
+      console.log('[BOOT] dashboard ready');
     }
   }
 
@@ -173,6 +184,7 @@ export class App {
   }
 
   async loadDocument(options = {}) {
+    console.log('[BOOT] opening document');
     const docId = this.documentId;
     if (!docId) return;
 
@@ -340,6 +352,7 @@ export class App {
     this.uiManager.clearOpeningDocumentState();
     this.uiManager.setSaveStatus('saved');
     this.libraryManager.clearOpeningStates();
+    console.log('[BOOT] editor ready');
     console.log('[OPEN] editor ready');
     console.log('[OPEN] transition cleanup');
     this.logLifecycle('editor-ready', { docId: this.documentId });
