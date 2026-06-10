@@ -58,6 +58,7 @@ export class Editor {
     this._hasLoadedDocumentContent = false;
     this._readyForUser = false;
     this._lastSaveStatus = 'saved';
+    this._hasLoggedTyping = false;
 
     // Ready promise — resolves when pages first render, or after 10s safety fallback
     this._isReady = false;
@@ -352,6 +353,10 @@ export class Editor {
     const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000);
     this._reconnectAttempts += 1;
     this.onStatusChange('reconnecting');
+    if (this._readyForUser) {
+      console.log('[SYNC] reconnecting after ready');
+      console.log('[SYNC] preserving editor view');
+    }
     console.warn('[Editor] Scheduling WebSocket reconnect', {
       docId,
       reason,
@@ -427,7 +432,7 @@ export class Editor {
   async connectWebSocket(docId, user) {
     console.log('[Editor] connectWebSocket docId=', docId);
     if (!docId || this._destroyed) return null;
-    this._emitLifecycle('connecting');
+    if (!this._readyForUser) this._emitLifecycle('connecting');
     if (user) this.user = user;
     this.currentDocId = docId;
 
@@ -441,7 +446,7 @@ export class Editor {
     }
 
     const generation = ++this._connectionGeneration;
-    this._hasReceivedInitialSync = false;
+    if (!this._readyForUser) this._hasReceivedInitialSync = false;
     this._clearReconnectTimer();
 
     const config = window.SYNCROEDIT_CONFIG || {};
@@ -494,14 +499,19 @@ export class Editor {
 
     console.log('[Editor] WebsocketProvider created for docId=', docId);
 
-    this._startSyncTimeout(docId, generation);
+    if (!this._readyForUser) this._startSyncTimeout(docId, generation);
 
     this.provider.on('status', async ({ status }) => {
       if (this._destroyed || generation !== this._connectionGeneration) return;
       this.onStatusChange(status);
       if (status === 'connected') {
         this._reconnectAttempts = 0;
-        this._emitLifecycle('syncing');
+        if (this._readyForUser) {
+          console.log('[SYNC] reconnected after ready');
+          console.log('[SYNC] preserving editor view');
+        } else {
+          this._emitLifecycle('syncing');
+        }
       }
     });
 
@@ -530,6 +540,10 @@ export class Editor {
 
       const details = this._describeProviderClose(event, provider);
       console.warn('[Editor] WebSocket connection closed', details);
+      if (this._readyForUser) {
+        console.log('[SYNC] connection lost after ready');
+        console.log('[SYNC] preserving editor view');
+      }
 
       if (this._intentionalProviderClose || provider.shouldConnect === false) {
         return;
@@ -907,6 +921,13 @@ export class Editor {
 
   _emitLifecycle(state, detail = {}) {
     if (this._destroyed) return;
+    if (this._readyForUser && (state === 'connecting' || state === 'syncing')) {
+      console.log('[SYNC] blocked full loading because editor already ready', {
+        requestedState: state,
+      });
+      console.log('[LOAD] full loading suppressed after ready', { requestedState: state });
+      return;
+    }
     this.onLifecycleChange(state, detail);
   }
 
@@ -1035,6 +1056,10 @@ export class Editor {
     this.pageQuillInstances.set(pageId, pageQuill);
 
     pageQuill.on('text-change', (delta, oldDelta, source) => {
+      if (source === 'user' && !this._hasLoggedTyping) {
+        console.log('[EDIT] user typing');
+        this._hasLoggedTyping = true;
+      }
       const currentIndex = this.yPages.toArray().findIndex((p) => p.get('id') === pageId);
       if (this.readabilityManager.showLineNumbers) {
         this.readabilityManager.updateGutter(currentIndex);

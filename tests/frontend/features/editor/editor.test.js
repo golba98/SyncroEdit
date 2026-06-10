@@ -247,4 +247,81 @@ describe('Editor Lifecycle & Resilience', () => {
       jest.useRealTimers();
     }
   });
+
+  it('does not emit syncing lifecycle when provider reconnects after ready', async () => {
+    const onLifecycleChange = jest.fn();
+    const onStatusChange = jest.fn();
+    const editor = new Editor('editor-container', {
+      onLifecycleChange,
+      onStatusChange,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const provider = mockProviderInstances[0];
+    expect(provider).toBeDefined();
+    editor._readyForUser = true;
+    onLifecycleChange.mockClear();
+    onStatusChange.mockClear();
+
+    provider.emit('status', { status: 'connected' });
+
+    expect(onStatusChange).toHaveBeenCalledWith('connected');
+    expect(onLifecycleChange).not.toHaveBeenCalledWith('syncing', expect.anything());
+    editor.destroy();
+  });
+
+  it('does not emit loading lifecycle when connection closes after ready', async () => {
+    const onLifecycleChange = jest.fn();
+    const onStatusChange = jest.fn();
+    const editor = new Editor('editor-container', {
+      onLifecycleChange,
+      onStatusChange,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const provider = mockProviderInstances[0];
+    editor._readyForUser = true;
+    provider.wsconnected = true;
+    provider.wsconnecting = false;
+    provider.shouldConnect = true;
+    onLifecycleChange.mockClear();
+    onStatusChange.mockClear();
+
+    provider.emit(
+      'connection-close',
+      { type: 'close', code: 1006, reason: '', wasClean: false },
+      provider
+    );
+
+    expect(onStatusChange).toHaveBeenCalledWith('reconnecting');
+    expect(onLifecycleChange).not.toHaveBeenCalledWith('connecting', expect.anything());
+    expect(onLifecycleChange).not.toHaveBeenCalledWith('syncing', expect.anything());
+    editor.destroy();
+  });
+
+  it('logs user typing without remounting the page', async () => {
+    const editor = new Editor('editor-container');
+    editor.provider = null;
+
+    const pageMap = new Y.Map();
+    pageMap.set('id', 'typing-page');
+    pageMap.set('content', new Y.Text(''));
+    editor.yPages.push([pageMap]);
+    editor.createPageContainer('typing-page', 0);
+    global.Quill.mockClear();
+    mockQuillInstance.on.mockClear();
+
+    editor.mountPage('typing-page');
+
+    const pageContainer = document.getElementById('page-container-typing-page');
+    const textChangeHandler = mockQuillInstance.on.mock.calls.find(
+      ([eventName]) => eventName === 'text-change'
+    )[1];
+
+    textChangeHandler({}, {}, 'user');
+
+    expect(document.getElementById('page-container-typing-page')).toBe(pageContainer);
+    expect(global.Quill).toHaveBeenCalledTimes(1);
+    editor.destroy();
+  });
 });

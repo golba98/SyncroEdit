@@ -6,6 +6,7 @@ import { App } from '/js/app/app.js';
 import { Network } from '/js/app/network.js';
 import { Auth } from '/js/features/auth/auth.js';
 import { Profile } from '/js/features/profile/profile.js';
+import { Editor } from '/js/features/editor/editor.js';
 import * as Utils from '/js/app/utils.js';
 
 // Mocks
@@ -26,6 +27,7 @@ describe('App Core Initialization', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Editor.mockReset();
     document.body.innerHTML = `
       <div id="bootLoader"></div>
       <div id="authGuard" style="display: none; opacity: 0;"></div>
@@ -254,7 +256,7 @@ describe('App Core Initialization', () => {
       jest.advanceTimersByTime(1);
 
       expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Reconnecting');
+      expect(badge.textContent).toBe('Reconnecting...');
     } finally {
       jest.useRealTimers();
     }
@@ -273,11 +275,124 @@ describe('App Core Initialization', () => {
       jest.advanceTimersByTime(1000);
 
       expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Connected');
+      expect(badge.textContent).toBe('Synced');
       expect(badge.dataset.status).toBe('connected');
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('keeps a ready document visible when reconnecting after editor ready', () => {
+    jest.useFakeTimers();
+    try {
+      const app = new App();
+      app.documentId = 'doc-ready';
+      app.readyDocumentId = 'doc-ready';
+      app.hasReachedEditorReady = true;
+      app.documentLoadState = 'ready';
+      app.uiManager.hasShownEditorReady = true;
+      app.uiManager.setDocumentOpenState('ready');
+
+      const skeleton = document.getElementById('editorSkeleton');
+      const badge = document.getElementById('connectionBadge');
+
+      app.handleEditorStatusChange('reconnecting', 'doc-ready');
+      jest.advanceTimersByTime(850);
+
+      expect(app.documentLoadState).toBe('ready');
+      expect(app.uiManager.documentOpenState).toBe('ready');
+      expect(document.body.dataset.documentOpenState).toBe('ready');
+      expect(skeleton.classList.contains('hidden')).toBe(true);
+      expect(badge.hidden).toBe(false);
+      expect(badge.textContent).toBe('Reconnecting...');
+      expect(badge.dataset.status).toBe('reconnecting');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('blocks full loading state changes after editor ready', () => {
+    const app = new App();
+    app.documentId = 'doc-ready';
+    app.readyDocumentId = 'doc-ready';
+    app.hasReachedEditorReady = true;
+    app.uiManager.hasShownEditorReady = true;
+    app.uiManager.setDocumentOpenState('ready');
+
+    app.setDocumentLifecycleState('syncing');
+    app.setDocumentLifecycleState('connecting');
+
+    expect(app.uiManager.documentOpenState).toBe('ready');
+    expect(document.body.dataset.documentOpenState).toBe('ready');
+    expect(document.getElementById('editorSkeleton').classList.contains('hidden')).toBe(true);
+  });
+
+  it('does not blur the active editor element during reconnect after ready', () => {
+    jest.useFakeTimers();
+    try {
+      const app = new App();
+      app.documentId = 'doc-ready';
+      app.readyDocumentId = 'doc-ready';
+      app.hasReachedEditorReady = true;
+      app.uiManager.hasShownEditorReady = true;
+      app.uiManager.setDocumentOpenState('ready');
+      document.getElementById('pagesContainer').innerHTML =
+        '<div class="editor-container"><div class="ql-editor" contenteditable="true"></div></div>';
+      const editorEl = document.querySelector('.ql-editor');
+      editorEl.focus();
+
+      app.handleEditorStatusChange('reconnecting', 'doc-ready');
+      jest.advanceTimersByTime(850);
+
+      expect(document.activeElement).toBe(editorEl);
+      expect(document.body.dataset.documentOpenState).toBe('ready');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('save status changes do not hide a ready document', () => {
+    const app = new App();
+    app.documentId = 'doc-ready';
+    app.readyDocumentId = 'doc-ready';
+    app.hasReachedEditorReady = true;
+    app.uiManager.hasShownEditorReady = true;
+    app.uiManager.setDocumentOpenState('ready');
+
+    app.setSaveState('saving');
+    app.setSaveState('offline');
+    app.setSaveState('saved');
+
+    expect(app.saveState).toBe('saved');
+    expect(app.uiManager.documentOpenState).toBe('ready');
+    expect(document.body.dataset.documentOpenState).toBe('ready');
+    expect(document.getElementById('editorSkeleton').classList.contains('hidden')).toBe(true);
+  });
+
+  it('opening a different document resets the ready loading guard', async () => {
+    global.URLSearchParams = jest.fn(() => ({
+      get: jest.fn().mockReturnValue(null),
+    }));
+    Editor.mockImplementation(() => ({
+      currentDocId: 'doc-2',
+      ready: Promise.resolve(),
+      isReadyForUser: () => false,
+      hasLoadedDocumentContent: () => false,
+    }));
+
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.documentId = 'doc-2';
+    app.readyDocumentId = 'doc-1';
+    app.hasReachedEditorReady = true;
+
+    await app.loadDocument({ mode: 'loading-document' });
+
+    expect(app.hasReachedEditorReady).toBe(false);
+    expect(app.readyDocumentId).toBeNull();
+    expect(app.uiManager.documentOpenState).toBe('loading-document');
+    expect(document.body.dataset.documentOpenState).toBe('loading-document');
+    expect(document.getElementById('editorSkeleton').classList.contains('hidden')).toBe(false);
   });
 
   it('shows retry and back actions for document open errors', async () => {
