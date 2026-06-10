@@ -337,6 +337,7 @@ app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
     {
       sub: user.id,
       username: user.username,
+      sessionId: user.sessionId,
       type: 'ws-ticket',
       exp: Math.floor(Date.now() / 1000) + 30,
     },

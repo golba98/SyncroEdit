@@ -11,7 +11,6 @@ import { ToolbarController } from '/js/features/ui/ToolbarController.js';
 import { ReadabilityManager } from '/js/features/editor/managers/ReadabilityManager.js';
 import { NavigationManager } from '/js/features/editor/managers/NavigationManager.js';
 import { SearchManager } from '/js/features/editor/managers/SearchManager.js';
-import { Auth } from '/js/features/auth/auth.js';
 import { Network } from '/js/app/network.js';
 import { debounce } from '/js/app/utils.js';
 
@@ -37,11 +36,22 @@ export class Editor {
     // Yjs Setup
     this.doc = new Y.Doc();
     const docId = new URLSearchParams(window.location.search).get('doc');
-    const token = Auth.getToken();
-    const user = options.user || { username: 'Anonymous', accentColor: '#ff0000' };
+    const user = options.user || {
+      username: 'Anonymous',
+      accentColor: '#ff0000',
+    };
     this.user = user;
     this.currentDocId = docId;
     this.yPages = this.doc.getArray('pages');
+    this.provider = null;
+    this.providerDocId = null;
+    this._connectionGeneration = 0;
+    this._destroyed = false;
+    this._intentionalProviderClose = false;
+    this._reconnectTimer = null;
+    this._reconnectAttempts = 0;
+    this._syncTimeout = null;
+    this._hasReceivedInitialSync = false;
 
     // Ready promise — resolves when pages first render, or after 10s safety fallback
     this._isReady = false;
@@ -260,11 +270,149 @@ export class Editor {
     }
   }
 
+  _clearReconnectTimer() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+  }
+
+  _clearSyncTimeout() {
+    if (this._syncTimeout) {
+      clearTimeout(this._syncTimeout);
+      this._syncTimeout = null;
+    }
+  }
+
+  _describeProviderClose(event, provider) {
+    return {
+      docId: this.currentDocId,
+      type: event?.type || 'close',
+      code: typeof event?.code === 'number' ? event.code : null,
+      reason: event?.reason || '',
+      wasClean: typeof event?.wasClean === 'boolean' ? event.wasClean : null,
+      readyState: provider?.ws?.readyState ?? null,
+      wsconnected: Boolean(provider?.wsconnected),
+      wsconnecting: Boolean(provider?.wsconnecting),
+      synced: Boolean(provider?.synced),
+    };
+  }
+
+  _destroyProvider() {
+    this._clearReconnectTimer();
+    this._clearSyncTimeout();
+    if (!this.provider) return;
+
+    this._intentionalProviderClose = true;
+    try {
+      if (typeof this.provider.destroy === 'function') {
+        this.provider.destroy();
+      }
+    } finally {
+      this._intentionalProviderClose = false;
+      this.provider = null;
+      this.providerDocId = null;
+      this.pageBindings.forEach((binding) => {
+        if (typeof binding.destroy === 'function') binding.destroy();
+      });
+      this.pageBindings.clear();
+    }
+  }
+
+  async _fetchWsTicket() {
+    const data = await Network.fetchAPI('/api/auth/ws-ticket');
+    if (!data || !data.ticket) {
+      throw new Error('WebSocket ticket response missing ticket');
+    }
+    return data.ticket;
+  }
+
+  _scheduleReconnect(docId, generation, reason) {
+    if (this._destroyed || generation !== this._connectionGeneration || this._reconnectTimer) {
+      return;
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000);
+    this._reconnectAttempts += 1;
+    this.onStatusChange('reconnecting');
+    console.warn('[Editor] Scheduling WebSocket reconnect', {
+      docId,
+      reason,
+      delay,
+    });
+
+    this._reconnectTimer = setTimeout(async () => {
+      this._reconnectTimer = null;
+      if (this._destroyed || generation !== this._connectionGeneration) return;
+
+      const provider = this.provider;
+      if (!provider || this.providerDocId !== docId) {
+        await this.connectWebSocket(docId, this.user);
+        return;
+      }
+
+      try {
+        provider.params.ticket = await this._fetchWsTicket();
+        if (
+          this._destroyed ||
+          generation !== this._connectionGeneration ||
+          provider !== this.provider
+        ) {
+          return;
+        }
+        provider.shouldConnect = true;
+        provider.connect();
+      } catch (err) {
+        console.error('[Editor] Failed to refresh WS ticket before reconnect:', err);
+        this._scheduleReconnect(docId, generation, 'ticket-refresh-failed');
+      }
+    }, delay);
+  }
+
+  _startSyncTimeout(docId, generation) {
+    this._clearSyncTimeout();
+    this._syncTimeout = setTimeout(() => {
+      if (
+        this._destroyed ||
+        generation !== this._connectionGeneration ||
+        this._hasReceivedInitialSync
+      ) {
+        return;
+      }
+
+      console.error('[Editor] Sync timeout - initial document state not received', {
+        docId,
+        pages: this.yPages.length,
+        wsconnected: Boolean(this.provider?.wsconnected),
+        wsconnecting: Boolean(this.provider?.wsconnecting),
+        synced: Boolean(this.provider?.synced),
+      });
+      this._showSyncError();
+      if (this._readyResolve) this._readyResolve();
+    }, 15000);
+  }
+
   async connectWebSocket(docId, user) {
     console.log('[Editor] connectWebSocket docId=', docId);
+    if (!docId || this._destroyed) return null;
+    if (user) this.user = user;
+    this.currentDocId = docId;
+
+    if (
+      this.provider &&
+      this.providerDocId === docId &&
+      (this.provider.wsconnected || this.provider.wsconnecting || this._reconnectTimer)
+    ) {
+      this.updateUser(this.user);
+      return this.provider;
+    }
+
+    const generation = ++this._connectionGeneration;
+    this._hasReceivedInitialSync = false;
+    this._clearReconnectTimer();
 
     const config = window.SYNCROEDIT_CONFIG || {};
-    const backend = config.REALTIME_BACKEND || 'node';
+    const backend = config.REALTIME_BACKEND || 'durable-object';
     let wsBaseUrl = Network.getWebSocketBaseUrl();
 
     if (backend === 'durable-object') {
@@ -288,51 +436,82 @@ export class Editor {
 
     let ticket;
     try {
-      const data = await Network.fetchAPI('/api/auth/ws-ticket');
-      ticket = data.ticket;
+      ticket = await this._fetchWsTicket();
       console.log('[Editor] WS ticket received');
     } catch (err) {
       console.error('[Editor] Failed to get WS ticket:', err);
-      setTimeout(() => this.connectWebSocket(docId, user), 1000);
-      return;
+      this._scheduleReconnect(docId, generation, 'initial-ticket-fetch-failed');
+      return null;
     }
 
-    if (this.provider) {
-      this.provider.destroy();
+    if (this._destroyed || generation !== this._connectionGeneration) {
+      return null;
     }
+
+    this._destroyProvider();
+    this._connectionGeneration = generation;
 
     this.provider = new WebsocketProvider(wsBaseUrl, docId, this.doc, {
       params: { ticket: ticket },
+      connect: false,
+      maxBackoffTime: 30000,
     });
+    this.providerDocId = docId;
+    this.updateUser(this.user);
 
     console.log('[Editor] WebsocketProvider created for docId=', docId);
 
-    // Timeout: if sync never fires within 15s, show a visible error
-    const syncTimeout = setTimeout(() => {
-      if (!this.provider?.synced) {
-        console.error('[Editor] Sync timeout — document server unreachable for docId:', docId);
-        this._showSyncError();
-        if (this._readyResolve) this._readyResolve();
-      }
-    }, 15000);
+    this._startSyncTimeout(docId, generation);
 
     this.provider.on('status', async ({ status }) => {
+      if (this._destroyed || generation !== this._connectionGeneration) return;
       this.onStatusChange(status);
-      if (status === 'disconnected') {
-        try {
-          const data = await Network.fetchAPI('/api/auth/ws-ticket');
-          if (data && data.ticket) {
-            this.provider.params.ticket = data.ticket;
-          }
-        } catch (err) {
-          console.warn('[WebSocket] Failed to refresh ticket:', err);
-        }
+      if (status === 'connected') {
+        this._reconnectAttempts = 0;
       }
     });
 
+    this.provider.on('connection-error', (event, provider) => {
+      if (
+        this._destroyed ||
+        generation !== this._connectionGeneration ||
+        provider !== this.provider
+      ) {
+        return;
+      }
+      console.error(
+        '[Editor] WebSocket connection error',
+        this._describeProviderClose(event, provider)
+      );
+    });
+
+    this.provider.on('connection-close', (event, provider) => {
+      if (
+        this._destroyed ||
+        generation !== this._connectionGeneration ||
+        provider !== this.provider
+      ) {
+        return;
+      }
+
+      const details = this._describeProviderClose(event, provider);
+      console.warn('[Editor] WebSocket connection closed', details);
+
+      if (this._intentionalProviderClose || provider.shouldConnect === false) {
+        return;
+      }
+
+      provider.shouldConnect = false;
+      this._scheduleReconnect(docId, generation, 'unexpected-close');
+    });
+
     this.provider.on('sync', (isSynced) => {
+      if (this._destroyed || generation !== this._connectionGeneration) return;
       console.log('[Editor] sync isSynced=', isSynced, 'docId=', docId);
-      clearTimeout(syncTimeout);
+      if (!isSynced) return;
+
+      this._hasReceivedInitialSync = true;
+      this._clearSyncTimeout();
       if (isSynced) {
         const isNewDoc = this.yPages.length === 0;
         if (isNewDoc) {
@@ -349,6 +528,9 @@ export class Editor {
         this.saveToCache(docId);
       }
     });
+
+    this.provider.connect();
+    return this.provider;
   }
 
   _showSyncError() {
@@ -367,15 +549,24 @@ export class Editor {
   async reconnect(user = null) {
     if (user) this.user = user;
     const docId = new URLSearchParams(window.location.search).get('doc');
+    if (!docId || this._destroyed) return;
+    this.updateUser(this.user);
+
+    if (this.provider && this.providerDocId === docId) {
+      if (this.provider.wsconnected || this.provider.wsconnecting || this._reconnectTimer) return;
+      const generation = this._connectionGeneration;
+      this._scheduleReconnect(docId, generation, 'explicit-reconnect');
+      return;
+    }
+
     await this.connectWebSocket(docId, this.user);
   }
 
   destroy() {
     console.log('[Editor] destroy docId=', this.currentDocId);
-    if (this.provider) {
-      this.provider.destroy();
-      this.provider = null;
-    }
+    this._destroyed = true;
+    this._connectionGeneration++;
+    this._destroyProvider();
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
@@ -528,8 +719,12 @@ export class Editor {
     const Parchment = Quill.import('parchment');
     const Style = Parchment.Attributor.Style;
 
-    const Width = new Style('width', 'width', { scope: Parchment.Scope.INLINE });
-    const Height = new Style('height', 'height', { scope: Parchment.Scope.INLINE });
+    const Width = new Style('width', 'width', {
+      scope: Parchment.Scope.INLINE,
+    });
+    const Height = new Style('height', 'height', {
+      scope: Parchment.Scope.INLINE,
+    });
     const Float = new Style('float', 'float', {
       whitelist: ['left', 'right', 'none'],
       scope: Parchment.Scope.INLINE,
@@ -538,7 +733,9 @@ export class Editor {
       whitelist: ['inline', 'block', 'inline-block'],
       scope: Parchment.Scope.INLINE,
     });
-    const Margin = new Style('margin', 'margin', { scope: Parchment.Scope.INLINE });
+    const Margin = new Style('margin', 'margin', {
+      scope: Parchment.Scope.INLINE,
+    });
 
     Quill.register(Width, true);
     Quill.register(Height, true);
