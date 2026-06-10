@@ -111,6 +111,14 @@ npm test
 
 SyncroEdit's production backend is the Cloudflare Worker in `src-worker/`. API routes, D1 access, session handling, and Durable Object realtime rooms all run in Cloudflare. Static assets are served from `./public` through Wrangler's assets binding.
 
+### Live URLs
+
+| URL | Purpose |
+| --- | ------- |
+| **<https://syncroedit.online>** | Production (custom domain) |
+| **<https://www.syncroedit.online>** | Production www redirect |
+| `https://synchroedit.jordanvorster404.workers.dev` | Worker fallback (workers.dev) |
+
 ---
 
 ## Follow-up / Future Work

@@ -187,6 +187,8 @@ export function getAllowedCorsOrigin(c) {
     requestOrigin,
     'http://localhost:8787',
     'http://127.0.0.1:8787',
+    'https://syncroedit.online',
+    'https://www.syncroedit.online',
     ...String(c.env.ALLOWED_ORIGINS || '')
       .split(',')
       .map((value) => value.trim())

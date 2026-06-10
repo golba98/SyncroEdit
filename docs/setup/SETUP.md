@@ -83,7 +83,11 @@ Deploy the code and assets directly to your Cloudflare account:
 npm run deploy
 ```
 
-Cloudflare will deploy your static files to the edge network and expose your APIs globally on a `*.workers.dev` subdomain (or a custom domain if configured).
+Cloudflare will deploy your static files to the edge network. The app is live at:
+
+- **<https://syncroedit.online>** (production custom domain)
+- **<https://www.syncroedit.online>** (www)
+- `https://synchroedit.jordanvorster404.workers.dev` (workers.dev fallback)
 
 ---
 
