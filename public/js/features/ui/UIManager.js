@@ -375,7 +375,10 @@ export class UIManager {
     if (fadingDashboard) {
       const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
       setTimeout(() => {
-        if (document.body.dataset.viewState !== 'dashboard') {
+        if (
+          document.body.dataset.viewState !== 'dashboard' &&
+          document.body.dataset.viewState !== 'opening-document'
+        ) {
           if (library) library.style.display = 'none';
           if (overlay) overlay.style.display = 'none';
           this.updateMobileUIState();
@@ -394,11 +397,13 @@ export class UIManager {
     const softRevealEls = [header, ribbonTabs, ribbonContent].filter(Boolean);
 
     if (state === 'opening-document') {
+      this.assertNoBlankOpeningState();
       softRevealEls.forEach((el) => {
         el.classList.add('soft-reveal-enter');
         el.classList.remove('soft-reveal-ready');
       });
     } else if (state === 'editor-loading' || state === 'editor-ready') {
+      this.hideDocumentOpeningLoader();
       requestAnimationFrame(() => {
         softRevealEls.forEach((el) => {
           el.classList.remove('soft-reveal-enter');
@@ -406,9 +411,37 @@ export class UIManager {
         });
       });
     } else if (state === 'booting' || state === 'auth' || state === 'dashboard') {
+      this.hideDocumentOpeningLoader();
       softRevealEls.forEach((el) => {
         el.classList.remove('soft-reveal-enter', 'soft-reveal-ready');
       });
+    } else if (state === 'editor-error') {
+      this.hideDocumentOpeningLoader();
+    }
+  }
+
+  showDocumentOpeningLoader(text = 'Opening document...') {
+    const loader = document.getElementById('documentOpeningLoader');
+    const title = document.getElementById('documentOpeningTitle');
+    if (loader) {
+      if (title) title.textContent = text;
+      loader.hidden = false;
+    }
+  }
+
+  hideDocumentOpeningLoader() {
+    const loader = document.getElementById('documentOpeningLoader');
+    if (loader) loader.hidden = true;
+  }
+
+  assertNoBlankOpeningState() {
+    const isOpening = document.body.dataset.viewState === 'opening-document';
+    const loader = document.getElementById('documentOpeningLoader');
+    const loaderVisible = loader && !loader.hidden;
+
+    if (isOpening && !loaderVisible) {
+      console.warn('[OPEN] Prevented blank opening state: showing loader');
+      this.showDocumentOpeningLoader('Opening document...');
     }
   }
 
