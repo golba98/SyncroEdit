@@ -215,6 +215,8 @@ test.describe('Bot Alignment & Rig Tests', () => {
     // Assert hands overlap with head significantly
     expect(leftBox.y).toBeGreaterThan(headBox.y);
     expect(leftBox.y + leftBox.height).toBeLessThan(headBox.y + headBox.height + 20); // allow slight overflow
+    expect(rightBox.y).toBeGreaterThan(headBox.y);
+    expect(rightBox.y + rightBox.height).toBeLessThan(headBox.y + headBox.height + 20);
   });
 
   test('Face Screen Clipping', async ({ page }) => {

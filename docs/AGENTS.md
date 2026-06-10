@@ -6,13 +6,14 @@
 
 ## Build, Test, and Development Commands
 
+Note: There is no `npm run build` script. Static assets are served directly from the `public/` directory by Cloudflare.
+
 - `npm install`: install dependencies from `package-lock.json`.
-- `npm run dev`: run the Worker locally with Wrangler.
-- `npm start`: run the local Worker start command.
-- `npm run deploy`: deploy the Worker and static assets.
+- `npm run dev` / `npm start`: run the Worker locally with Wrangler.
+- `npm run deploy` / `npx wrangler deploy --config wrangler.toml`: deploy the Worker and static assets to Cloudflare.
 - `npm run db:migrate:local`: apply D1 migrations locally.
 - `npm run db:migrate:remote`: apply D1 migrations remotely.
-- `npm test`: run unit and integration Jest suites.
+- `npm test`: run all unit, integration, and frontend Jest suites.
 - `npm run test:unit`: run Worker unit tests.
 - `npm run test:integration`: run Worker integration/security tests.
 - `npm run test:e2e`: run Playwright tests using `config/playwright.config.js`.

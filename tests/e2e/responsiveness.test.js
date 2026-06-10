@@ -15,6 +15,9 @@ test.describe('Responsiveness', () => {
 
     // Let's check if it's visible at least.
     await expect(container).toBeVisible();
+    if (viewport && box) {
+      expect(box.width).toBeGreaterThan(0);
+    }
   });
 
   test('should display editor correctly on mobile', async ({ page }) => {

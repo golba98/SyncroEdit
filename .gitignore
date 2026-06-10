@@ -65,6 +65,7 @@ Thumbs.db
 # Optional: Local config files not meant for repo
 config/local.json
 gemini.md
+GEMINI.md
 CLAUDE.md
 AGENTS.md
 

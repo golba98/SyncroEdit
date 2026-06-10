@@ -206,8 +206,6 @@ export class LibraryManager {
     if (this.openLock) return;
     this.openLock = true;
     this.isTransitioning = true;
-    console.log('[OPEN] click blank');
-    console.log('[OPEN] start');
     this.markCreateOpening(true);
     this.disableLibraryInteraction('create');
 
@@ -217,7 +215,6 @@ export class LibraryManager {
 
       // Create document in background
       const doc = await Network.createDocument();
-      console.log('[OPEN] document created');
 
       // Update URL without reload
       const newUrl = `${window.location.pathname}?doc=${doc._id}`;
@@ -235,7 +232,6 @@ export class LibraryManager {
       this.markCreateOpening(false);
     } catch (err) {
       console.error('Failed to create document:', err);
-      console.log('[OPEN] failed');
       this.clearOpeningStates();
       // Re-show library on error
       const library = document.getElementById('docLibrary');
@@ -257,8 +253,6 @@ export class LibraryManager {
     if (this.openLock) return;
     this.openLock = true;
     this.isTransitioning = true;
-    console.log('[OPEN] click recent', { docId });
-    console.log('[OPEN] start');
     this.disableLibraryInteraction('open', docId);
 
     try {
@@ -277,7 +271,6 @@ export class LibraryManager {
       this.isTransitioning = false;
     } catch (err) {
       console.error('Failed to open document:', err);
-      console.log('[OPEN] failed');
       this.clearOpeningStates();
       alert('Failed to open document');
     }

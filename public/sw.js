@@ -99,7 +99,7 @@ self.addEventListener('fetch', (event) => {
   let requestUrl;
   try {
     requestUrl = new URL(urlString);
-  } catch (e) {
+  } catch {
     // If the URL cannot be parsed for some reason, do not handle it
     return;
   }
@@ -157,7 +157,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch((err) => {
+        .catch(() => {
           console.warn('[SW] Fetch failed:', event.request.url);
           return new Response('Network Error', { status: 404, statusText: 'Network Error' });
         });

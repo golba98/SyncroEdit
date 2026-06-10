@@ -41,7 +41,7 @@ export class CursorManager extends Plugin {
     // Editor would emit 'page-mounted' and this plugin would listen to it.
 
     // For now, adhering to the plan:
-    pageQuill.root.addEventListener('mousedown', (e) => {
+    pageQuill.root.addEventListener('mousedown', () => {
       const pages = this.editor.yPages.toArray();
       const pageIndex = pages.findIndex((p) => p.get('id') === pageId);
       const range = pageQuill.getSelection();

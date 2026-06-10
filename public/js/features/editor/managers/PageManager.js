@@ -51,7 +51,7 @@ export class PageManager extends Plugin {
     return (this.editor.currentZoom || 100) / 100;
   }
 
-  handleContentChange(pageIndex, changeDelta, source) {
+  handleContentChange() {
     // We now allow 'api' source to trigger reflows so collaborators stay in sync.
     // The debounce below prevents this from being too expensive during rapid remote sync.
     if (this.reflowTimeout) clearTimeout(this.reflowTimeout);

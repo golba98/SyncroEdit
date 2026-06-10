@@ -83,15 +83,18 @@ Open `http://localhost:8787` in your browser.
 
 ## CLI Commands
 
-| Command                     | Description                                               |
-| --------------------------- | --------------------------------------------------------- |
-| `npm run dev`               | Runs the wrangler dev emulator on `http://localhost:8787` |
-| `npm run deploy`            | Deploys the Worker and static assets to Cloudflare        |
-| `npm run db:migrate:local`  | Applies migrations to the local development D1 database   |
-| `npm run db:migrate:remote` | Applies migrations to the production remote D1 database   |
-| `npm run test`              | Runs the Jest test suite                                  |
-| `npm run lint`              | Runs ESLint checker                                       |
-| `npm run format`            | Standardizes codebase formatting via Prettier             |
+> [!NOTE]
+> There is no `npm run build` script in this repository. Static assets are served directly from the `public/` directory by Cloudflare.
+
+| Command                     | Description                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `npm run dev`               | Runs the wrangler dev emulator on `http://localhost:8787`                               |
+| `npm run deploy`            | Deploys the Worker and static assets using `npx wrangler deploy --config wrangler.toml` |
+| `npm run db:migrate:local`  | Applies migrations to the local development D1 database                                 |
+| `npm run db:migrate:remote` | Applies migrations to the production remote D1 database                                 |
+| `npm test`                  | Runs the Jest test suite (unit, integration, and frontend)                              |
+| `npm run lint`              | Runs the ESLint checker                                                                 |
+| `npm run format`            | Standardizes codebase formatting via Prettier                                           |
 
 ---
 

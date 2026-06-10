@@ -261,7 +261,7 @@ export class SynchroBot {
   /**
    * Called when a field receives focus
    */
-  onFieldFocus(fieldName, fieldValue) {
+  onFieldFocus(fieldName) {
     this.focusTarget = fieldName;
     this.resetIdleTimer();
 
