@@ -2,12 +2,12 @@
 // Copy this file to 'config.production.js' or adapt it when building the deployment.
 window.SYNCROEDIT_CONFIG = {
   // API_BASE_URL: Points to your production backend API.
-  API_BASE_URL: 'https://api.syncroedit.example.com',
+  API_BASE_URL: 'https://synchroedit.pages.dev',
 
   // WS_BASE_URL: Points to your production WebSocket server.
-  WS_BASE_URL: 'wss://api.syncroedit.example.com/ws',
+  WS_BASE_URL: 'wss://synchroedit.pages.dev/ws',
 
   // REALTIME_BACKEND: Choose your realtime provider.
-  // Options: 'node' (Node WebSocket backend)
-  REALTIME_BACKEND: 'node',
+  // Options: 'durable-object' (Cloudflare Durable Objects realtime)
+  REALTIME_BACKEND: 'durable-object',
 };
