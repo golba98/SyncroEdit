@@ -33,7 +33,7 @@ const ASSETS_TO_CACHE = [
   '/vendor/fontawesome/css/all.min.css',
   'https://cdn.quilljs.com/1.3.6/quill.snow.css',
   'https://cdn.quilljs.com/1.3.6/quill.js',
-  'https://unpkg.com/idb-keyval@6.2.1/dist/index.js',
+  '/vendor/idb-keyval/index.js',
   'https://esm.sh/yjs@13.6.28',
   'https://esm.sh/y-quill@1.0.0?deps=yjs@13.6.28',
   '/js/vendor/y-websocket.js',
