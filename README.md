@@ -37,51 +37,61 @@ graph TD
 To run SyncroEdit in production, configure the following bindings in your Cloudflare dashboard or `wrangler.toml`:
 
 ### Bindings
+
 1. **D1 Database:** Bind a D1 database to `DB`.
 2. **Durable Objects:** Bind the class `DocumentSyncObject` to `DOCUMENT_SYNC_OBJECT`.
 
 ### Secrets
+
 Set the following secret using wrangler CLI:
+
 ```bash
 wrangler secret put JWT_SECRET
 ```
-*Note: `JWT_SECRET` is used for signing/verifying session access tokens and short-lived WebSocket connection tickets.*
+
+_Note: `JWT_SECRET` is used for signing/verifying session access tokens and short-lived WebSocket connection tickets._
 
 ---
 
 ## Development Setup
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Apply Database Migrations (Local)
+
 Create the local SQLite database and apply the schema:
+
 ```bash
 npm run db:migrate:local
 ```
 
 ### 3. Start Local Development Server
+
 Launch wrangler's local dev server (which emulates D1 and Durable Objects locally):
+
 ```bash
 npm run dev
 ```
+
 Open `http://localhost:8787` in your browser.
 
 ---
 
 ## CLI Commands
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Runs the wrangler dev emulator on `http://localhost:8787` |
-| `npm run deploy` | Deploys the Worker and static assets to Cloudflare |
-| `npm run db:migrate:local` | Applies migrations to the local development D1 database |
-| `npm run db:migrate:remote` | Applies migrations to the production remote D1 database |
-| `npm run test` | Runs the Jest test suite |
-| `npm run lint` | Runs ESLint checker |
-| `npm run format` | Standardizes codebase formatting via Prettier |
+| Command                     | Description                                               |
+| --------------------------- | --------------------------------------------------------- |
+| `npm run dev`               | Runs the wrangler dev emulator on `http://localhost:8787` |
+| `npm run deploy`            | Deploys the Worker and static assets to Cloudflare        |
+| `npm run db:migrate:local`  | Applies migrations to the local development D1 database   |
+| `npm run db:migrate:remote` | Applies migrations to the production remote D1 database   |
+| `npm run test`              | Runs the Jest test suite                                  |
+| `npm run lint`              | Runs ESLint checker                                       |
+| `npm run format`            | Standardizes codebase formatting via Prettier             |
 
 ---
 
@@ -90,6 +100,7 @@ Open `http://localhost:8787` in your browser.
 The tests run using Jest and Hono's lightweight request testing harness combined with a stateful D1 mock database.
 
 To execute tests:
+
 ```bash
 npm test
 ```

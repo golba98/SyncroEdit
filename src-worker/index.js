@@ -55,6 +55,13 @@ app.get('/api/config', (c) => {
   });
 });
 
+app.get('/api/debug/bindings', (c) => {
+  return c.json({
+    hasDB: c.env.DB !== undefined,
+    hasDocumentSyncObject: c.env.DOCUMENT_SYNC_OBJECT !== undefined,
+  });
+});
+
 // Provide a mock CSRF token route for compatibility.
 // Bearer-token authentication is stateless and header-based, so CSRF is not required.
 app.get('/api/auth/csrf-token', (c) => {
