@@ -19,6 +19,7 @@ describe('PageManager', () => {
     mockQuillPage0 = {
       getLength: jest.fn(),
       getBounds: jest.fn(),
+      getSelection: jest.fn().mockReturnValue(null),
       updateContents: jest.fn(),
       deleteText: jest.fn(),
       getLine: jest.fn(),
@@ -32,6 +33,7 @@ describe('PageManager', () => {
     mockQuillPage1 = {
       getLength: jest.fn(),
       getBounds: jest.fn(),
+      getSelection: jest.fn().mockReturnValue(null),
       updateContents: jest.fn(),
       deleteText: jest.fn(),
       getLine: jest.fn(),
@@ -43,10 +45,10 @@ describe('PageManager', () => {
     };
 
     mockEditor = {
-      pageQuillInstances: {
-        0: mockQuillPage0,
-        1: mockQuillPage1,
-      },
+      pageQuillInstances: new Map([
+        ['page-0', mockQuillPage0],
+        ['page-1', mockQuillPage1],
+      ]),
       currentZoom: 100,
       doc: {
         transact: jest.fn((cb) => cb()),
@@ -54,6 +56,12 @@ describe('PageManager', () => {
       yPages: {
         delete: jest.fn(),
         insert: jest.fn(),
+        toArray: jest
+          .fn()
+          .mockReturnValue([
+            { get: (key) => (key === 'id' ? 'page-0' : null) },
+            { get: (key) => (key === 'id' ? 'page-1' : null) },
+          ]),
       },
       handlePageUpdate: jest.fn(), // Mock the recursive call
       switchToPage: jest.fn(),
@@ -62,6 +70,9 @@ describe('PageManager', () => {
     pageManager = new PageManager(mockEditor);
     // Overwrite handlePageUpdate to avoid async issues in test or circular deps
     pageManager.handlePageUpdate = jest.fn();
+    mockQuillPage0.getLines.mockReturnValue([]);
+    mockQuillPage1.getLines.mockReturnValue([{ length: () => 6 }]);
+    mockQuillPage1.getIndex.mockReturnValue(0);
   });
 
   describe('attemptMergeFromNextPage', () => {
@@ -90,11 +101,11 @@ describe('PageManager', () => {
       // Should check bounds on page 0
       expect(mockQuillPage0.getBounds).toHaveBeenCalled();
 
-      // Should check text on page 1
-      expect(mockQuillPage1.getText).toHaveBeenCalled();
+      // Should check lines on page 1
+      expect(mockQuillPage1.getLines).toHaveBeenCalled();
 
       // Should check line height (safety check)
-      expect(mockQuillPage1.getBounds).toHaveBeenCalledWith(0);
+      expect(mockQuillPage1.getBounds).toHaveBeenCalledWith(5);
 
       // Should move content (length of "Hello\n" is 6)
       expect(mockEditor.doc.transact).toHaveBeenCalled();
@@ -103,7 +114,7 @@ describe('PageManager', () => {
       // Should update page 0
       expect(mockQuillPage0.updateContents).toHaveBeenCalledWith(
         {
-          ops: [{ insert: 'Hello\n' }],
+          ops: [{ retain: 99 }, { insert: 'Hello\n' }],
         },
         'user'
       );
@@ -114,16 +125,10 @@ describe('PageManager', () => {
       // Should NOT delete page 1 (length remains > 1 after delete)
       expect(mockEditor.yPages.delete).not.toHaveBeenCalled();
 
-      // Should trigger update check again
-      jest.useFakeTimers();
-      // Re-run to capture the timeout callback
-      pageManager.handlePageUpdate.mockClear();
+      // Should trigger update check again via scheduleReflow
+      const reflowSpy = jest.spyOn(pageManager, 'scheduleReflow');
       pageManager.attemptMergeFromNextPage(0);
-      jest.runAllTimers();
-
-      expect(pageManager.handlePageUpdate).toHaveBeenCalledWith(0);
-      expect(pageManager.handlePageUpdate).toHaveBeenCalledWith(1);
-      jest.useRealTimers();
+      expect(reflowSpy).toHaveBeenCalledWith(true);
     });
 
     it('should NOT pull content if no space', () => {
@@ -158,6 +163,7 @@ describe('PageManager', () => {
       // Crucial: We need to mock getLength returning 1 inside the transaction logic check
       mockQuillPage1.getLength
         .mockReturnValueOnce(6) // Initial check
+        .mockReturnValueOnce(6) // Clamp check
         .mockReturnValueOnce(1); // Check inside transact
 
       // 3. Execute
@@ -167,22 +173,10 @@ describe('PageManager', () => {
       expect(mockEditor.doc.transact).toHaveBeenCalled();
       expect(mockEditor.yPages.delete).toHaveBeenCalledWith(1, 1);
 
-      // Verify handlePageUpdate(1) is NOT called because page was deleted
-      jest.useFakeTimers();
-      pageManager.handlePageUpdate.mockClear();
+      // Verify scheduleReflow is called
+      const reflowSpy = jest.spyOn(pageManager, 'scheduleReflow');
       pageManager.attemptMergeFromNextPage(0);
-      jest.runAllTimers();
-      expect(pageManager.handlePageUpdate).toHaveBeenCalledWith(0);
-      // handlePageUpdate(1) should NOT be called
-      // Note: Since we re-ran attemptMergeFromNextPage inside the fake timer block,
-      // and we mocked getLength to return 6 then 1.
-      // The second run inside fake timers will use getLength again.
-      // We need to ensure mocks are consistent.
-      // Simpler verification: Just check that handlePageUpdate(1) wasn't called in the FIRST execution?
-      // But Step 5 (setTimeout) happens asynchronously.
-      // So we MUST use fake timers for the FIRST execution too if we want to check Step 5.
-
-      jest.useRealTimers();
+      expect(reflowSpy).toHaveBeenCalledWith(true);
     });
   });
 
@@ -224,7 +218,7 @@ describe('PageManager', () => {
       expect(mockQuillPage0.getLines).toHaveBeenCalled();
       // Should find Block 2 as overflow candidate
       // Should search strictly within range 50-99
-      expect(result).toEqual({ hasOverflow: true, splitIndex: 96 });
+      expect(result).toEqual({ hasOverflow: true, splitIndex: 92 });
     });
 
     it('should return no overflow if all blocks fit', () => {

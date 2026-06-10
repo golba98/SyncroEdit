@@ -2783,6 +2783,7 @@ body.light-theme .skeleton {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center; /* Center loading card vertically */
   padding: 60px 32px 48px;
   pointer-events: none;
   z-index: 5;
@@ -2793,6 +2794,11 @@ body.light-theme .skeleton {
     transform 0.18s ease-out;
 }
 
+.editor-skeleton .skeleton-toolbar,
+.editor-skeleton .skeleton-paper {
+  display: none !important;
+}
+
 .editor-skeleton.hidden {
   opacity: 0;
   transform: translateY(4px);
@@ -2801,6 +2807,37 @@ body.light-theme .skeleton {
 
 .editor-skeleton.has-error {
   pointer-events: auto;
+}
+
+/* Gate editor visibility and transitions */
+body:not([data-document-open-state='ready']) #pagesContainer {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#pagesContainer {
+  transition: opacity 0.25s ease-in-out !important;
+}
+
+body[data-view-state='dashboard'] .header,
+body[data-view-state='dashboard'] .ribbon-tabs,
+body[data-view-state='dashboard'] .ribbon-content,
+body[data-view-state='dashboard'] .main-workspace {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.header,
+.ribbon-tabs,
+.ribbon-content,
+.main-workspace {
+  transition: opacity 0.25s ease-in-out !important;
+}
+
+/* Disabled interaction styles on dashboard */
+#createNewDoc.is-disabled,
+.doc-item.is-disabled {
+  pointer-events: none !important;
 }
 
 .skeleton-toolbar {

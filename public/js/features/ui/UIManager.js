@@ -373,6 +373,11 @@ export class UIManager {
     this.showSkeletonMessage(false);
     this.showSkeleton(false);
     this.setDocumentOpenState('ready');
+
+    // Re-render final connection status badge when state becomes ready
+    if (this.connectionPendingStatus) {
+      this.renderConnectionStatus(this.connectionPendingStatus);
+    }
   }
 
   showSkeleton(visible) {
@@ -540,15 +545,24 @@ export class UIManager {
     const badge = document.getElementById('connectionBadge');
     const overlay = document.getElementById('serverOfflineOverlay');
     if (overlay) overlay.style.display = 'none';
-    if (!badge) return;
+
+    this.connectionPendingStatus = status;
 
     if (this.connectionStatusTimer) {
       clearTimeout(this.connectionStatusTimer);
       this.connectionStatusTimer = null;
     }
 
-    this.connectionPendingStatus = status;
-    const delay = status === 'connected' || status === 'offline' ? 0 : 800;
+    // Hide badge during document opening to prevent distracting state changes
+    if (this.documentOpenState !== 'ready') {
+      if (badge) badge.hidden = true;
+      return;
+    }
+
+    if (!badge) return;
+
+    // Delay warning status display by 850ms
+    const delay = status === 'connected' ? 0 : 850;
 
     if (delay > 0) {
       this.connectionStatusTimer = setTimeout(() => {
@@ -566,6 +580,12 @@ export class UIManager {
   renderConnectionStatus(status) {
     const badge = document.getElementById('connectionBadge');
     if (!badge) return;
+
+    // Do not display badge if not ready
+    if (this.documentOpenState !== 'ready') {
+      badge.hidden = true;
+      return;
+    }
 
     const stateMap = {
       connecting: 'Connecting',

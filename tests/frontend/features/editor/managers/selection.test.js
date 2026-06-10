@@ -7,7 +7,13 @@ import { SelectionManager } from '../../../../../public/js/features/editor/manag
 // Mock Editor
 class MockEditor {
   constructor() {
-    this.pageQuillInstances = {};
+    this.pageQuillInstances = new Map();
+    this.yPages = {
+      toArray: () => [
+        { get: (key) => (key === 'id' ? '0' : null) },
+        { get: (key) => (key === 'id' ? '1' : null) },
+      ],
+    };
   }
 }
 
@@ -40,8 +46,8 @@ describe('SelectionManager', () => {
             </div>
         `;
 
-    editor.pageQuillInstances[0] = new MockQuill();
-    editor.pageQuillInstances[1] = new MockQuill();
+    editor.pageQuillInstances.set('0', new MockQuill());
+    editor.pageQuillInstances.set('1', new MockQuill());
   });
 
   test('should initialize correctly', () => {
@@ -67,9 +73,9 @@ describe('SelectionManager', () => {
     manager.updateSelection(1, { index: 10, length: 0 }); // Top of Page 1
 
     // Mock that Page 1 has focus (so no overlay there)
-    editor.pageQuillInstances[1].hasFocus.mockReturnValue(true);
+    editor.pageQuillInstances.get('1').hasFocus.mockReturnValue(true);
     // Page 0 does not have focus (needs overlay)
-    editor.pageQuillInstances[0].hasFocus.mockReturnValue(false);
+    editor.pageQuillInstances.get('0').hasFocus.mockReturnValue(false);
 
     manager.renderVisuals();
 
@@ -79,7 +85,7 @@ describe('SelectionManager', () => {
     // Verify overlay position
     const overlay = manager.overlays[0];
     expect(overlay.style.backgroundColor).toContain('rgba');
-    expect(editor.pageQuillInstances[0].getBounds).toHaveBeenCalledWith(90, 10);
+    expect(editor.pageQuillInstances.get('0').getBounds).toHaveBeenCalledWith(90, 10);
   });
 
   test('should handle copy event across pages', () => {
