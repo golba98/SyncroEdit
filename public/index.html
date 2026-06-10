@@ -59,7 +59,9 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: #000000;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.16), transparent 32%),
+          rgba(0, 0, 0, 0.82);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -73,13 +75,11 @@
         pointer-events: none;
       }
 
-      body[data-document-open-state='idle'] #pagesContainer,
       body[data-document-open-state='opening'] #pagesContainer,
-      body[data-document-open-state='creating-document'] #pagesContainer,
-      body[data-document-open-state='loading-document'] #pagesContainer,
-      body[data-document-open-state='connecting'] #pagesContainer,
-      body[data-document-open-state='syncing'] #pagesContainer,
-      body[data-document-open-state='error'] #pagesContainer {
+      body[data-document-open-state='creating'] #pagesContainer,
+      body[data-document-open-state='loading-content'] #pagesContainer,
+      body[data-document-open-state='initial-syncing'] #pagesContainer,
+      body[data-document-open-state='failed'] #pagesContainer {
         opacity: 0 !important;
         transform: translateY(14px) !important;
         pointer-events: none !important;

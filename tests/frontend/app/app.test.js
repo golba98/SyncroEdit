@@ -163,7 +163,7 @@ describe('App Core Initialization', () => {
     expect(Utils.navigateTo).toHaveBeenCalledWith('pages/login.html?doc=doc-42');
   });
 
-  it('should update connection badge without showing the connection overlay', async () => {
+  it('hides initial connecting badge without showing the connection overlay', async () => {
     jest.useFakeTimers();
     try {
       global.URLSearchParams = jest.fn(() => ({
@@ -187,9 +187,8 @@ describe('App Core Initialization', () => {
       jest.advanceTimersByTime(5000);
 
       expect(overlay.style.display).toBe('none');
-      expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Connecting');
-      expect(badge.dataset.status).toBe('connecting');
+      expect(badge.hidden).toBe(true);
+      expect(badge.textContent).toBe('');
     } finally {
       jest.useRealTimers();
     }
@@ -246,6 +245,22 @@ describe('App Core Initialization', () => {
     expect(app.documentId).toBe('doc-1');
   });
 
+  it('renders normalized opening card copy for create, open, and initial sync', () => {
+    const app = new App();
+
+    app.setDocumentLifecycleState('creating');
+    expect(document.getElementById('editorSkeletonTitle').textContent).toBe('Creating document...');
+    expect(document.body.dataset.documentOpenState).toBe('creating');
+
+    app.setDocumentLifecycleState('loading-content');
+    expect(document.getElementById('editorSkeletonTitle').textContent).toBe('Opening document...');
+    expect(document.body.dataset.documentOpenState).toBe('loading-content');
+
+    app.setDocumentLifecycleState('initial-syncing');
+    expect(document.getElementById('editorSkeletonTitle').textContent).toBe('Syncing document...');
+    expect(document.body.dataset.documentOpenState).toBe('initial-syncing');
+  });
+
   it('does not show reconnect status before the delay', () => {
     jest.useFakeTimers();
     try {
@@ -254,7 +269,7 @@ describe('App Core Initialization', () => {
       const badge = document.getElementById('connectionBadge');
 
       app.handleWSStatusChange('reconnecting');
-      jest.advanceTimersByTime(849);
+      jest.advanceTimersByTime(999);
 
       expect(badge.hidden).toBe(true);
       expect(badge.textContent).toBe('');
@@ -301,7 +316,7 @@ describe('App Core Initialization', () => {
       const badge = document.getElementById('connectionBadge');
 
       app.handleEditorStatusChange('reconnecting', 'doc-ready');
-      jest.advanceTimersByTime(850);
+      jest.advanceTimersByTime(1000);
 
       expect(app.documentLoadState).toBe('ready');
       expect(app.uiManager.documentOpenState).toBe('ready');
@@ -346,7 +361,7 @@ describe('App Core Initialization', () => {
       editorEl.focus();
 
       app.handleEditorStatusChange('reconnecting', 'doc-ready');
-      jest.advanceTimersByTime(850);
+      jest.advanceTimersByTime(1000);
 
       expect(document.activeElement).toBe(editorEl);
       expect(document.body.dataset.documentOpenState).toBe('ready');
@@ -373,6 +388,30 @@ describe('App Core Initialization', () => {
     expect(document.getElementById('editorSkeleton').classList.contains('hidden')).toBe(true);
   });
 
+  it('save status labels are restricted and stable', () => {
+    jest.useFakeTimers();
+    try {
+      const app = new App();
+      const indicator = document.getElementById('saveStatusIndicator');
+
+      app.setSaveState('unsaved');
+      expect(indicator.textContent).toBe('Saving...');
+      expect(indicator.dataset.status).toBe('unsaved');
+
+      app.setSaveState('saved');
+      expect(indicator.textContent).toBe('Saved');
+      expect(indicator.dataset.status).toBe('saved');
+
+      app.setSaveState('offline');
+      expect(indicator.textContent).toBe('Offline');
+
+      app.setSaveState('failed');
+      expect(indicator.textContent).toBe('Save failed');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('opening a different document resets the ready loading guard', async () => {
     global.URLSearchParams = jest.fn(() => ({
       get: jest.fn().mockReturnValue(null),
@@ -390,12 +429,12 @@ describe('App Core Initialization', () => {
     app.readyDocumentId = 'doc-1';
     app.hasReachedEditorReady = true;
 
-    await app.loadDocument({ mode: 'loading-document' });
+    await app.loadDocument({ mode: 'loading-content' });
 
     expect(app.hasReachedEditorReady).toBe(false);
     expect(app.readyDocumentId).toBeNull();
-    expect(app.uiManager.documentOpenState).toBe('loading-document');
-    expect(document.body.dataset.documentOpenState).toBe('loading-document');
+    expect(app.uiManager.documentOpenState).toBe('loading-content');
+    expect(document.body.dataset.documentOpenState).toBe('loading-content');
     expect(document.getElementById('editorSkeleton').classList.contains('hidden')).toBe(false);
   });
 
@@ -519,8 +558,8 @@ describe('App Core Initialization', () => {
     expect(document.body.dataset.viewState).toBe('booting');
 
     await new Promise(process.nextTick);
-    // After async tasks resolve, it has progressed past opening-document to editor-loading
-    expect(document.body.dataset.viewState).toBe('editor-loading');
+    // After async tasks resolve, the compact opening card remains until editor readiness.
+    expect(document.body.dataset.viewState).toBe('opening-document');
     expect(document.getElementById('bootLoader').style.display).toBe('none');
   });
 
@@ -748,8 +787,8 @@ describe('App Core Initialization', () => {
   it('pagesContainer state attribute control matches design', () => {
     const app = new App();
 
-    app.uiManager.setDocumentOpenState('loading-document');
-    expect(document.body.dataset.documentOpenState).toBe('loading-document');
+    app.uiManager.setDocumentOpenState('loading-content');
+    expect(document.body.dataset.documentOpenState).toBe('loading-content');
 
     app.uiManager.setDocumentOpenState('ready');
     expect(document.body.dataset.documentOpenState).toBe('ready');
