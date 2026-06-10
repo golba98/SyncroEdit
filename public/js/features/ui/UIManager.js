@@ -10,6 +10,7 @@ export class UIManager {
     this.connectionPendingStatus = null;
     this.saveStatusTimer = null;
     this.documentOpenState = 'idle';
+    this.hasShownEditorReady = false;
   }
 
   setupEventListeners() {
@@ -413,6 +414,14 @@ export class UIManager {
   }
 
   setOpeningDocumentState() {
+    if (this.hasShownEditorReady && this.app?.isEditorReadyForCurrentDocument?.()) {
+      console.log('[LOAD] full loading suppressed after ready', {
+        requestedState: 'loading-document',
+      });
+      return;
+    }
+
+    console.log('[LOAD] full loading shown');
     this.showSkeleton(true);
     this.showSkeletonMessage(false);
     this.setDocumentOpenState('loading-document');
@@ -424,6 +433,7 @@ export class UIManager {
   clearOpeningDocumentState() {
     this.showSkeletonMessage(false);
     this.showSkeleton(false);
+    this.hasShownEditorReady = true;
     this.setDocumentOpenState('ready');
 
     // Re-render final connection status badge when state becomes ready
@@ -454,6 +464,27 @@ export class UIManager {
   }
 
   setDocumentOpenState(state, options = {}) {
+    const loadingStates = new Set([
+      'idle',
+      'opening',
+      'creating-document',
+      'loading-document',
+      'connecting',
+      'syncing',
+    ]);
+    if (
+      this.documentOpenState === 'ready' &&
+      this.hasShownEditorReady &&
+      loadingStates.has(state) &&
+      this.app?.isEditorReadyForCurrentDocument?.()
+    ) {
+      console.log('[SYNC] blocked full loading because editor already ready', {
+        requestedState: state,
+      });
+      console.log('[LOAD] full loading suppressed after ready', { requestedState: state });
+      return;
+    }
+
     this.documentOpenState = state;
     document.body.dataset.documentOpenState = state;
 
@@ -641,11 +672,11 @@ export class UIManager {
 
     const stateMap = {
       connecting: 'Connecting',
-      connected: 'Connected',
-      reconnecting: 'Reconnecting',
-      disconnected: 'Reconnecting',
-      offline: 'Offline',
-      syncing: 'Syncing',
+      connected: 'Synced',
+      reconnecting: 'Reconnecting...',
+      disconnected: 'Reconnecting...',
+      offline: 'Offline changes saved locally',
+      syncing: 'Syncing...',
       savingLocal: 'Saving locally',
     };
 
@@ -669,6 +700,7 @@ export class UIManager {
       saving: 'Saving...',
       unsaved: 'Unsaved changes',
       offline: 'Offline changes saved locally',
+      'offline-saved': 'Offline changes saved locally',
       failed: 'Save failed',
     };
 

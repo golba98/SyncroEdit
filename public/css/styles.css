@@ -2822,8 +2822,14 @@ body.light-theme .skeleton {
   pointer-events: auto;
 }
 
-/* Gate editor visibility and transitions */
-body:not([data-document-open-state='ready']) #pagesContainer {
+/* Gate editor visibility only during the initial document open flow. */
+body[data-document-open-state='idle'] #pagesContainer,
+body[data-document-open-state='opening'] #pagesContainer,
+body[data-document-open-state='creating-document'] #pagesContainer,
+body[data-document-open-state='loading-document'] #pagesContainer,
+body[data-document-open-state='connecting'] #pagesContainer,
+body[data-document-open-state='syncing'] #pagesContainer,
+body[data-document-open-state='error'] #pagesContainer {
   opacity: 0 !important;
   transform: translateY(14px) !important;
   pointer-events: none !important;
