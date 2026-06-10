@@ -386,8 +386,7 @@ export class UIManager {
     const header = document.querySelector('.header');
     const ribbonTabs = document.querySelector('.ribbon-tabs');
     const ribbonContent = document.querySelector('.ribbon-content');
-    const workspace = document.querySelector('.main-workspace');
-    const softRevealEls = [header, ribbonTabs, ribbonContent, workspace].filter(Boolean);
+    const softRevealEls = [header, ribbonTabs, ribbonContent].filter(Boolean);
 
     if (state === 'opening-document') {
       softRevealEls.forEach((el) => {
@@ -651,8 +650,8 @@ export class UIManager {
     const badge = document.getElementById('connectionBadge');
     if (!badge) return;
 
-    // Do not display badge if not ready
-    if (this.documentOpenState !== 'ready') {
+    // Do not display badge if not ready OR if already connected
+    if (this.documentOpenState !== 'ready' || status === 'connected') {
       badge.hidden = true;
       return;
     }
@@ -685,9 +684,9 @@ export class UIManager {
     const stateMap = {
       saved: 'Saved',
       saving: 'Saving...',
-      unsaved: 'Unsaved changes',
-      offline: 'Offline changes saved locally',
-      'offline-saved': 'Offline changes saved locally',
+      unsaved: 'Saving...',
+      offline: 'Offline',
+      'offline-saved': 'Offline',
       failed: 'Save failed',
     };
 
@@ -695,12 +694,10 @@ export class UIManager {
     indicator.dataset.status = status;
     indicator.hidden = false;
 
-    if (status === 'saving') {
+    if (status === 'saved' || status === 'offline' || status === 'offline-saved') {
       this.saveStatusTimer = setTimeout(() => {
-        if (indicator.dataset.status === 'saving') {
-          this.setSaveStatus('saved');
-        }
-      }, 1200);
+        indicator.hidden = true;
+      }, 2000);
     }
   }
 

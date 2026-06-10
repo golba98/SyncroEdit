@@ -3,6 +3,7 @@
  */
 
 import { App } from '/js/app/app.js';
+import { LibraryManager } from '/js/features/library/LibraryManager.js';
 import { Network } from '/js/app/network.js';
 import { Profile } from '/js/features/profile/profile.js';
 import { Editor } from '/js/features/editor/editor.js';
@@ -109,7 +110,9 @@ describe('App Core Initialization', () => {
     // Wait for async init
     await new Promise(process.nextTick);
 
-    expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({ silent: true });
+    expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({
+      silent: true,
+    });
     expect(document.getElementById('authGuard').style.display).toBe('none');
 
     const lib = document.getElementById('docLibrary');
@@ -128,7 +131,9 @@ describe('App Core Initialization', () => {
     await new Promise(process.nextTick);
     await new Promise(process.nextTick);
 
-    expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({ silent: true });
+    expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({
+      silent: true,
+    });
     expect(document.getElementById('authGuard').style.display).toBe('none');
 
     const lib = document.getElementById('docLibrary');
@@ -204,7 +209,9 @@ describe('App Core Initialization', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     await new Promise(process.nextTick);
 
-    expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({ silent: true });
+    expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({
+      silent: true,
+    });
   });
 
   it('prevents duplicate blank document creation while opening', async () => {
@@ -273,9 +280,7 @@ describe('App Core Initialization', () => {
       app.handleWSStatusChange('connected');
       jest.advanceTimersByTime(1000);
 
-      expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Synced');
-      expect(badge.dataset.status).toBe('connected');
+      expect(badge.hidden).toBe(true);
     } finally {
       jest.useRealTimers();
     }
@@ -476,13 +481,17 @@ describe('App Core Initialization', () => {
   });
 
   it('fallback still works if View Transition API is disabled/unavailable', async () => {
-    const app = new App();
-    await new Promise(process.nextTick);
+    const mockApp = {
+      uiManager: { applyViewState: jest.fn(), updateMobileUIState: jest.fn() },
+    };
+    const lm = new LibraryManager(mockApp);
+    const library = document.getElementById('docLibrary');
+    library.classList.add('view-visible');
 
-    await app.libraryManager.startEditorTransition();
+    await lm.startEditorTransition();
 
     // Should run transition immediately
-    expect(document.getElementById('docLibrary').classList.contains('view-visible')).toBe(false);
+    expect(library.classList.contains('view-visible')).toBe(false);
     expect(document.getElementById('libraryOverlay').classList.contains('view-visible')).toBe(
       false
     );
@@ -700,24 +709,32 @@ describe('App Core Initialization', () => {
     jest.useFakeTimers();
     try {
       window.matchMedia = jest.fn().mockReturnValue({
-        matches: false, // Enable motion to trigger timeout
+        matches: false,
         addEventListener: jest.fn(),
         removeEventListener: jest.fn(),
       });
 
-      const app = new App();
+      const mockApp = {
+        documentId: null,
+        uiManager: {
+          applyViewState: jest.fn(),
+          updateMobileUIState: jest.fn(),
+        },
+      };
+      document.body.dataset.viewState = 'opening-document';
+      const lm = new LibraryManager(mockApp);
       const library = document.getElementById('docLibrary');
       const overlay = document.getElementById('libraryOverlay');
 
       library.classList.add('view-visible');
       overlay.classList.add('view-visible');
 
-      const transitionPromise = app.libraryManager.startEditorTransition();
+      const transitionPromise = lm.startEditorTransition();
 
       expect(library.classList.contains('view-exiting')).toBe(true);
       expect(overlay.classList.contains('view-exiting')).toBe(true);
 
-      jest.advanceTimersByTime(180);
+      jest.advanceTimersByTime(250);
       await transitionPromise;
 
       expect(library.classList.contains('view-visible')).toBe(false);
