@@ -40,6 +40,7 @@ describe('BorderManager', () => {
     };
 
     borderManager = new BorderManager(editorMock);
+    borderManager.init();
   });
 
   it('should update border style on selection change', () => {

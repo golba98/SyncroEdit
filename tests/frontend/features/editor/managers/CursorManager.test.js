@@ -15,6 +15,21 @@ describe('CursorManager', () => {
       currentPageIndex: 0,
       quill: null, // Initially null
       onPageChange: jest.fn(),
+      yPages: {
+        toArray: jest
+          .fn()
+          .mockReturnValue([
+            { get: (key) => (key === 'id' ? 0 : null) },
+            { get: (key) => (key === 'id' ? 1 : null) },
+            { get: (key) => (key === 'id' ? 2 : null) },
+          ]),
+        get: jest.fn().mockImplementation((idx) => ({ get: (key) => (key === 'id' ? idx : null) })),
+      },
+      pageQuillInstances: new Map([
+        [0, quillMock],
+        [1, quillMock],
+        [2, quillMock],
+      ]),
     };
 
     cursorManager = new CursorManager(editorMock);
@@ -25,6 +40,7 @@ describe('CursorManager', () => {
       getSelection: jest.fn(),
       setSelection: jest.fn(),
       focus: jest.fn(),
+      root: document.createElement('div'),
     };
   });
 
@@ -82,15 +98,21 @@ describe('CursorManager', () => {
 
   describe('scrollToCursor', () => {
     it('should scroll page container into view', () => {
-      const mockElement = { scrollIntoView: jest.fn() };
+      const mockElement = {
+        scrollIntoView: jest.fn(),
+        getBoundingClientRect: jest
+          .fn()
+          .mockReturnValue({ top: 100, bottom: 200, left: 0, right: 0, height: 100 }),
+        scrollTo: jest.fn(),
+      };
       document.getElementById = jest.fn().mockReturnValue(mockElement);
 
       cursorManager.scrollToCursor(2);
 
       expect(document.getElementById).toHaveBeenCalledWith('page-container-2');
-      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({
+      expect(mockElement.scrollTo).toHaveBeenCalledWith({
+        top: expect.any(Number),
         behavior: 'smooth',
-        block: 'nearest',
       });
     });
   });

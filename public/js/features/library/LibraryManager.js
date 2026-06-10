@@ -206,7 +206,9 @@ export class LibraryManager {
     if (this.openLock) return;
     this.openLock = true;
     this.isTransitioning = true;
+    console.log('[OPEN] start');
     this.markCreateOpening(true);
+    this.disableLibraryInteraction('create');
 
     try {
       this.app.setDocumentLifecycleState?.('creating-document');
@@ -214,6 +216,7 @@ export class LibraryManager {
 
       // Create document in background
       const doc = await Network.createDocument();
+      console.log('[OPEN] document created');
 
       // Update URL without reload
       const newUrl = `${window.location.pathname}?doc=${doc._id}`;
@@ -231,9 +234,8 @@ export class LibraryManager {
       this.markCreateOpening(false);
     } catch (err) {
       console.error('Failed to create document:', err);
-      this.openLock = false;
-      this.isTransitioning = false;
-      this.markCreateOpening(false);
+      console.log('[OPEN] failed');
+      this.clearOpeningStates();
       // Re-show library on error
       const library = document.getElementById('docLibrary');
       const overlay = document.getElementById('libraryOverlay');
@@ -254,6 +256,8 @@ export class LibraryManager {
     if (this.openLock) return;
     this.openLock = true;
     this.isTransitioning = true;
+    console.log('[OPEN] start');
+    this.disableLibraryInteraction('open', docId);
 
     try {
       this.app.openingDocumentId = docId;
@@ -271,8 +275,8 @@ export class LibraryManager {
       this.isTransitioning = false;
     } catch (err) {
       console.error('Failed to open document:', err);
-      this.openLock = false;
-      this.isTransitioning = false;
+      console.log('[OPEN] failed');
+      this.clearOpeningStates();
       alert('Failed to open document');
     }
   }
@@ -286,7 +290,10 @@ export class LibraryManager {
       if (overlay) overlay.classList.remove('view-visible');
     };
 
-    if (!reduceMotion && document.startViewTransition) {
+    // View Transition API disabled for dashboard -> editor to prevent giant bad snapshots
+    const useViewTransition = false;
+
+    if (useViewTransition && !reduceMotion && document.startViewTransition) {
       const transition = document.startViewTransition(run);
       await transition.ready.catch(() => {});
       return;
@@ -294,7 +301,7 @@ export class LibraryManager {
 
     run();
     if (!reduceMotion) {
-      await new Promise((resolve) => setTimeout(resolve, 160));
+      await new Promise((resolve) => setTimeout(resolve, 180));
     }
   }
 
@@ -337,5 +344,74 @@ export class LibraryManager {
       deleteBtn.disabled = true;
       deleteBtn.setAttribute('aria-disabled', 'true');
     }
+  }
+
+  disableLibraryInteraction(clickedType, clickedId) {
+    // Disable Blank document card
+    const createCard = document.getElementById('createNewDoc');
+    if (createCard) {
+      createCard.classList.add('is-disabled');
+      if (clickedType !== 'create') {
+        createCard.style.opacity = '0.4';
+        createCard.style.pointerEvents = 'none';
+      }
+    }
+
+    // Disable all recent document rows
+    document.querySelectorAll('.doc-item').forEach((row) => {
+      row.classList.add('is-disabled');
+      row.style.pointerEvents = 'none';
+      if (clickedType !== 'open' || row.dataset.docId !== clickedId) {
+        row.style.opacity = '0.4';
+      }
+    });
+
+    const search = document.getElementById('docSearch');
+    if (search) search.disabled = true;
+  }
+
+  enableLibraryInteraction() {
+    const createCard = document.getElementById('createNewDoc');
+    if (createCard) {
+      createCard.classList.remove('is-disabled');
+      createCard.style.opacity = '';
+      createCard.style.pointerEvents = '';
+    }
+
+    document.querySelectorAll('.doc-item').forEach((row) => {
+      row.classList.remove('is-disabled');
+      row.style.opacity = '';
+      row.style.pointerEvents = '';
+    });
+
+    const search = document.getElementById('docSearch');
+    if (search) search.disabled = false;
+  }
+
+  clearOpeningStates() {
+    this.openLock = false;
+    this.isTransitioning = false;
+    this.markCreateOpening(false);
+    this.enableLibraryInteraction();
+
+    // Remove is-opening from all rows
+    document.querySelectorAll('.doc-item.is-opening').forEach((row) => {
+      row.classList.remove('is-opening');
+      row.removeAttribute('aria-busy');
+
+      const icon = row.querySelector('.doc-icon-container i');
+      if (icon) {
+        icon.classList.remove('fa-spinner', 'fa-spin');
+        icon.classList.add('fa-file-alt');
+      }
+
+      row.querySelector('.doc-opening-pill')?.remove();
+
+      const deleteBtn = row.querySelector('.delete-doc-btn');
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.removeAttribute('aria-disabled');
+      }
+    });
   }
 }

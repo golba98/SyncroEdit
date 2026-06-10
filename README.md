@@ -113,10 +113,10 @@ SyncroEdit's production backend is the Cloudflare Worker in `src-worker/`. API r
 
 ### Live URLs
 
-| URL | Purpose |
-| --- | ------- |
-| **<https://syncroedit.online>** | Production (custom domain) |
-| **<https://www.syncroedit.online>** | Production www redirect |
+| URL                                                | Purpose                       |
+| -------------------------------------------------- | ----------------------------- |
+| **<https://syncroedit.online>**                    | Production (custom domain)    |
+| **<https://www.syncroedit.online>**                | Production www redirect       |
 | `https://synchroedit.jordanvorster404.workers.dev` | Worker fallback (workers.dev) |
 
 ---

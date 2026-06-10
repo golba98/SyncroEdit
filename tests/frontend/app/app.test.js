@@ -173,6 +173,7 @@ describe('App Core Initialization', () => {
       const badge = document.getElementById('connectionBadge');
       overlay.style.display = 'none';
 
+      app.uiManager.documentOpenState = 'ready';
       app.handleWSStatusChange('connecting');
       jest.advanceTimersByTime(5000);
 
@@ -238,10 +239,11 @@ describe('App Core Initialization', () => {
     jest.useFakeTimers();
     try {
       const app = new App();
+      app.uiManager.documentOpenState = 'ready';
       const badge = document.getElementById('connectionBadge');
 
       app.handleWSStatusChange('reconnecting');
-      jest.advanceTimersByTime(799);
+      jest.advanceTimersByTime(849);
 
       expect(badge.hidden).toBe(true);
       expect(badge.textContent).toBe('');
@@ -259,6 +261,7 @@ describe('App Core Initialization', () => {
     jest.useFakeTimers();
     try {
       const app = new App();
+      app.uiManager.documentOpenState = 'ready';
       const badge = document.getElementById('connectionBadge');
 
       app.handleWSStatusChange('connecting');
@@ -300,6 +303,7 @@ describe('App Core Initialization', () => {
     jest.useFakeTimers();
     try {
       const app = new App();
+      app.uiManager.documentOpenState = 'ready';
       const badge = document.getElementById('connectionBadge');
 
       app.handleWSStatusChange('reconnecting');
@@ -310,5 +314,60 @@ describe('App Core Initialization', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('removes dashboard opening class and disabled attributes after success', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+
+    app.uiManager.applyViewState('opening-document');
+    app.libraryManager.openLock = true;
+    app.libraryManager.isTransitioning = true;
+    app.editor = { isReadyForUser: () => true };
+
+    // Simulate active opening item
+    const card = document.getElementById('createNewDoc');
+    card.classList.add('is-opening');
+
+    // Trigger successful open completion
+    app.finishDocumentOpen(app.loadDocumentToken);
+
+    expect(app.libraryManager.openLock).toBe(false);
+    expect(app.libraryManager.isTransitioning).toBe(false);
+    expect(card.classList.contains('is-opening')).toBe(false);
+    expect(document.body.dataset.viewState).toBe('editor-ready');
+  });
+
+  it('removes dashboard opening class and disabled attributes after failure', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+
+    app.uiManager.applyViewState('opening-document');
+    app.libraryManager.openLock = true;
+    app.libraryManager.isTransitioning = true;
+
+    const card = document.getElementById('createNewDoc');
+    card.classList.add('is-opening');
+
+    // Trigger open failure
+    app.showDocumentOpenError(app.loadDocumentToken, 'Failed');
+
+    expect(app.libraryManager.openLock).toBe(false);
+    expect(app.libraryManager.isTransitioning).toBe(false);
+    expect(card.classList.contains('is-opening')).toBe(false);
+    expect(document.body.dataset.viewState).toBe('editor-error');
+  });
+
+  it('fallback still works if View Transition API is disabled/unavailable', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+
+    await app.libraryManager.startEditorTransition();
+
+    // Should run transition immediately
+    expect(document.getElementById('docLibrary').classList.contains('view-visible')).toBe(false);
+    expect(document.getElementById('libraryOverlay').classList.contains('view-visible')).toBe(
+      false
+    );
   });
 });

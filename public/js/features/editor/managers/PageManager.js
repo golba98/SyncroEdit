@@ -192,6 +192,10 @@ export class PageManager extends Plugin {
     );
   }
 
+  findOverflowPoint(quill) {
+    return this.findOverflowPointPrecise(quill);
+  }
+
   findOverflowPointPrecise(quill) {
     const scale = this.getScale();
     const lines = quill.getLines();
@@ -343,7 +347,9 @@ export class PageManager extends Plugin {
       }
       this.scheduleReflow(true);
       return true;
-    } // Aggressive Pull: Try to pull multiple lines as long as they fit
+    }
+
+    // Aggressive Pull: Try to pull multiple lines as long as they fit
     const lines = nextQuill.getLines();
     let linesToMove = 0;
     let cumulativeHeight = 0;
@@ -378,7 +384,9 @@ export class PageManager extends Plugin {
 
     // Ensure we don't pull the mandatory trailing newline of the next page
     moveLength = Math.min(moveLength, nextQuill.getLength() - 1);
-    if (moveLength <= 0) return false;
+    if (moveLength <= 0) {
+      return false;
+    }
 
     const contentToMove = nextQuill.getContents(0, moveLength);
     const relativeCursorIndex = shouldMoveCursor ? joinPoint + selection.index : 0;
@@ -393,6 +401,10 @@ export class PageManager extends Plugin {
           'user'
         );
         nextQuill.deleteText(0, moveLength, 'user');
+      }
+
+      if (nextQuill.getLength() <= 1) {
+        this.editor.yPages.delete(pageIndex + 1, 1);
       }
     });
     if (shouldMoveCursor && selection.index < moveLength) {

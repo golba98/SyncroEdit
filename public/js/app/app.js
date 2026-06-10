@@ -186,6 +186,15 @@ export class App {
     this.setDocumentLifecycleState(mode);
     this.uiManager.handleWSStatusChange('connecting');
 
+    // Safety timeout to clear stuck opening states after 10 seconds
+    if (this.openingSafetyTimeout) clearTimeout(this.openingSafetyTimeout);
+    this.openingSafetyTimeout = setTimeout(() => {
+      if (requestToken === this.loadDocumentToken && this.documentLifecycleState !== 'ready') {
+        console.warn('[OPEN] Safety timeout triggered. Cleaning up opening states.');
+        this.showDocumentOpenError(requestToken, 'Opening timed out. Please try again.');
+      }
+    }, 10000);
+
     const slowLoadTimer = setTimeout(() => {
       if (requestToken === this.loadDocumentToken && !this.hasLoadedEditorContent()) {
         this.uiManager.showSkeletonMessage(true, 'Still opening document...');
@@ -238,6 +247,7 @@ export class App {
             this.uiManager.handleWSStatusChange(status);
             if (status === 'connected') {
               this.logLifecycle('websocket-connected', { docId });
+              console.log('[OPEN] websocket connected');
               this.setDocumentLifecycleState('syncing');
             } else if (status === 'connecting') {
               this.setDocumentLifecycleState('connecting');
@@ -283,6 +293,8 @@ export class App {
 
       if (requestToken !== this.loadDocumentToken) return;
 
+      console.log('[OPEN] document loaded');
+
       if (
         this.editor?.isReadyForUser ? this.editor.isReadyForUser() : this.hasLoadedEditorContent()
       ) {
@@ -293,6 +305,7 @@ export class App {
       }
     } catch (err) {
       console.error('[App] Failed to load document:', err);
+      console.log('[OPEN] failed');
       if (requestToken === this.loadDocumentToken) {
         this.showDocumentOpenError(requestToken, 'Could not load this document.');
       }
@@ -318,16 +331,32 @@ export class App {
     if (this.editor?.isReadyForUser && !this.editor.isReadyForUser()) return;
     if (!this.editor?.isReadyForUser && !this.hasLoadedEditorContent()) return;
 
+    if (this.openingSafetyTimeout) {
+      clearTimeout(this.openingSafetyTimeout);
+      this.openingSafetyTimeout = null;
+    }
+
     this.uiManager.applyViewState('editor-ready');
     this.uiManager.clearOpeningDocumentState();
     this.uiManager.setSaveStatus('saved');
+    this.libraryManager.clearOpeningStates();
+    console.log('[OPEN] editor ready');
+    console.log('[OPEN] transition cleanup');
     this.logLifecycle('editor-ready', { docId: this.documentId });
   }
 
   showDocumentOpenError(requestToken, message) {
     if (requestToken !== this.loadDocumentToken) return;
+
+    if (this.openingSafetyTimeout) {
+      clearTimeout(this.openingSafetyTimeout);
+      this.openingSafetyTimeout = null;
+    }
+
     this.uiManager.applyViewState('editor-error');
     this.setDocumentLifecycleState('error', { description: message });
+    this.libraryManager.clearOpeningStates();
+    console.log('[OPEN] failed');
     this.uiManager.showDocumentOpenError({
       message,
       onRetry: () => this.loadDocument(),

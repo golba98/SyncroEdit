@@ -87,8 +87,8 @@ describe('Editor Virtualization / Scalability', () => {
 
     // Spy on Editor methods
     editor = new Editor('editor-container');
-    editor.createPageEditor = jest.fn();
-    editor.destroyPageEditor = jest.fn();
+    jest.spyOn(editor, 'createPageContainer');
+    editor.removePageById = jest.fn();
   });
 
   afterEach(() => {
@@ -98,23 +98,28 @@ describe('Editor Virtualization / Scalability', () => {
 
   it('should only render changed pages when possible', () => {
     // Simulate 50 existing pages
-    const initialPages = Array(50).fill({ get: () => 'mockYText' });
+    const initialPages = Array.from({ length: 50 }, (_, i) => ({
+      get: (key) => (key === 'id' ? `page-${i}` : 'mockYText'),
+    }));
     mockYPages.toArray.mockReturnValue(initialPages);
 
     // Initial Render
     editor.renderAllPages();
 
-    expect(editor.createPageEditor).toHaveBeenCalledTimes(50);
-    editor.createPageEditor.mockClear();
+    expect(editor.createPageContainer).toHaveBeenCalledTimes(50);
+    editor.createPageContainer.mockClear();
 
     // Now assume we simulate a change: 1 new page added at the end
-    const newPages = [...initialPages, { get: () => 'mockYTextNew' }];
+    const newPages = [
+      ...initialPages,
+      { get: (key) => (key === 'id' ? 'page-50' : 'mockYTextNew') },
+    ];
     mockYPages.toArray.mockReturnValue(newPages);
 
     // Also assume existing editors are already tracked
     initialPages.forEach((_, i) => {
-      editor.pageQuillInstances[i] = new Quill();
-      editor.pageBindings[i] = { type: 'mockYText' }; // Matches existing
+      editor.pageQuillInstances.set(`page-${i}`, new Quill());
+      editor.pageBindings.set(`page-${i}`, { type: 'mockYText' }); // Matches existing
     });
 
     // Render again
@@ -129,13 +134,15 @@ describe('Editor Virtualization / Scalability', () => {
     // The current implementation calls 'createPageEditor' only if instance is missing.
     // BUT it iterates the whole array.
 
-    expect(editor.createPageEditor).toHaveBeenCalledTimes(1);
+    expect(editor.createPageContainer).toHaveBeenCalledTimes(1);
     // Passed 50 (index 0-49), called for index 50.
   });
 
   it('should efficiently handle large page lists', () => {
     // Simulate 1000 pages
-    const manyPages = Array(1000).fill({ get: () => 'mockYText' });
+    const manyPages = Array.from({ length: 1000 }, (_, i) => ({
+      get: (key) => (key === 'id' ? `page-${i}` : 'mockYText'),
+    }));
     mockYPages.toArray.mockReturnValue(manyPages);
 
     const start = performance.now();
@@ -149,6 +156,6 @@ describe('Editor Virtualization / Scalability', () => {
 
     console.log(`Render loop for 1000 pages took: ${end - start}ms`);
 
-    expect(editor.createPageEditor).toHaveBeenCalledTimes(1000);
+    expect(editor.createPageContainer).toHaveBeenCalledTimes(1000);
   });
 });

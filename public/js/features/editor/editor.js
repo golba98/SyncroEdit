@@ -544,6 +544,7 @@ export class Editor {
       console.log('[Editor] sync isSynced=', isSynced, 'docId=', docId);
       if (!isSynced) return;
 
+      console.log('[OPEN] initial sync received');
       this._hasReceivedInitialSync = true;
       this._clearSyncTimeout();
       if (isSynced) {
