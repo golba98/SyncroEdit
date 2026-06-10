@@ -65,10 +65,24 @@
         justify-content: center;
         z-index: 999999;
         font-family: 'Roboto', 'Arial', sans-serif;
+        transition: opacity 0.2s ease-out;
       }
 
-      body:not([data-view-state='booting']) #bootLoader {
-        display: none !important;
+      #bootLoader.fading-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      body:not([data-document-open-state='ready']) #pagesContainer {
+        opacity: 0 !important;
+        transform: translateY(14px) !important;
+        pointer-events: none !important;
+      }
+
+      #pagesContainer {
+        transition:
+          opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important,
+          transform 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
       }
 
       @keyframes float {
@@ -162,7 +176,7 @@
               letter-spacing: 0.5px;
             "
           >
-            Loading application...
+            Loading workspace...
           </p>
         </div>
         <div
@@ -2511,13 +2525,6 @@
         </div>
         <div id="editorSkeletonMessage" class="editor-skeleton-message" hidden>
           Still loading document...
-        </div>
-        <div class="skeleton-paper">
-          <div class="skeleton-line skeleton-page"></div>
-          <div class="skeleton-line skeleton-page"></div>
-          <div class="skeleton-line skeleton-page"></div>
-          <div class="skeleton-line skeleton-page"></div>
-          <div class="skeleton-line skeleton-page"></div>
         </div>
         <div id="editorOpenError" class="editor-open-error" hidden>
           <div class="editor-open-error-icon">

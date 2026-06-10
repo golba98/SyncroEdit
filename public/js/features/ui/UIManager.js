@@ -327,9 +327,31 @@ export class UIManager {
   applyViewState(state) {
     document.body.dataset.viewState = state;
 
+    if (state === 'dashboard') {
+      console.log('[BOOT] dashboard reveal');
+    }
+
     const bootLoader = document.getElementById('bootLoader');
     if (bootLoader) {
-      bootLoader.style.display = state === 'booting' ? 'flex' : 'none';
+      if (state === 'booting') {
+        bootLoader.classList.remove('fading-out');
+        bootLoader.style.display = 'flex';
+      } else if (
+        bootLoader.style.display !== 'none' &&
+        !bootLoader.classList.contains('fading-out')
+      ) {
+        bootLoader.classList.add('fading-out');
+        const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 200;
+        if (duration === 0) {
+          bootLoader.style.display = 'none';
+        } else {
+          setTimeout(() => {
+            if (document.body.dataset.viewState !== 'booting') {
+              bootLoader.style.display = 'none';
+            }
+          }, duration);
+        }
+      }
     }
 
     const library = document.getElementById('docLibrary');
@@ -362,6 +384,31 @@ export class UIManager {
 
     if (closeBtn) {
       closeBtn.style.display = showDashboard && this.app.documentId ? 'block' : 'none';
+    }
+
+    // Editor elements soft-reveal transitions
+    const header = document.querySelector('.header');
+    const ribbonTabs = document.querySelector('.ribbon-tabs');
+    const ribbonContent = document.querySelector('.ribbon-content');
+    const workspace = document.querySelector('.main-workspace');
+    const softRevealEls = [header, ribbonTabs, ribbonContent, workspace].filter(Boolean);
+
+    if (state === 'opening-document') {
+      softRevealEls.forEach((el) => {
+        el.classList.add('soft-reveal-enter');
+        el.classList.remove('soft-reveal-ready');
+      });
+    } else if (state === 'editor-loading' || state === 'editor-ready') {
+      requestAnimationFrame(() => {
+        softRevealEls.forEach((el) => {
+          el.classList.remove('soft-reveal-enter');
+          el.classList.add('soft-reveal-ready');
+        });
+      });
+    } else if (state === 'booting' || state === 'auth' || state === 'dashboard') {
+      softRevealEls.forEach((el) => {
+        el.classList.remove('soft-reveal-enter', 'soft-reveal-ready');
+      });
     }
   }
 
