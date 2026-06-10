@@ -10,10 +10,10 @@ compatibility_date = "2026-06-10"
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*"]
+run_worker_first = ["/api/*", "/ws/*", "/health"]
 
 [[d1_databases]]
-binding = "synchroedit_db"
+binding = "DB"
 database_name = "synchroedit-db"
 database_id = "22d0142f-5997-4622-bd2d-33eab48beeea"
 migrations_dir = "migrations"
