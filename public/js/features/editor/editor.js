@@ -30,6 +30,7 @@ export class Editor {
     this.onTitleChange = options.onTitleChange || (() => {});
     this.onStatusChange = options.onStatusChange || (() => {});
     this.onCollaboratorsChange = options.onCollaboratorsChange || (() => {});
+    this.onContentReady = options.onContentReady || (() => {});
 
     this.initQuill();
 
@@ -659,6 +660,10 @@ export class Editor {
     if (!this._isReady && this.yPages.length > 0) {
       this._isReady = true;
       if (this._readyResolve) this._readyResolve();
+    }
+
+    if (this.yPages.length > 0) {
+      this.onContentReady();
     }
   }
 

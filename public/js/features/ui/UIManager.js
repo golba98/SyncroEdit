@@ -1,7 +1,6 @@
 import { Auth } from '/js/features/auth/auth.js';
 import { Network } from '/js/app/network.js';
 import { escapeHTML } from '/js/app/utils.js';
-import { UI } from '/js/features/ui/ui.js';
 
 export class UIManager {
   constructor(app) {
@@ -335,6 +334,91 @@ export class UIManager {
     }
   }
 
+  applyViewState(state) {
+    document.body.dataset.viewState = state;
+
+    const library = document.getElementById('docLibrary');
+    const overlay = document.getElementById('libraryOverlay');
+    const closeBtn = document.getElementById('closeLibrary');
+    const showDashboard = state === 'dashboard';
+    const fadingDashboard = state === 'opening-document';
+    const keepDashboardMounted = showDashboard || fadingDashboard;
+
+    if (library) {
+      library.style.display = keepDashboardMounted ? 'block' : 'none';
+      library.classList.toggle('view-visible', showDashboard);
+    }
+
+    if (overlay) {
+      overlay.style.display = keepDashboardMounted ? 'block' : 'none';
+      overlay.classList.toggle('view-visible', showDashboard);
+    }
+
+    if (fadingDashboard) {
+      const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
+      setTimeout(() => {
+        if (document.body.dataset.viewState !== 'dashboard') {
+          if (library) library.style.display = 'none';
+          if (overlay) overlay.style.display = 'none';
+          this.updateMobileUIState();
+        }
+      }, duration);
+    }
+
+    if (closeBtn) {
+      closeBtn.style.display = showDashboard && this.app.documentId ? 'block' : 'none';
+    }
+  }
+
+  setOpeningDocumentState() {
+    this.showSkeleton(true);
+    this.showSkeletonMessage(false);
+
+    const error = document.getElementById('editorOpenError');
+    if (error) error.hidden = true;
+  }
+
+  clearOpeningDocumentState() {
+    this.showSkeletonMessage(false);
+    this.showSkeleton(false);
+  }
+
+  showSkeleton(visible) {
+    const skeleton = document.getElementById('editorSkeleton');
+    if (!skeleton) return;
+
+    skeleton.classList.toggle('hidden', !visible);
+    if (!visible) {
+      skeleton.classList.remove('has-error');
+      this.showSkeletonMessage(false);
+      const error = document.getElementById('editorOpenError');
+      if (error) error.hidden = true;
+    }
+  }
+
+  showSkeletonMessage(visible, message = 'Still loading document...') {
+    const messageEl = document.getElementById('editorSkeletonMessage');
+    if (!messageEl) return;
+
+    messageEl.textContent = message;
+    messageEl.hidden = !visible;
+  }
+
+  showDocumentOpenError({ message, onRetry }) {
+    this.showSkeleton(true);
+    this.showSkeletonMessage(false);
+
+    const skeleton = document.getElementById('editorSkeleton');
+    const error = document.getElementById('editorOpenError');
+    const errorMessage = document.getElementById('editorOpenErrorMessage');
+    const retryBtn = document.getElementById('editorOpenRetry');
+
+    if (skeleton) skeleton.classList.add('has-error');
+    if (errorMessage) errorMessage.textContent = message;
+    if (retryBtn) retryBtn.onclick = onRetry;
+    if (error) error.hidden = false;
+  }
+
   setMobileEditMode(active) {
     const toolbar = document.getElementById('mobileContextualToolbar');
     const fabEdit = document.getElementById('fabEditDoc');
@@ -425,27 +509,22 @@ export class UIManager {
   }
 
   handleWSStatusChange(status) {
+    const badge = document.getElementById('connectionBadge');
     const overlay = document.getElementById('serverOfflineOverlay');
-    if (!overlay) return;
+    if (overlay) overlay.style.display = 'none';
+    if (!badge) return;
 
-    if (status === 'connected') {
-      if (this.app.connectionTimer) {
-        clearTimeout(this.app.connectionTimer);
-        this.app.connectionTimer = null;
-      }
-      overlay.style.display = 'none';
-    } else {
-      if (document.visibilityState === 'visible') {
-        if (!this.app.connectionTimer) {
-          this.app.connectionTimer = setTimeout(() => {
-            if (document.visibilityState === 'visible') {
-              UI.updateConnectionStatus(overlay, status);
-              overlay.style.display = 'flex';
-            }
-            this.app.connectionTimer = null;
-          }, 5000);
-        }
-      }
-    }
+    const stateMap = {
+      connecting: 'Connecting...',
+      connected: 'Connected',
+      reconnecting: 'Reconnecting...',
+      disconnected: 'Reconnecting...',
+      offline: 'Offline',
+      syncing: 'Syncing...',
+    };
+
+    badge.textContent = stateMap[status] || 'Connecting...';
+    badge.dataset.status = status;
+    badge.hidden = false;
   }
 }

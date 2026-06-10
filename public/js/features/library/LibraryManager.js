@@ -26,6 +26,10 @@ export class LibraryManager {
     }
 
     // Prepare library for display (hidden initially for smooth transition)
+    if (this.app.uiManager) {
+      this.app.uiManager.applyViewState('dashboard');
+    }
+
     library.style.display = 'block';
     overlay.style.display = 'block';
 
@@ -145,11 +149,6 @@ export class LibraryManager {
       const newUrl = `${window.location.pathname}?doc=${doc._id}`;
       window.history.pushState({ view: 'editor', docId: doc._id }, '', newUrl);
 
-      // Hide library after transition
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      if (library) library.style.display = 'none';
-      if (overlay) overlay.style.display = 'none';
-
       // Invalidate library cache since we have a new doc
       localStorage.removeItem('syncroedit_library_cache');
 
@@ -182,35 +181,53 @@ export class LibraryManager {
     this.isTransitioning = true;
 
     try {
-      // Get library elements
       const library = document.getElementById('docLibrary');
       const overlay = document.getElementById('libraryOverlay');
 
-      // Start fade-out transition
+      this.app.openingDocumentId = docId;
+      this.markDocumentOpening(docId);
+
       if (library) library.classList.remove('view-visible');
       if (overlay) overlay.classList.remove('view-visible');
 
-      // Wait for transition to complete (200ms)
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Hide library after transition
-      if (library) library.style.display = 'none';
-      if (overlay) overlay.style.display = 'none';
-
-      // Update URL with document ID
       const newUrl = `${window.location.pathname}?doc=${docId}`;
       window.history.pushState({ view: 'editor', docId }, '', newUrl);
 
-      // Update app state and load document
       this.app.documentId = docId;
       await this.app.loadDocument();
 
-      // Release transition lock
       this.isTransitioning = false;
     } catch (err) {
       console.error('Failed to open document:', err);
       this.isTransitioning = false;
       alert('Failed to open document');
+    }
+  }
+
+  markDocumentOpening(docId) {
+    const row = Array.from(document.querySelectorAll('.doc-item')).find(
+      (item) => item.dataset.docId === docId
+    );
+    if (!row) return;
+
+    row.classList.add('is-opening');
+    row.setAttribute('aria-busy', 'true');
+
+    const icon = row.querySelector('.doc-icon-container i');
+    if (icon) {
+      icon.classList.remove('fa-file-alt');
+      icon.classList.add('fa-spinner', 'fa-spin');
+    }
+
+    const titleWrap = row.querySelector('.doc-title-text')?.parentElement;
+    if (titleWrap && !titleWrap.querySelector('.doc-opening-pill')) {
+      titleWrap.insertAdjacentHTML('beforeend', '<span class="doc-opening-pill">Opening...</span>');
+    }
+
+    const deleteBtn = row.querySelector('.delete-doc-btn');
+    if (deleteBtn) {
+      deleteBtn.disabled = true;
+      deleteBtn.setAttribute('aria-disabled', 'true');
     }
   }
 }
