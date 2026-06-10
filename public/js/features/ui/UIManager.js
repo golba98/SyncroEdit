@@ -6,6 +6,8 @@ import { UI } from '/js/features/ui/ui.js';
 export class UIManager {
   constructor(app) {
     this.app = app;
+    this.activeOpeningDocumentId = null;
+    this.hasFocusedAfterOpen = false;
   }
 
   setupEventListeners() {
@@ -335,6 +337,145 @@ export class UIManager {
     }
   }
 
+  applyViewState(state) {
+    document.body.dataset.viewState = state;
+
+    const shell = document.getElementById('editorShell');
+    const library = document.getElementById('docLibrary');
+    const overlay = document.getElementById('libraryOverlay');
+    const closeBtn = document.getElementById('closeLibrary');
+
+    if (shell) {
+      shell.classList.toggle(
+        'is-loading',
+        state === 'opening-document' || state === 'editor-loading'
+      );
+      shell.classList.toggle('is-ready', state === 'editor-ready');
+      shell.classList.toggle('is-error', state === 'editor-error');
+    }
+
+    if (library) {
+      const visible = state === 'dashboard' || state === 'opening-document';
+      library.style.display = visible ? 'block' : 'none';
+      library.classList.toggle('view-visible', state === 'dashboard');
+      library.classList.toggle('is-transitioning-out', state === 'opening-document');
+    }
+
+    if (overlay) {
+      const visible = state === 'dashboard' || state === 'opening-document';
+      overlay.style.display = visible ? 'block' : 'none';
+      overlay.classList.toggle('view-visible', state === 'dashboard');
+      overlay.classList.toggle('is-transitioning-out', state === 'opening-document');
+    }
+
+    if (closeBtn)
+      closeBtn.style.display = state === 'dashboard' && this.app.documentId ? 'block' : 'none';
+  }
+
+  setOpeningDocumentState(docId) {
+    this.activeOpeningDocumentId = docId;
+    this.hasFocusedAfterOpen = false;
+    this.showSkeleton(true);
+
+    const error = document.getElementById('editorOpenError');
+    if (error) error.hidden = true;
+  }
+
+  clearOpeningDocumentState() {
+    this.activeOpeningDocumentId = null;
+    if (this.app.libraryManager && this.app.libraryManager.showLibrary) {
+      const cachedData = localStorage.getItem('syncroedit_library_cache');
+      if (cachedData) {
+        const list = document.getElementById('documentList');
+        if (list && document.body.dataset.viewState === 'dashboard') {
+          try {
+            const docs = JSON.parse(cachedData);
+            UI.renderDocumentList(
+              list,
+              docs,
+              this.app.documentId,
+              (id) => this.app.libraryManager.openDocument(id),
+              async (id) => {
+                if (confirm('Delete this document?')) {
+                  await Network.deleteDocument(id);
+                  localStorage.removeItem('syncroedit_library_cache');
+                  this.app.libraryManager.showLibrary();
+                }
+              },
+              this.app.user._id
+            );
+          } catch {}
+        }
+      }
+    }
+  }
+
+  prepareEditorShellForLoading() {
+    this.applyViewState('opening-document');
+    this.showSkeleton(true);
+    this.handleWSStatusChange('connecting');
+  }
+
+  async transitionToEditorShell() {
+    const library = document.getElementById('docLibrary');
+    const overlay = document.getElementById('libraryOverlay');
+
+    this.applyViewState('opening-document');
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    if (library) library.classList.remove('view-visible');
+    if (overlay) overlay.classList.remove('view-visible');
+
+    await new Promise((resolve) => {
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(resolve, reducedMotion ? 0 : 180);
+    });
+  }
+
+  showSkeleton(visible) {
+    const skeleton = document.getElementById('editorSkeleton');
+    if (skeleton) {
+      skeleton.classList.toggle('hidden', !visible);
+    }
+  }
+
+  showDocumentOpenError({ message, onRetry }) {
+    this.showSkeleton(true);
+    const error = document.getElementById('editorOpenError');
+    const errorMessage = document.getElementById('editorOpenErrorMessage');
+    const retryBtn = document.getElementById('editorOpenRetry');
+
+    if (errorMessage) errorMessage.textContent = message;
+    if (retryBtn) retryBtn.onclick = onRetry;
+    if (error) error.hidden = false;
+  }
+
+  focusEditorSurface({ preferTitle = false } = {}) {
+    if (this.hasFocusedAfterOpen) return;
+
+    if (preferTitle) {
+      const title = document.getElementById('docTitle');
+      if (title) {
+        title.focus();
+        this.hasFocusedAfterOpen = true;
+        return;
+      }
+    }
+
+    const quill = this.app.editor?.quill;
+    if (quill && typeof quill.focus === 'function') {
+      quill.focus();
+      this.hasFocusedAfterOpen = true;
+      return;
+    }
+
+    const title = document.getElementById('docTitle');
+    if (title) {
+      title.focus();
+      this.hasFocusedAfterOpen = true;
+    }
+  }
+
   setMobileEditMode(active) {
     const toolbar = document.getElementById('mobileContextualToolbar');
     const fabEdit = document.getElementById('fabEditDoc');
@@ -425,27 +566,24 @@ export class UIManager {
   }
 
   handleWSStatusChange(status) {
-    const overlay = document.getElementById('serverOfflineOverlay');
-    if (!overlay) return;
+    const badge = document.getElementById('connectionBadge');
+    if (!badge) return;
 
-    if (status === 'connected') {
-      if (this.app.connectionTimer) {
-        clearTimeout(this.app.connectionTimer);
-        this.app.connectionTimer = null;
-      }
-      overlay.style.display = 'none';
-    } else {
-      if (document.visibilityState === 'visible') {
-        if (!this.app.connectionTimer) {
-          this.app.connectionTimer = setTimeout(() => {
-            if (document.visibilityState === 'visible') {
-              UI.updateConnectionStatus(overlay, status);
-              overlay.style.display = 'flex';
-            }
-            this.app.connectionTimer = null;
-          }, 5000);
-        }
-      }
-    }
+    const stateMap = {
+      connecting: 'Connecting...',
+      connected: 'Connected',
+      reconnecting: 'Reconnecting...',
+      disconnected: 'Reconnecting...',
+      offline: 'Offline',
+      syncing: 'Syncing...',
+    };
+
+    const text = stateMap[status] || 'Connecting...';
+    badge.textContent = text;
+    badge.dataset.status = status;
+    badge.hidden = false;
+
+    const overlay = document.getElementById('serverOfflineOverlay');
+    if (overlay) overlay.style.display = 'none';
   }
 }

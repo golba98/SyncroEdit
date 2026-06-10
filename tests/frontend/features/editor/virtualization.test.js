@@ -1,49 +1,47 @@
 /**
  * @jest-environment jsdom
  */
-import { Editor } from '../../../../public/js/features/editor/editor.js';
+
+import { Editor } from '/js/features/editor/editor.js';
 import * as Y from 'yjs';
 
-// Mock dependencies
-jest.mock('yjs', () => ({
-  Doc: jest.fn(),
-  Map: jest.fn(),
-  Text: jest.fn(),
-  Array: jest.fn(),
-  applyUpdate: jest.fn(),
-  encodeStateAsUpdate: jest.fn(),
+jest.mock('idb-keyval', () => ({
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn(),
+}));
+jest.mock('/js/app/network.js', () => ({
+  Network: {
+    fetchAPI: jest.fn(),
+    getWebSocketBaseUrl: jest.fn().mockReturnValue('ws://localhost'),
+  },
+}));
+jest.mock('y-websocket', () => ({
+  WebsocketProvider: jest.fn().mockImplementation(() => ({
+    awareness: {
+      setLocalStateField: jest.fn(),
+      on: jest.fn(),
+      getStates: jest.fn(),
+    },
+    on: jest.fn(),
+    destroy: jest.fn(),
+  })),
+}));
+jest.mock('y-quill', () => ({
+  QuillBinding: jest.fn().mockImplementation(() => ({ destroy: jest.fn() })),
 }));
 
-jest.mock('../../../../public/js/features/editor/managers/PageManager.js');
-jest.mock('../../../../public/js/features/editor/managers/BorderManager.js');
-jest.mock('../../../../public/js/features/editor/managers/CursorManager.js');
-jest.mock('../../../../public/js/features/editor/managers/ImageManager.js');
-jest.mock('../../../../public/js/features/ui/ToolbarController.js');
-jest.mock('../../../../public/js/features/editor/managers/ReadabilityManager.js');
-jest.mock('../../../../public/js/features/editor/managers/NavigationManager.js');
-jest.mock('../../../../public/js/features/auth/auth.js', () => ({
-  Auth: { getToken: jest.fn() },
-}));
-jest.mock('y-websocket');
-jest.mock('y-quill');
-
-// Mock Quill
 global.Quill = class {
-  constructor(el, opts) {
+  constructor() {
     this.root = document.createElement('div');
     this.on = jest.fn();
-    this.getLength = jest.fn().mockReturnValue(0);
+    this.getLength = jest.fn().mockReturnValue(1);
     this.getText = jest.fn().mockReturnValue('');
   }
   static import(path) {
     if (path === 'parchment') {
       return {
         Scope: { INLINE: 'inline' },
-        Attributor: {
-          Style: class {
-            constructor() {}
-          },
-        },
+        Attributor: { Style: class {} },
       };
     }
     return { whitelist: [] };
@@ -52,103 +50,46 @@ global.Quill = class {
 };
 
 describe('Editor Virtualization / Scalability', () => {
-  let editor;
-  let mockContainer;
-  let mockYPages;
-
   beforeEach(() => {
-    // Debugging: Check prototype
-    console.log('Editor prototype keys:', Object.getOwnPropertyNames(Editor.prototype));
-
-    // Mock initQuill to avoid module issues
-    Editor.prototype.initQuill = jest.fn();
-
-    // Setup DOM
-    mockContainer = document.createElement('div');
-    mockContainer.id = 'editor-container';
-    document.body.appendChild(mockContainer);
-
-    // Setup Yjs mocks
-    const mockDoc = {
-      getArray: jest.fn(),
-      getMap: jest.fn(),
-    };
-    Y.Doc.mockImplementation(() => mockDoc);
-
-    mockYPages = {
-      observe: jest.fn(),
-      toArray: jest.fn(),
-      get: jest.fn(),
-      push: jest.fn(),
-      delete: jest.fn(),
-    };
-    mockDoc.getArray.mockReturnValue(mockYPages);
-    mockDoc.getMap.mockReturnValue({ observe: jest.fn(), set: jest.fn(), get: jest.fn() });
-
-    // Spy on Editor methods
-    editor = new Editor('editor-container');
-    editor.createPageEditor = jest.fn();
-    editor.destroyPageEditor = jest.fn();
+    document.body.innerHTML = '<div id="editor-container"></div><input id="docTitle">';
   });
 
-  afterEach(() => {
-    document.body.innerHTML = '';
-    jest.clearAllMocks();
+  it('creates page containers only for pages missing in the DOM', () => {
+    const editor = new Editor('editor-container', { docId: 'doc-1' });
+    const createPageContainerSpy = jest.spyOn(editor, 'createPageContainer');
+
+    const first = new Y.Map();
+    first.set('id', 'page-1');
+    first.set('content', new Y.Text());
+    const second = new Y.Map();
+    second.set('id', 'page-2');
+    second.set('content', new Y.Text());
+
+    editor.yPages.push([first, second]);
+    editor.renderAllPages();
+
+    expect(createPageContainerSpy).toHaveBeenCalledTimes(2);
+
+    createPageContainerSpy.mockClear();
+    editor.renderAllPages();
+
+    expect(createPageContainerSpy).not.toHaveBeenCalled();
   });
 
-  it('should only render changed pages when possible', () => {
-    // Simulate 50 existing pages
-    const initialPages = Array(50).fill({ get: () => 'mockYText' });
-    mockYPages.toArray.mockReturnValue(initialPages);
+  it('handles large page lists without mounting quill instances eagerly', () => {
+    const editor = new Editor('editor-container', { docId: 'doc-1' });
+    const mountPageSpy = jest.spyOn(editor, 'mountPage');
 
-    // Initial Render
+    for (let index = 0; index < 200; index++) {
+      const page = new Y.Map();
+      page.set('id', `page-${index}`);
+      page.set('content', new Y.Text());
+      editor.yPages.push([page]);
+    }
+
     editor.renderAllPages();
 
-    expect(editor.createPageEditor).toHaveBeenCalledTimes(50);
-    editor.createPageEditor.mockClear();
-
-    // Now assume we simulate a change: 1 new page added at the end
-    const newPages = [...initialPages, { get: () => 'mockYTextNew' }];
-    mockYPages.toArray.mockReturnValue(newPages);
-
-    // Also assume existing editors are already tracked
-    initialPages.forEach((_, i) => {
-      editor.pageQuillInstances[i] = new Quill();
-      editor.pageBindings[i] = { type: 'mockYText' }; // Matches existing
-    });
-
-    // Render again
-    editor.renderAllPages();
-
-    // Expectation:
-    // Ideally, it should only create 1 new editor.
-    // Currently, the implementation iterates all pages.
-    // If logic is efficient, it checks existence and skips creation.
-    // We want to verify that it doesn't do expensive DOM operations for all 50.
-
-    // The current implementation calls 'createPageEditor' only if instance is missing.
-    // BUT it iterates the whole array.
-
-    expect(editor.createPageEditor).toHaveBeenCalledTimes(1);
-    // Passed 50 (index 0-49), called for index 50.
-  });
-
-  it('should efficiently handle large page lists', () => {
-    // Simulate 1000 pages
-    const manyPages = Array(1000).fill({ get: () => 'mockYText' });
-    mockYPages.toArray.mockReturnValue(manyPages);
-
-    const start = performance.now();
-    editor.renderAllPages();
-    const end = performance.now();
-
-    // This is a loose benchmark, but iterating 1000 items and doing DOM checks
-    // shouldn't take > 100ms in a test environment if virtualized/optimized.
-    // If it tries to render 1000 Quills, it will be slow.
-    // Since we mocked createPageEditor, we measure the overhead of the loop and logic.
-
-    console.log(`Render loop for 1000 pages took: ${end - start}ms`);
-
-    expect(editor.createPageEditor).toHaveBeenCalledTimes(1000);
+    expect(editor.container.querySelectorAll('.editor-container').length).toBe(200);
+    expect(mountPageSpy).not.toHaveBeenCalled();
   });
 });

@@ -20,6 +20,10 @@ export class App {
     this.libraryManager = new LibraryManager(this);
     this.uiManager = new UIManager(this);
     this.connectionTimer = null;
+    this.viewState = this.documentId ? 'editor-loading' : 'dashboard';
+    this.openingDocumentId = null;
+    this.openRequestToken = 0;
+    this.openPromise = null;
 
     // Offline Indicator
     window.addEventListener('offline', () => this.showOfflineIndicator(true));
@@ -114,9 +118,10 @@ export class App {
     this.uiManager.setupEventListeners();
     this.uiManager.setupRibbonTabs();
     this.setupVisibilityListener();
+    this.uiManager.applyViewState(this.viewState);
 
     if (this.documentId) {
-      await this.loadDocument();
+      await this.openDocument(this.documentId, { pushHistory: false });
     } else {
       await this.libraryManager.showLibrary();
     }
@@ -170,75 +175,166 @@ export class App {
     }
   }
 
-  async loadDocument() {
-    console.log('[App] loadDocument docId=', this.documentId);
-    // Show skeleton immediately for instant perceived response
-    const skeleton = document.getElementById('editorSkeleton');
-    if (skeleton) skeleton.classList.remove('hidden');
-
-    try {
-      Network.addToRecent(this.documentId).catch((err) =>
-        console.warn('Recent list update failed:', err)
-      );
-
-      // Destroy and recreate editor when switching to a different document
-      if (this.editor && this.editor.currentDocId !== this.documentId) {
-        this.editor.destroy();
-        this.editor = null;
-      }
-
-      if (!this.editor) {
-        this.editor = new Editor('pagesContainer', {
-          user: this.user,
-          onPageChange: (index) => this.uiManager.updateStatus(index),
-          onTitleChange: (title) => {
-            try {
-              const cache = localStorage.getItem('syncroedit_library_cache');
-              if (cache) {
-                const docs = JSON.parse(cache);
-                const docIndex = docs.findIndex((d) => d._id === this.documentId);
-                if (docIndex !== -1) {
-                  docs[docIndex].title = title;
-                  localStorage.setItem('syncroedit_library_cache', JSON.stringify(docs));
-                }
-              }
-            } catch (e) {
-              console.warn('Failed to update library cache title:', e);
-            }
-          },
-          onStatusChange: (status) => this.uiManager.handleWSStatusChange(status),
-          onCollaboratorsChange: (users) => {
-            UI.updateCollaboratorsUI(
-              document.getElementById('activeCollaborators'),
-              users,
-              this.user.username
-            );
-          },
-        });
-        console.log('[App] Editor created for docId=', this.documentId);
-      }
-
-      const docLibrary = document.getElementById('docLibrary');
-      const libraryOverlay = document.getElementById('libraryOverlay');
-      if (docLibrary) docLibrary.style.display = 'none';
-      if (libraryOverlay) libraryOverlay.style.display = 'none';
-
-      if (this.uiManager) {
-        this.uiManager.updateMobileUIState();
-      }
-
-      // Wait for editor to signal ready (pages rendered), with built-in 10s fallback
-      if (this.editor.ready) {
-        await this.editor.ready;
-      }
-      console.log('[App] Editor ready, hiding skeleton for docId=', this.documentId);
-      if (skeleton) skeleton.classList.add('hidden');
-    } catch (err) {
-      console.error('[App] Failed to load document:', err);
-      // Hide skeleton on error
-      if (skeleton) skeleton.classList.add('hidden');
-      this.libraryManager.showLibrary();
+  setViewState(state) {
+    this.viewState = state;
+    if (this.uiManager && this.uiManager.applyViewState) {
+      this.uiManager.applyViewState(state);
     }
+  }
+
+  async ensureEditor(docId) {
+    if (this.editor && this.editor.currentDocId !== docId) {
+      this.editor.destroy();
+      this.editor = null;
+    }
+
+    if (!this.editor) {
+      this.editor = new Editor('pagesContainer', {
+        user: this.user,
+        docId,
+        onPageChange: (index) => this.uiManager.updateStatus(index),
+        onTitleChange: (title) => {
+          try {
+            const cache = localStorage.getItem('syncroedit_library_cache');
+            if (cache) {
+              const docs = JSON.parse(cache);
+              const docIndex = docs.findIndex((d) => d._id === this.documentId);
+              if (docIndex !== -1) {
+                docs[docIndex].title = title;
+                localStorage.setItem('syncroedit_library_cache', JSON.stringify(docs));
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to update library cache title:', e);
+          }
+        },
+        onStatusChange: (status) => this.uiManager.handleWSStatusChange(status),
+        onCollaboratorsChange: (users) => {
+          UI.updateCollaboratorsUI(
+            document.getElementById('activeCollaborators'),
+            users,
+            this.user.username
+          );
+        },
+      });
+      console.log('[App] Editor created for docId=', docId);
+    }
+
+    return this.editor;
+  }
+
+  async openDocument(docId, options = {}) {
+    if (!docId) return;
+    if (this.openPromise && this.openingDocumentId === docId) {
+      return this.openPromise;
+    }
+
+    const requestToken = ++this.openRequestToken;
+    this.openingDocumentId = docId;
+    this.documentId = docId;
+
+    if (options.pushHistory !== false) {
+      const nextUrl = `${window.location.pathname}?doc=${docId}`;
+      if (window.location.search !== `?doc=${docId}`) {
+        window.history.pushState({ view: 'editor', docId }, '', nextUrl);
+      }
+    }
+
+    this.openPromise = (async () => {
+      console.log('[App] openDocument docId=', docId);
+      this.setViewState('opening-document');
+      this.uiManager.setOpeningDocumentState(docId);
+      this.uiManager.prepareEditorShellForLoading();
+      this.uiManager.handleWSStatusChange('connecting');
+
+      Network.addToRecent(docId).catch((err) => console.warn('Recent list update failed:', err));
+
+      const snapshotPromise = Network.getDocumentSnapshot(docId);
+      const editor = await this.ensureEditor(docId);
+
+      if (requestToken !== this.openRequestToken) return;
+
+      await this.uiManager.transitionToEditorShell();
+
+      if (requestToken !== this.openRequestToken) return;
+
+      this.setViewState('editor-loading');
+
+      let hasCache = false;
+      try {
+        hasCache = await editor.loadFromCache(docId);
+      } catch (err) {
+        console.warn('[App] Cache load failed:', err);
+      }
+
+      if (requestToken !== this.openRequestToken) return;
+
+      if (hasCache && editor.hasRenderableContent()) {
+        this.setViewState('editor-ready');
+        this.uiManager.showSkeleton(false);
+        this.uiManager.focusEditorSurface({
+          preferTitle: Boolean(options.focusTitle),
+        });
+        this.uiManager.handleWSStatusChange('syncing');
+      }
+
+      let snapshotApplied = false;
+      try {
+        const snapshot = await snapshotPromise;
+        if (requestToken !== this.openRequestToken) return;
+        snapshotApplied = await editor.applySnapshot(snapshot);
+      } catch (err) {
+        console.error('[App] Failed to load document snapshot:', err);
+        if (!hasCache) {
+          this.setViewState('editor-error');
+          this.uiManager.showDocumentOpenError({
+            message: 'Could not load this document.',
+            onRetry: () => this.openDocument(docId, { ...options, pushHistory: false }),
+          });
+          return;
+        }
+      }
+
+      if (requestToken !== this.openRequestToken) return;
+
+      if (
+        (snapshotApplied || hasCache || editor.hasRenderableContent()) &&
+        this.viewState !== 'editor-error'
+      ) {
+        this.setViewState('editor-ready');
+        this.uiManager.showSkeleton(false);
+        this.uiManager.focusEditorSurface({
+          preferTitle: Boolean(options.focusTitle),
+        });
+      }
+
+      editor.connectWebSocket(docId, this.user).catch((err) => {
+        console.error('[App] Realtime connection failed:', err);
+      });
+    })()
+      .catch((err) => {
+        console.error('[App] Failed to open document:', err);
+        if (requestToken === this.openRequestToken) {
+          this.setViewState('editor-error');
+          this.uiManager.showDocumentOpenError({
+            message: 'Could not load this document.',
+            onRetry: () => this.openDocument(docId, { ...options, pushHistory: false }),
+          });
+        }
+      })
+      .finally(() => {
+        if (requestToken === this.openRequestToken) {
+          this.openingDocumentId = null;
+          this.uiManager.clearOpeningDocumentState();
+          this.uiManager.updateMobileUIState();
+        }
+      });
+
+    return this.openPromise;
+  }
+
+  async loadDocument(options = {}) {
+    return this.openDocument(this.documentId, options);
   }
 
   showTransitionOverlay(text = 'Loading...') {
@@ -265,7 +361,7 @@ export class App {
     }
   }
 
-  handlePopState(event) {
+  handlePopState() {
     // Handle browser back/forward navigation
     const urlParams = new URLSearchParams(window.location.search);
     const docId = urlParams.get('doc');
@@ -273,7 +369,7 @@ export class App {
     if (docId && docId !== this.documentId) {
       // Navigate to a different document
       this.documentId = docId;
-      this.loadDocument();
+      this.openDocument(docId, { pushHistory: false });
     } else if (!docId && this.documentId) {
       // Navigate to library from document
       this.documentId = null;

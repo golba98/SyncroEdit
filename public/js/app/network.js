@@ -160,6 +160,10 @@ export const Network = {
     return this.fetchAPI(`/api/documents/${docId}/settings`);
   },
 
+  async getDocumentSnapshot(docId) {
+    return this.fetchAPI(`/api/documents/${docId}/snapshot`);
+  },
+
   async updateDocumentSettings(docId, settings) {
     return this.fetchAPI(`/api/documents/${docId}/settings`, {
       method: 'PATCH',
