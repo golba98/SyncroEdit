@@ -29,7 +29,7 @@
       "^/js/(.*)$": "<rootDir>/public/js/$1",
       "^y-websocket$": "<rootDir>/tests/mocks/emptyModule.js",
       "^y-quill$": "<rootDir>/tests/mocks/emptyModule.js",
-      "^https://unpkg.com/idb-keyval@(.*)$": "idb-keyval"
+      "^/vendor/idb-keyval/index\\.js$": "idb-keyval"
     },
     "transform": {
       "^.+\\.jsx?$": [

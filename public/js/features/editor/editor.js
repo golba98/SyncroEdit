@@ -1,4 +1,4 @@
-import { get, set } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
+import { get, set } from '/vendor/idb-keyval/index.js';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { QuillBinding } from 'y-quill';
