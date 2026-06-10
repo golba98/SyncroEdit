@@ -22,6 +22,7 @@ export class App {
     this.connectionTimer = null;
     this.loadDocumentToken = 0;
     this.openingDocumentId = null;
+    this.documentLifecycleState = 'idle';
 
     // Offline Indicator
     window.addEventListener('offline', () => this.showOfflineIndicator(true));
@@ -157,21 +158,37 @@ export class App {
     }
   }
 
-  async loadDocument() {
+  setDocumentLifecycleState(state, options = {}) {
+    this.documentLifecycleState = state;
+    if (this.uiManager?.setDocumentOpenState) {
+      this.uiManager.setDocumentOpenState(state, options);
+    }
+  }
+
+  logLifecycle(event, details = {}) {
+    const debug = window.SYNCROEDIT_CONFIG?.DEBUG_LIFECYCLE;
+    if (window.testEnv && !debug) return;
+    if (!debug && window.location.hostname !== 'localhost') return;
+    console.log('[Lifecycle]', event, details);
+  }
+
+  async loadDocument(options = {}) {
     const docId = this.documentId;
     if (!docId) return;
 
+    const mode = options.mode || 'loading-document';
     const requestToken = ++this.loadDocumentToken;
     this.openingDocumentId = docId;
-    console.log('[App] loadDocument docId=', docId);
+    this.logLifecycle('document-open-start', { docId, mode });
 
     this.uiManager.applyViewState('opening-document');
     this.uiManager.setOpeningDocumentState();
+    this.setDocumentLifecycleState(mode);
     this.uiManager.handleWSStatusChange('connecting');
 
     const slowLoadTimer = setTimeout(() => {
       if (requestToken === this.loadDocumentToken && !this.hasLoadedEditorContent()) {
-        this.uiManager.showSkeletonMessage(true);
+        this.uiManager.showSkeletonMessage(true, 'Still opening document...');
       }
     }, 2000);
 
@@ -187,8 +204,21 @@ export class App {
       if (!this.editor) {
         this.editor = new Editor('pagesContainer', {
           user: this.user,
+          isNewDocument: Boolean(options.isNewDocument),
           onPageChange: (index) => this.uiManager.updateStatus(index),
           onContentReady: () => this.finishDocumentOpen(requestToken),
+          onLifecycleChange: (state, detail) => {
+            if (requestToken !== this.loadDocumentToken) return;
+            this.setDocumentLifecycleState(state, detail || {});
+            if (state === 'ready') this.finishDocumentOpen(requestToken);
+            if (state === 'error') {
+              this.showDocumentOpenError(
+                requestToken,
+                detail?.message || 'Could not load this document.'
+              );
+            }
+          },
+          onSaveStatusChange: (status) => this.uiManager.setSaveStatus(status),
           onTitleChange: (title) => {
             try {
               const cache = localStorage.getItem('syncroedit_library_cache');
@@ -204,7 +234,20 @@ export class App {
               console.warn('Failed to update library cache title:', e);
             }
           },
-          onStatusChange: (status) => this.uiManager.handleWSStatusChange(status),
+          onStatusChange: (status) => {
+            this.uiManager.handleWSStatusChange(status);
+            if (status === 'connected') {
+              this.logLifecycle('websocket-connected', { docId });
+              this.setDocumentLifecycleState('syncing');
+            } else if (status === 'connecting') {
+              this.setDocumentLifecycleState('connecting');
+            } else if (status === 'reconnecting' || status === 'disconnected') {
+              this.setDocumentLifecycleState('connecting', {
+                title: 'Reconnecting...',
+                description: 'Keeping local edits available while sync reconnects.',
+              });
+            }
+          },
           onCollaboratorsChange: (users) => {
             UI.updateCollaboratorsUI(
               document.getElementById('activeCollaborators'),
@@ -213,10 +256,22 @@ export class App {
             );
           },
         });
-        console.log('[App] Editor created for docId=', docId);
+        this.logLifecycle('editor-created', { docId });
       }
 
       this.editor.onContentReady = () => this.finishDocumentOpen(requestToken);
+      this.editor.onLifecycleChange = (state, detail) => {
+        if (requestToken !== this.loadDocumentToken) return;
+        this.setDocumentLifecycleState(state, detail || {});
+        if (state === 'ready') this.finishDocumentOpen(requestToken);
+        if (state === 'error') {
+          this.showDocumentOpenError(
+            requestToken,
+            detail?.message || 'Could not load this document.'
+          );
+        }
+      };
+      this.editor.onSaveStatusChange = (status) => this.uiManager.setSaveStatus(status);
 
       if (this.uiManager) {
         this.uiManager.updateMobileUIState();
@@ -228,7 +283,9 @@ export class App {
 
       if (requestToken !== this.loadDocumentToken) return;
 
-      if (this.hasLoadedEditorContent()) {
+      if (
+        this.editor?.isReadyForUser ? this.editor.isReadyForUser() : this.hasLoadedEditorContent()
+      ) {
         this.finishDocumentOpen(requestToken);
       } else {
         this.uiManager.applyViewState('editor-loading');
@@ -237,11 +294,7 @@ export class App {
     } catch (err) {
       console.error('[App] Failed to load document:', err);
       if (requestToken === this.loadDocumentToken) {
-        this.uiManager.applyViewState('editor-error');
-        this.uiManager.showDocumentOpenError({
-          message: 'Could not load this document.',
-          onRetry: () => this.loadDocument(),
-        });
+        this.showDocumentOpenError(requestToken, 'Could not load this document.');
       }
     } finally {
       clearTimeout(slowLoadTimer);
@@ -253,6 +306,7 @@ export class App {
   }
 
   hasLoadedEditorContent() {
+    if (this.editor?.hasLoadedDocumentContent?.()) return true;
     if (this.editor?.yPages?.length > 0) return true;
 
     const pagesContainer = document.getElementById('pagesContainer');
@@ -260,11 +314,35 @@ export class App {
   }
 
   finishDocumentOpen(requestToken) {
-    if (requestToken !== this.loadDocumentToken || !this.hasLoadedEditorContent()) return;
+    if (requestToken !== this.loadDocumentToken) return;
+    if (this.editor?.isReadyForUser && !this.editor.isReadyForUser()) return;
+    if (!this.editor?.isReadyForUser && !this.hasLoadedEditorContent()) return;
 
     this.uiManager.applyViewState('editor-ready');
     this.uiManager.clearOpeningDocumentState();
-    console.log('[App] Editor content ready for docId=', this.documentId);
+    this.uiManager.setSaveStatus('saved');
+    this.logLifecycle('editor-ready', { docId: this.documentId });
+  }
+
+  showDocumentOpenError(requestToken, message) {
+    if (requestToken !== this.loadDocumentToken) return;
+    this.uiManager.applyViewState('editor-error');
+    this.setDocumentLifecycleState('error', { description: message });
+    this.uiManager.showDocumentOpenError({
+      message,
+      onRetry: () => this.loadDocument(),
+      onBack: () => {
+        this.loadDocumentToken++;
+        if (this.editor) {
+          this.editor.destroy();
+          this.editor = null;
+        }
+        this.documentId = null;
+        window.history.pushState({ view: 'library' }, '', window.location.pathname);
+        this.libraryManager.showLibrary();
+      },
+    });
+    this.logLifecycle('open-failed', { docId: this.documentId, message });
   }
 
   showTransitionOverlay(text = 'Loading...') {

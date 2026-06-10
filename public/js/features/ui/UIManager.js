@@ -5,6 +5,11 @@ import { escapeHTML } from '/js/app/utils.js';
 export class UIManager {
   constructor(app) {
     this.app = app;
+    this.connectionStatusTimer = null;
+    this.connectionCurrentStatus = null;
+    this.connectionPendingStatus = null;
+    this.saveStatusTimer = null;
+    this.documentOpenState = 'idle';
   }
 
   setupEventListeners() {
@@ -115,21 +120,6 @@ export class UIManager {
     });
 
     // Save and Save As
-    addEvent('saveBtn', 'click', () => {
-      const saveBtn = document.getElementById('saveBtn');
-      const originalText = saveBtn.innerHTML;
-      saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved';
-      saveBtn.style.background = '#10b981';
-
-      // Yjs autosaves, so this is just visual feedback
-      // We could force a save via API if we wanted to be sure
-
-      setTimeout(() => {
-        saveBtn.innerHTML = originalText;
-        saveBtn.style.background = '';
-      }, 2000);
-    });
-
     addEvent('saveAsBtn', 'click', async () => {
       alert('Save As is currently disabled during migration to Real-time engine.');
       // Needs to be re-implemented to copy Yjs state
@@ -373,6 +363,7 @@ export class UIManager {
   setOpeningDocumentState() {
     this.showSkeleton(true);
     this.showSkeletonMessage(false);
+    this.setDocumentOpenState('loading-document');
 
     const error = document.getElementById('editorOpenError');
     if (error) error.hidden = true;
@@ -381,6 +372,7 @@ export class UIManager {
   clearOpeningDocumentState() {
     this.showSkeletonMessage(false);
     this.showSkeleton(false);
+    this.setDocumentOpenState('ready');
   }
 
   showSkeleton(visible) {
@@ -404,18 +396,54 @@ export class UIManager {
     messageEl.hidden = !visible;
   }
 
-  showDocumentOpenError({ message, onRetry }) {
+  setDocumentOpenState(state, options = {}) {
+    this.documentOpenState = state;
+    document.body.dataset.documentOpenState = state;
+
+    const skeleton = document.getElementById('editorSkeleton');
+    const statusEl = document.getElementById('editorSkeletonStatus');
+    const titleEl = document.getElementById('editorSkeletonTitle');
+    const descEl = document.getElementById('editorSkeletonDescription');
+
+    const copy = {
+      idle: ['Preparing editor...', 'Getting your workspace ready.'],
+      'creating-document': ['Creating document...', 'Setting up a blank page.'],
+      'loading-document': ['Opening document...', 'Loading document content.'],
+      connecting: ['Connecting...', 'Starting real-time sync.'],
+      syncing: ['Syncing...', 'Applying the latest document state.'],
+      ready: ['Synced', 'Your document is ready.'],
+      error: ['Could not open document', 'Try again or return to the dashboard.'],
+    };
+
+    const [title, description] = copy[state] || copy.idle;
+    if (statusEl) statusEl.textContent = options.status || title;
+    if (titleEl) titleEl.textContent = options.title || title;
+    if (descEl) descEl.textContent = options.description || description;
+
+    if (skeleton) {
+      skeleton.dataset.openState = state;
+      if (state !== 'ready') this.showSkeleton(true);
+    }
+  }
+
+  showDocumentOpenError({ message, onRetry, onBack }) {
     this.showSkeleton(true);
     this.showSkeletonMessage(false);
+    this.setDocumentOpenState('error', {
+      title: 'Could not open document',
+      description: message,
+    });
 
     const skeleton = document.getElementById('editorSkeleton');
     const error = document.getElementById('editorOpenError');
     const errorMessage = document.getElementById('editorOpenErrorMessage');
     const retryBtn = document.getElementById('editorOpenRetry');
+    const backBtn = document.getElementById('editorOpenBack');
 
     if (skeleton) skeleton.classList.add('has-error');
     if (errorMessage) errorMessage.textContent = message;
     if (retryBtn) retryBtn.onclick = onRetry;
+    if (backBtn) backBtn.onclick = onBack;
     if (error) error.hidden = false;
   }
 
@@ -514,17 +542,81 @@ export class UIManager {
     if (overlay) overlay.style.display = 'none';
     if (!badge) return;
 
+    if (this.connectionStatusTimer) {
+      clearTimeout(this.connectionStatusTimer);
+      this.connectionStatusTimer = null;
+    }
+
+    this.connectionPendingStatus = status;
+    const delay = status === 'connected' || status === 'offline' ? 0 : 800;
+
+    if (delay > 0) {
+      this.connectionStatusTimer = setTimeout(() => {
+        this.connectionStatusTimer = null;
+        if (this.connectionPendingStatus === status) {
+          this.renderConnectionStatus(status);
+        }
+      }, delay);
+      return;
+    }
+
+    this.renderConnectionStatus(status);
+  }
+
+  renderConnectionStatus(status) {
+    const badge = document.getElementById('connectionBadge');
+    if (!badge) return;
+
     const stateMap = {
-      connecting: 'Connecting...',
+      connecting: 'Connecting',
       connected: 'Connected',
-      reconnecting: 'Reconnecting...',
-      disconnected: 'Reconnecting...',
+      reconnecting: 'Reconnecting',
+      disconnected: 'Reconnecting',
       offline: 'Offline',
-      syncing: 'Syncing...',
+      syncing: 'Syncing',
+      savingLocal: 'Saving locally',
     };
 
-    badge.textContent = stateMap[status] || 'Connecting...';
+    this.connectionCurrentStatus = status;
+    badge.textContent = stateMap[status] || 'Connecting';
     badge.dataset.status = status;
     badge.hidden = false;
+  }
+
+  setSaveStatus(status) {
+    const indicator = document.getElementById('saveStatusIndicator');
+    if (!indicator) return;
+
+    if (this.saveStatusTimer) {
+      clearTimeout(this.saveStatusTimer);
+      this.saveStatusTimer = null;
+    }
+
+    const stateMap = {
+      saved: 'Saved',
+      saving: 'Saving...',
+      unsaved: 'Unsaved changes',
+      offline: 'Offline changes saved locally',
+      failed: 'Save failed',
+    };
+
+    indicator.textContent = stateMap[status] || stateMap.saved;
+    indicator.dataset.status = status;
+    indicator.hidden = false;
+
+    if (status === 'saving') {
+      this.saveStatusTimer = setTimeout(() => {
+        if (indicator.dataset.status === 'saving') {
+          this.setSaveStatus('saved');
+        }
+      }, 1200);
+    }
+  }
+
+  cleanupTimers() {
+    if (this.connectionStatusTimer) clearTimeout(this.connectionStatusTimer);
+    if (this.saveStatusTimer) clearTimeout(this.saveStatusTimer);
+    this.connectionStatusTimer = null;
+    this.saveStatusTimer = null;
   }
 }

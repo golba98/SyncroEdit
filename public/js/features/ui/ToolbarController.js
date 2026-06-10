@@ -88,8 +88,7 @@ export class ToolbarController extends Plugin {
     if (saveBtn) {
       this.addDisposableListener(saveBtn, 'click', async (e) => {
         e.preventDefault();
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        this.editor?._setSaveStatus?.('saving');
 
         try {
           // Force save to IndexedDB
@@ -102,16 +101,10 @@ export class ToolbarController extends Plugin {
             }
           }
 
-          saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved';
-          setTimeout(() => {
-            saveBtn.innerHTML = originalText;
-          }, 2000);
+          this.editor?._setSaveStatus?.(navigator.onLine === false ? 'offline' : 'saved');
         } catch (err) {
           console.error('Save failed:', err);
-          saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
-          setTimeout(() => {
-            saveBtn.innerHTML = originalText;
-          }, 2000);
+          this.editor?._setSaveStatus?.('failed');
         }
       });
     }

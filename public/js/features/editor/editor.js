@@ -30,6 +30,9 @@ export class Editor {
     this.onStatusChange = options.onStatusChange || (() => {});
     this.onCollaboratorsChange = options.onCollaboratorsChange || (() => {});
     this.onContentReady = options.onContentReady || (() => {});
+    this.onLifecycleChange = options.onLifecycleChange || (() => {});
+    this.onSaveStatusChange = options.onSaveStatusChange || (() => {});
+    this.isNewDocument = Boolean(options.isNewDocument);
 
     this.initQuill();
 
@@ -52,6 +55,9 @@ export class Editor {
     this._reconnectAttempts = 0;
     this._syncTimeout = null;
     this._hasReceivedInitialSync = false;
+    this._hasLoadedDocumentContent = false;
+    this._readyForUser = false;
+    this._lastSaveStatus = 'saved';
 
     // Ready promise — resolves when pages first render, or after 10s safety fallback
     this._isReady = false;
@@ -59,7 +65,7 @@ export class Editor {
     this.ready = new Promise((resolve) => {
       this._readyResolve = resolve;
     });
-    setTimeout(() => {
+    this._readySafetyTimer = setTimeout(() => {
       if (this._readyResolve) this._readyResolve();
     }, 10000);
 
@@ -79,6 +85,7 @@ export class Editor {
     this.setupGlobalListeners();
 
     // 1. Instant Load from IndexedDB
+    this._emitLifecycle('loading-document');
     this.loadFromCache(docId).then(() => {
       // Only connect after cache check (or concurrently, but we apply cache first)
       this.connectWebSocket(docId, user);
@@ -89,12 +96,17 @@ export class Editor {
     });
 
     // Persistence: Save to IndexedDB on every update (debounced)
-    this.doc.on(
-      'update',
-      debounce(() => {
-        this.saveToCache(docId);
-      }, 1000)
-    );
+    if (typeof this.doc.on === 'function') {
+      this.doc.on(
+        'update',
+        debounce(() => {
+          this._setSaveStatus('saving');
+          this.saveToCache(docId)
+            .then(() => this._setSaveStatus(navigator.onLine === false ? 'offline' : 'saved'))
+            .catch(() => this._setSaveStatus('failed'));
+        }, 1000)
+      );
+    }
 
     // Persistence: Save immediately on close
     window.addEventListener('beforeunload', () => {
@@ -192,6 +204,11 @@ export class Editor {
         console.log('[Editor] cache hit for docId=', docId);
         Y.applyUpdate(this.doc, cachedUpdate);
         this.renderAllPages();
+        this._hasLoadedDocumentContent = this.yPages.length > 0;
+        this._emitLifecycle('loading-document', {
+          title: 'Opening cached document...',
+          description: 'Showing local content while sync starts.',
+        });
 
         // Restore View State
         const savedView = localStorage.getItem(`doc-view-${docId}`);
@@ -387,7 +404,22 @@ export class Editor {
         wsconnecting: Boolean(this.provider?.wsconnecting),
         synced: Boolean(this.provider?.synced),
       });
+      if (this.yPages.length > 0) {
+        this._emitLifecycle('ready', {
+          title: 'Offline editing enabled',
+          description:
+            'Document content loaded locally. Changes will sync when the connection returns.',
+        });
+        this.onStatusChange('offline');
+        this._setSaveStatus('offline');
+        this._markReadyForUser('local-cache-timeout');
+        return;
+      }
+
       this._showSyncError();
+      this._emitLifecycle('error', {
+        message: 'Could not connect to the document server.',
+      });
       if (this._readyResolve) this._readyResolve();
     }, 15000);
   }
@@ -395,6 +427,7 @@ export class Editor {
   async connectWebSocket(docId, user) {
     console.log('[Editor] connectWebSocket docId=', docId);
     if (!docId || this._destroyed) return null;
+    this._emitLifecycle('connecting');
     if (user) this.user = user;
     this.currentDocId = docId;
 
@@ -468,6 +501,7 @@ export class Editor {
       this.onStatusChange(status);
       if (status === 'connected') {
         this._reconnectAttempts = 0;
+        this._emitLifecycle('syncing');
       }
     });
 
@@ -526,6 +560,7 @@ export class Editor {
           this.switchToPage(0, 'start');
         }
         this.saveToCache(docId);
+        this._markReadyForUser('initial-sync');
       }
     });
 
@@ -566,6 +601,10 @@ export class Editor {
     console.log('[Editor] destroy docId=', this.currentDocId);
     this._destroyed = true;
     this._connectionGeneration++;
+    if (this._readySafetyTimer) {
+      clearTimeout(this._readySafetyTimer);
+      this._readySafetyTimer = null;
+    }
     this._destroyProvider();
     if (this.observer) {
       this.observer.disconnect();
@@ -860,8 +899,57 @@ export class Editor {
     }
 
     if (this.yPages.length > 0) {
+      this._hasLoadedDocumentContent = true;
       this.onContentReady();
     }
+  }
+
+  _emitLifecycle(state, detail = {}) {
+    if (this._destroyed) return;
+    this.onLifecycleChange(state, detail);
+  }
+
+  _setSaveStatus(status) {
+    if (this._lastSaveStatus === status) return;
+    this._lastSaveStatus = status;
+    this.onSaveStatusChange(status);
+  }
+
+  hasLoadedDocumentContent() {
+    return this._hasLoadedDocumentContent || this.yPages.length > 0;
+  }
+
+  isReadyForUser() {
+    return this._readyForUser;
+  }
+
+  _markReadyForUser(reason) {
+    if (this._readyForUser || this._destroyed) return;
+    this._readyForUser = true;
+    this._hasLoadedDocumentContent = this.yPages.length > 0;
+    this._applyReadyPlaceholders();
+    this._emitLifecycle('ready', {
+      title: reason === 'initial-sync' ? 'Synced' : 'Ready',
+      description:
+        reason === 'initial-sync'
+          ? 'The latest document state is ready.'
+          : 'Document content is available locally.',
+    });
+    if (this._readyResolve) this._readyResolve();
+    this.onContentReady();
+
+    requestAnimationFrame(() => {
+      if (this._destroyed || !this.quill) return;
+      try {
+        this.quill.focus();
+      } catch {}
+    });
+  }
+
+  _applyReadyPlaceholders() {
+    this.container
+      ?.querySelectorAll('.ql-editor')
+      .forEach((editorEl) => editorEl.setAttribute('data-placeholder', 'Start typing...'));
   }
 
   registerPlugin(PluginClass, options = {}) {
@@ -935,7 +1023,7 @@ export class Editor {
 
     const pageQuill = new Quill(`#editor-${pageId}`, {
       theme: 'snow',
-      placeholder: 'Start typing...',
+      placeholder: this._readyForUser ? 'Start typing...' : '',
       modules: {
         toolbar: false,
         syntax: { highlight: (text) => hljs.highlightAuto(text).value },

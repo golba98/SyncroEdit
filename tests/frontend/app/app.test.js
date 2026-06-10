@@ -32,10 +32,25 @@ describe('App Core Initialization', () => {
       <div id="docLibrary"></div>
       <div id="libraryOverlay"></div>
       <button id="closeLibrary"></button>
+      <div id="createNewDoc"><i class="fas fa-plus"></i></div>
+      <input id="docSearch" />
       <div id="documentList"></div>
       <div id="activeCollaborators"></div>
       <div id="connectionBadge" hidden></div>
+      <div id="saveStatusIndicator"></div>
       <div id="serverOfflineOverlay"></div>
+      <div id="editorSkeleton" class="hidden">
+        <div id="editorSkeletonStatus"></div>
+        <div id="editorSkeletonTitle"></div>
+        <div id="editorSkeletonDescription"></div>
+        <div id="editorSkeletonMessage" hidden></div>
+        <div id="editorOpenError" hidden>
+          <div id="editorOpenErrorMessage"></div>
+          <button id="editorOpenRetry"></button>
+          <button id="editorOpenBack"></button>
+        </div>
+      </div>
+      <div id="pagesContainer"></div>
       
       <div id="userProfileTrigger">
         <img id="headerPfp" />
@@ -62,6 +77,13 @@ describe('App Core Initialization', () => {
     // Default Network mocks
     Network.getDocuments.mockResolvedValue({ documents: [] });
     Network.addToRecent.mockResolvedValue({});
+    Network.createDocument.mockResolvedValue({ _id: 'new-doc' });
+
+    window.matchMedia = jest.fn().mockReturnValue({
+      matches: true,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    });
 
     // Mock URLSearchParams globally
     global.URLSearchParams = jest.fn(() => ({
@@ -156,7 +178,7 @@ describe('App Core Initialization', () => {
 
       expect(overlay.style.display).toBe('none');
       expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Connecting...');
+      expect(badge.textContent).toBe('Connecting');
       expect(badge.dataset.status).toBe('connecting');
     } finally {
       jest.useRealTimers();
@@ -178,5 +200,115 @@ describe('App Core Initialization', () => {
     await new Promise(process.nextTick);
 
     expect(Profile.prototype.loadProfile).toHaveBeenCalledWith({ silent: true });
+  });
+
+  it('prevents duplicate blank document creation while opening', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.loadDocument = jest.fn().mockResolvedValue();
+
+    const pendingCreate = new Promise((resolve) => {
+      setTimeout(() => resolve({ _id: 'new-doc' }), 20);
+    });
+    Network.createDocument.mockReturnValue(pendingCreate);
+
+    const first = app.libraryManager.createNewDocument();
+    const second = app.libraryManager.createNewDocument();
+    await Promise.resolve();
+
+    expect(Network.createDocument).toHaveBeenCalledTimes(1);
+    await Promise.all([first, second]);
+    expect(app.loadDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents duplicate recent document opens while opening', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.loadDocument = jest.fn().mockResolvedValue();
+
+    const first = app.libraryManager.openDocument('doc-1');
+    const second = app.libraryManager.openDocument('doc-1');
+
+    await Promise.all([first, second]);
+    expect(app.loadDocument).toHaveBeenCalledTimes(1);
+    expect(app.documentId).toBe('doc-1');
+  });
+
+  it('does not show reconnect status before the delay', () => {
+    jest.useFakeTimers();
+    try {
+      const app = new App();
+      const badge = document.getElementById('connectionBadge');
+
+      app.handleWSStatusChange('reconnecting');
+      jest.advanceTimersByTime(799);
+
+      expect(badge.hidden).toBe(true);
+      expect(badge.textContent).toBe('');
+
+      jest.advanceTimersByTime(1);
+
+      expect(badge.hidden).toBe(false);
+      expect(badge.textContent).toBe('Reconnecting');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not flicker connecting status on quick connect', () => {
+    jest.useFakeTimers();
+    try {
+      const app = new App();
+      const badge = document.getElementById('connectionBadge');
+
+      app.handleWSStatusChange('connecting');
+      jest.advanceTimersByTime(200);
+      app.handleWSStatusChange('connected');
+      jest.advanceTimersByTime(1000);
+
+      expect(badge.hidden).toBe(false);
+      expect(badge.textContent).toBe('Connected');
+      expect(badge.dataset.status).toBe('connected');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('shows retry and back actions for document open errors', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    const retry = jest.fn();
+    const back = jest.fn();
+
+    app.uiManager.showDocumentOpenError({
+      message: 'Open failed',
+      onRetry: retry,
+      onBack: back,
+    });
+
+    expect(document.getElementById('editorOpenError').hidden).toBe(false);
+    expect(document.getElementById('editorOpenErrorMessage').textContent).toBe('Open failed');
+
+    document.getElementById('editorOpenRetry').click();
+    document.getElementById('editorOpenBack').click();
+
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it('cleanup cancels pending connection status timers', () => {
+    jest.useFakeTimers();
+    try {
+      const app = new App();
+      const badge = document.getElementById('connectionBadge');
+
+      app.handleWSStatusChange('reconnecting');
+      app.uiManager.cleanupTimers();
+      jest.advanceTimersByTime(1000);
+
+      expect(badge.hidden).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
