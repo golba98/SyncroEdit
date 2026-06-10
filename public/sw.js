@@ -1,4 +1,4 @@
-const CACHE_NAME = 'syncroedit-v4';
+const CACHE_NAME = 'syncroedit-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

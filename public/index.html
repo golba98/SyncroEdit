@@ -27,17 +27,28 @@
       href="https://cdn.jsdelivr.net/gh/bitmaks/cm-web-fonts@latest/fonts.css"
     />
     <style id="critical-boot-styles">
-      /* Initial critical styles to prevent FOUC (Flash of Unstyled Content) */
+      /* Initial critical styles to prevent FOUC (Flash of Unstyled Content).
+         NOTE: dashboard state is included here so editor chrome is hidden even
+         before styles.css finishes loading (e.g. on a slow connection or after
+         a stale service-worker cache miss). */
       body[data-view-state='booting'] .header,
       body[data-view-state='booting'] .ribbon-tabs,
       body[data-view-state='booting'] .ribbon-content,
       body[data-view-state='booting'] .main-workspace,
       body[data-view-state='booting'] .page-navigator,
+      body[data-view-state='booting'] #editorSkeleton,
       body[data-view-state='auth'] .header,
       body[data-view-state='auth'] .ribbon-tabs,
       body[data-view-state='auth'] .ribbon-content,
       body[data-view-state='auth'] .main-workspace,
-      body[data-view-state='auth'] .page-navigator {
+      body[data-view-state='auth'] .page-navigator,
+      body[data-view-state='auth'] #editorSkeleton,
+      body[data-view-state='dashboard'] .header,
+      body[data-view-state='dashboard'] .ribbon-tabs,
+      body[data-view-state='dashboard'] .ribbon-content,
+      body[data-view-state='dashboard'] .main-workspace,
+      body[data-view-state='dashboard'] .page-navigator,
+      body[data-view-state='dashboard'] #editorSkeleton {
         display: none !important;
       }
 
