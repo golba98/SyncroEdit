@@ -313,6 +313,8 @@ export class App {
     this.logLifecycle('document-open-start', { docId, mode });
 
     if (!this.isEditorReadyForCurrentDocument()) {
+      const loaderText = mode === 'creating' ? 'Creating document...' : 'Opening document...';
+      this.uiManager.showDocumentOpeningLoader(loaderText);
       this.setDocumentLifecycleState(mode);
       this.uiManager.applyViewState('opening-document');
       this.uiManager.setOpeningDocumentState();

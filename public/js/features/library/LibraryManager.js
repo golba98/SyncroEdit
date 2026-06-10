@@ -212,6 +212,7 @@ export class LibraryManager {
 
     try {
       this.app.setDocumentLifecycleState?.('creating');
+      this.app.uiManager?.showDocumentOpeningLoader('Creating document...');
       this.app.uiManager?.applyViewState('opening-document');
       this.app.uiManager?.setOpeningDocumentState();
       await this.startEditorTransition();
@@ -263,6 +264,7 @@ export class LibraryManager {
       this.app.openingDocumentId = docId;
       this.markDocumentOpening(docId);
       this.app.setDocumentLifecycleState?.('opening');
+      this.app.uiManager?.showDocumentOpeningLoader('Opening document...');
       this.app.uiManager?.applyViewState('opening-document');
       this.app.uiManager?.setOpeningDocumentState();
       await this.startEditorTransition();
@@ -297,16 +299,23 @@ export class LibraryManager {
 
     // Cleanup after animation finishes, but don't block the main flow
     setTimeout(() => {
+      const isStillOpening = document.body.dataset.viewState === 'opening-document';
       if (library) {
         library.classList.remove('view-exiting');
-        // Only hide if we are not back on the dashboard
-        if (!document.body.dataset.viewState || document.body.dataset.viewState !== 'dashboard') {
+        // Only hide if we are not back on the dashboard AND not currently opening a document
+        if (
+          !document.body.dataset.viewState ||
+          (document.body.dataset.viewState !== 'dashboard' && !isStillOpening)
+        ) {
           library.style.display = 'none';
         }
       }
       if (overlay) {
         overlay.classList.remove('view-exiting');
-        if (!document.body.dataset.viewState || document.body.dataset.viewState !== 'dashboard') {
+        if (
+          !document.body.dataset.viewState ||
+          (document.body.dataset.viewState !== 'dashboard' && !isStillOpening)
+        ) {
           overlay.style.display = 'none';
         }
       }

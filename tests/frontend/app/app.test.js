@@ -760,7 +760,7 @@ describe('App Core Initialization', () => {
           updateMobileUIState: jest.fn(),
         },
       };
-      document.body.dataset.viewState = 'opening-document';
+      document.body.dataset.viewState = 'editor-ready';
       const lm = new LibraryManager(mockApp);
       const library = document.getElementById('docLibrary');
       const overlay = document.getElementById('libraryOverlay');
