@@ -204,7 +204,9 @@
       <div class="document-opening-card">
         <div class="document-opening-icon">✦</div>
         <div id="documentOpeningTitle" class="document-opening-title">Opening document...</div>
-        <div id="documentOpeningSubtitle" class="document-opening-subtitle">Preparing your workspace</div>
+        <div id="documentOpeningSubtitle" class="document-opening-subtitle">
+          Preparing your workspace
+        </div>
         <div class="document-opening-bar">
           <span></span>
         </div>
@@ -2524,6 +2526,16 @@
 
     <!-- Main Workspace -->
     <div class="main-workspace">
+      <!-- Editor Workspace Loader (shows centered card above the workspace area when document is opening) -->
+      <div id="editorWorkspaceLoader" class="editor-workspace-loader" hidden>
+        <div class="editor-workspace-loader-card">
+          <div class="loader-document-icon">⌁</div>
+          <div class="loader-title">Opening document...</div>
+          <div class="loader-subtitle">Preparing your workspace</div>
+          <div class="loader-progress"><span></span></div>
+        </div>
+      </div>
+
       <!-- Editor Skeleton (shown inside the editor workspace during document load) -->
       <div id="editorSkeleton" class="editor-skeleton hidden">
         <div class="skeleton-toolbar">
