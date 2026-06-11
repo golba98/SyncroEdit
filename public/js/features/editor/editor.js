@@ -515,7 +515,6 @@ export class Editor {
       if (status === 'connected') {
         this._reconnectAttempts = 0;
         if (!this._readyForUser) {
-          console.log('[OPEN] initial sync');
           this._emitLifecycle('syncing');
         } else {
           console.log('[CONNECTION] reconnect after ready - non blocking');

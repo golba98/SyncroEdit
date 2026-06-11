@@ -28,6 +28,13 @@ export class App {
     this.saveState = 'saved';
     this.hasReachedEditorReady = false;
     this.readyDocumentId = null;
+    this.documentContentLoaded = false;
+    this.initialSyncReceived = false;
+    this.isNewBlankDocument = false;
+    this.pendingWebSocketConnectedLog = false;
+    this.hasLoggedWebSocketConnected = false;
+    this.pendingInitialSyncLog = false;
+    this.hasLoggedInitialSync = false;
 
     // Offline Indicator
     window.addEventListener('offline', () => this.showOfflineIndicator(true));
@@ -212,9 +219,12 @@ export class App {
 
   setDocumentLifecycleState(state, options = {}) {
     const nextLoadState = this.normalizeDocumentLoadState(state);
-    const isFullLoadingState = ['opening', 'loading-content', 'initial-syncing'].includes(
-      nextLoadState
-    );
+    const isFullLoadingState = [
+      'opening',
+      'creating',
+      'loading-content',
+      'initial-syncing',
+    ].includes(nextLoadState);
 
     if (this.isEditorReadyForCurrentDocument() && isFullLoadingState) {
       console.log('[CONNECTION] suppressed full loader after ready', {
@@ -242,8 +252,13 @@ export class App {
       return;
     }
 
+    if (state === 'ready') {
+      this.initialSyncReceived = true;
+      this.logInitialSyncReceived(requestToken);
+      this.maybeMarkEditorReady(requestToken, 'editor-lifecycle-ready');
+      return;
+    }
     this.setDocumentLifecycleState(state, detail || {});
-    if (state === 'ready') this.finishDocumentOpen(requestToken);
     if (state === 'error') {
       this.showDocumentOpenError(requestToken, detail?.message || 'Could not load this document.');
     }
@@ -267,9 +282,7 @@ export class App {
 
     if (status === 'connected') {
       this.logLifecycle('websocket-connected', { docId });
-      console.log('[OPEN] websocket connected');
-      console.log('[OPEN] initial sync');
-      this.setDocumentLifecycleState('initial-syncing');
+      this.logWebSocketConnected(this.loadDocumentToken);
     } else if (status === 'connecting') {
       this.setDocumentLifecycleState('initial-syncing');
     } else if (status === 'reconnecting' || status === 'disconnected') {
@@ -298,36 +311,81 @@ export class App {
     console.log('[Lifecycle]', event, details);
   }
 
+  beginDocumentOpen({
+    mode = 'loading-content',
+    docId = this.documentId,
+    isNewDocument = false,
+  } = {}) {
+    const loaderText = mode === 'creating' ? 'Creating document...' : 'Opening document...';
+    const documentState = mode === 'creating' ? 'creating' : 'opening';
+
+    this.openingDocumentId = docId || null;
+    this.hasReachedEditorReady = false;
+    this.readyDocumentId = null;
+    this.documentContentLoaded = false;
+    this.initialSyncReceived = false;
+    this.isNewBlankDocument = Boolean(isNewDocument || mode === 'creating');
+    this.pendingWebSocketConnectedLog = false;
+    this.hasLoggedWebSocketConnected = false;
+    this.pendingInitialSyncLog = false;
+    this.hasLoggedInitialSync = false;
+    this.documentLoadState = documentState;
+    this.documentLifecycleState = documentState;
+
+    document.body.dataset.editorReady = 'false';
+    document.body.dataset.documentState = documentState;
+    document.body.dataset.documentOpenState = documentState;
+
+    if (this.uiManager) {
+      this.uiManager.hasShownEditorReady = false;
+      this.uiManager.showEditorWorkspaceLoader(loaderText, 'Preparing your workspace');
+      this.uiManager.showDocumentOpeningLoader(loaderText);
+    }
+
+    console.log('[OPEN] loader visible', { token: this.loadDocumentToken });
+  }
+
+  logWebSocketConnected(requestToken) {
+    if (this.hasLoggedWebSocketConnected) return;
+    if (!this.documentContentLoaded) {
+      this.pendingWebSocketConnectedLog = true;
+      return;
+    }
+    this.hasLoggedWebSocketConnected = true;
+    this.pendingWebSocketConnectedLog = false;
+    console.log('[OPEN] websocket connected', { token: requestToken });
+  }
+
+  logInitialSyncReceived(requestToken) {
+    if (this.hasLoggedInitialSync) return;
+    if (!this.documentContentLoaded) {
+      this.pendingInitialSyncLog = true;
+      return;
+    }
+    if (this.pendingWebSocketConnectedLog) {
+      this.logWebSocketConnected(requestToken);
+    }
+    this.hasLoggedInitialSync = true;
+    this.pendingInitialSyncLog = false;
+    console.log('[OPEN] initial sync received', { token: requestToken });
+  }
+
   async loadDocument(options = {}) {
-    console.log('[BOOT] opening document');
+    console.log('[OPEN] opening document');
     const docId = this.documentId;
     if (!docId) return;
 
     const mode = options.mode || 'loading-content';
     const requestToken = ++this.loadDocumentToken;
-    const isDifferentDocument =
-      this.readyDocumentId !== docId || this.editor?.currentDocId !== docId;
+    const type = mode === 'creating' ? 'create-document' : 'open-document';
     this.openingDocumentId = docId;
-    if (isDifferentDocument) {
-      this.hasReachedEditorReady = false;
-      this.readyDocumentId = null;
-    }
+    this.beginDocumentOpen({ mode, docId, isNewDocument: Boolean(options.isNewDocument) });
+    console.log('[OPEN] start', { token: requestToken, type, docId });
     this.logLifecycle('document-open-start', { docId, mode });
 
-    if (!this.isEditorReadyForCurrentDocument()) {
-      const loaderText = mode === 'creating' ? 'Creating document...' : 'Opening document...';
-      // Pre-set body dataset so CSS body-state rules and preventBlackEditorLoadingState
-      // can react immediately — before the JS state machine fully wires up.
-      document.body.dataset.documentState = mode === 'creating' ? 'creating' : 'opening';
-      document.body.dataset.editorReady = 'false';
-      this.uiManager.showEditorWorkspaceLoader(loaderText, 'Preparing your workspace');
-      this.uiManager.showDocumentOpeningLoader(loaderText);
-      this.setDocumentLifecycleState(mode);
-      this.uiManager.applyViewState('opening-document');
-      this.uiManager.setOpeningDocumentState();
-    } else {
-      console.log('[CONNECTION] suppressed full loader after ready', { requestedState: mode });
-    }
+    this.setDocumentLifecycleState(mode);
+    this.uiManager.applyViewState('opening-document');
+    this.uiManager.setOpeningDocumentState();
     this.uiManager.handleWSStatusChange('connecting');
 
     // Safety timeout to clear stuck opening states after 10 seconds
@@ -359,7 +417,7 @@ export class App {
           user: this.user,
           isNewDocument: Boolean(options.isNewDocument),
           onPageChange: (index) => this.uiManager.updateStatus(index),
-          onContentReady: () => this.finishDocumentOpen(requestToken),
+          onContentReady: () => this.handleEditorContentReady(requestToken),
           onLifecycleChange: (state, detail) =>
             this.handleEditorLifecycleChange(state, detail, requestToken),
           onSaveStatusChange: (status) => this.setSaveState(status),
@@ -390,7 +448,7 @@ export class App {
         this.logLifecycle('editor-created', { docId });
       }
 
-      this.editor.onContentReady = () => this.finishDocumentOpen(requestToken);
+      this.editor.onContentReady = () => this.handleEditorContentReady(requestToken);
       this.editor.onLifecycleChange = (state, detail) =>
         this.handleEditorLifecycleChange(state, detail, requestToken);
       this.editor.onSaveStatusChange = (status) => this.setSaveState(status);
@@ -405,12 +463,22 @@ export class App {
 
       if (requestToken !== this.loadDocumentToken) return;
 
-      console.log('[OPEN] document loaded');
+      this.documentContentLoaded = true;
+      console.log('[OPEN] document loaded', { token: requestToken });
+      if (this.pendingWebSocketConnectedLog) {
+        this.logWebSocketConnected(requestToken);
+      }
+      if (this.pendingInitialSyncLog) {
+        this.logInitialSyncReceived(requestToken);
+      }
 
       if (
         this.editor?.isReadyForUser ? this.editor.isReadyForUser() : this.hasLoadedEditorContent()
       ) {
-        this.finishDocumentOpen(requestToken);
+        if (this.editor?.isReadyForUser?.()) {
+          this.initialSyncReceived = true;
+        }
+        this.maybeMarkEditorReady(requestToken, 'document-loaded');
       } else {
         if (!this.isEditorReadyForCurrentDocument()) {
           this.uiManager.applyViewState('opening-document');
@@ -441,10 +509,61 @@ export class App {
     return Boolean(pagesContainer?.querySelector('.editor-container:not(.loading-placeholder)'));
   }
 
-  finishDocumentOpen(requestToken) {
+  handleEditorContentReady(requestToken) {
     if (requestToken !== this.loadDocumentToken) return;
-    if (this.editor?.isReadyForUser && !this.editor.isReadyForUser()) return;
-    if (!this.editor?.isReadyForUser && !this.hasLoadedEditorContent()) return;
+    if (this.hasLoadedEditorContent()) {
+      this.maybeMarkEditorReady(requestToken, 'content-ready');
+    }
+  }
+
+  finishDocumentOpen(requestToken) {
+    this.maybeMarkEditorReady(requestToken, 'finish-document-open');
+  }
+
+  maybeMarkEditorReady(requestToken, reason) {
+    if (requestToken !== this.loadDocumentToken) return;
+    if (this.hasReachedEditorReady) return;
+
+    const hasDocument = Boolean(this.documentId);
+    const hasEditorModel = Boolean(this.editor);
+    const pagesContainer = document.getElementById('pagesContainer');
+    const hasPagesContainer = Boolean(pagesContainer);
+    const hasLoadedContent = this.documentContentLoaded && this.hasLoadedEditorContent();
+    const initialSyncDone =
+      this.initialSyncReceived || (this.isNewBlankDocument && this.hasLoadedEditorContent());
+
+    if (!this.documentContentLoaded) {
+      console.warn('[OPEN] blocked editor ready before document loaded', {
+        token: requestToken,
+        reason,
+      });
+      return;
+    }
+
+    if (
+      !hasDocument ||
+      !hasEditorModel ||
+      !hasPagesContainer ||
+      !hasLoadedContent ||
+      !initialSyncDone
+    ) {
+      console.log('[OPEN] not ready yet', {
+        token: requestToken,
+        reason,
+        hasDocument,
+        hasEditorModel,
+        hasPages: hasPagesContainer,
+        hasLoadedContent,
+        initialSyncDone,
+        documentLoadState: this.documentLoadState,
+        connectionState: this.connectionState,
+      });
+      return;
+    }
+
+    if (!this.initialSyncReceived && this.isNewBlankDocument) {
+      console.log('[OPEN] initial sync skipped for new blank doc', { token: requestToken });
+    }
 
     if (this.openingSafetyTimeout) {
       clearTimeout(this.openingSafetyTimeout);
@@ -459,10 +578,9 @@ export class App {
     this.documentLifecycleState = 'ready';
     this.setSaveState('saved');
     this.libraryManager.clearOpeningStates();
-    console.log('[BOOT] editor ready');
-    console.log('[OPEN] ready');
-    console.log('[OPEN] cleanup');
-    this.logLifecycle('editor-ready', { docId: this.documentId });
+    console.log('[OPEN] editor ready', { token: requestToken, reason });
+    console.log('[OPEN] cleanup', { token: requestToken });
+    this.logLifecycle('editor-ready', { docId: this.documentId, token: requestToken, reason });
   }
 
   showDocumentOpenError(requestToken, message) {

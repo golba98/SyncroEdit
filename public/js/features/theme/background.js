@@ -204,7 +204,21 @@ export class DynamicBackground {
 
   createParticles() {
     this.particles = [];
-    const theme = this.themes[this.currentTheme];
+    const theme = this.themes[this.currentTheme] ||
+      this.themes.dots || {
+        particleCount: 40,
+        connectionDistance: 100,
+        mouseDistance: 180,
+        baseSpeed: 0.1,
+        sizeRange: [1, 3],
+        type: 'dots',
+      };
+
+    if (!this.themes[this.currentTheme]) {
+      console.warn('[THEME] Missing background theme, using fallback', {
+        requestedTheme: this.currentTheme,
+      });
+    }
 
     for (let i = 0; i < theme.particleCount; i++) {
       const size = Math.random() * (theme.sizeRange[1] - theme.sizeRange[0]) + theme.sizeRange[0];
