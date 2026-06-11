@@ -163,7 +163,12 @@ export class ReadabilityManager extends Plugin {
     if (!quill) return;
 
     const lines = quill.getLines();
-    gutter.innerHTML = lines.map((_, i) => `<div>${i + 1}</div>`).join('');
+    const lineNumberElements = lines.map((_, i) => {
+      const lineNumber = document.createElement('div');
+      lineNumber.textContent = String(i + 1);
+      return lineNumber;
+    });
+    gutter.replaceChildren(...lineNumberElements);
   }
 
   applyPageGlow() {

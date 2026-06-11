@@ -1,4 +1,4 @@
-const CACHE_NAME = 'syncroedit-v6';
+const CACHE_NAME = 'syncroedit-v7';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -29,13 +29,22 @@ const ASSETS_TO_CACHE = [
   '/pages/forgot-password.html',
   '/pages/reset-password.html',
   '/pages/verify.html',
-  // External CDNs - Cache them for performance/offline
   '/vendor/fontawesome/css/all.min.css',
-  'https://cdn.quilljs.com/1.3.6/quill.snow.css',
-  'https://cdn.quilljs.com/1.3.6/quill.js',
+  '/vendor/quill/quill.snow.css',
+  '/vendor/quill/quill.js',
+  '/vendor/highlight.js/highlight.min.js',
+  '/vendor/highlight.js/styles/monokai-sublime.min.css',
+  '/vendor/mammoth/mammoth.browser.min.js',
+  '/vendor/pdfjs/pdf.min.js',
+  '/vendor/html2pdf/html2pdf.bundle.min.js',
   '/vendor/idb-keyval/index.js',
-  'https://esm.sh/yjs@13.6.28',
-  'https://esm.sh/y-quill@1.0.0?deps=yjs@13.6.28',
+  '/vendor/yjs/process.mjs',
+  '/vendor/yjs/yjs.mjs',
+  '/vendor/yjs/yjs.bundle.mjs',
+  '/vendor/y-quill/y-quill.mjs',
+  '/vendor/y-quill/y-quill.bundle.mjs',
+  '/vendor/fonts/google/fonts.css',
+  '/vendor/fonts/cm-web-fonts/fonts.css',
   '/js/vendor/y-websocket.js',
 ];
 

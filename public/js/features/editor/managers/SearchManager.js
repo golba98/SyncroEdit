@@ -1,5 +1,9 @@
 import { Plugin } from '/js/app/Plugin.js';
 
+export function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export class SearchManager extends Plugin {
   constructor(editor, options) {
     super(editor, options);
@@ -133,8 +137,7 @@ export class SearchManager extends Plugin {
     if (!term) return;
 
     const pages = this.editor.yPages.toArray();
-    // Safe regex escaping
-    const escapedTerm = term.replace(/[.*+?^${}()|[\\]/g, '\$&');
+    const escapedTerm = escapeRegExp(term);
     const regex = new RegExp(escapedTerm, this.isCaseSensitive ? 'g' : 'gi');
 
     pages.forEach((pageMap, pageIndex) => {

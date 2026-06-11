@@ -195,7 +195,9 @@ export class ImageManager extends Plugin {
 
     const createBtn = (icon, action, title) => {
       const btn = document.createElement('button');
-      btn.innerHTML = `<i class="fas ${icon}"></i>`;
+      const btnIcon = document.createElement('i');
+      btnIcon.className = `fas ${icon}`;
+      btn.replaceChildren(btnIcon);
       btn.title = title;
       btn.style.background = 'transparent';
       btn.style.border = 'none';

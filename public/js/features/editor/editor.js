@@ -18,7 +18,7 @@ export class Editor {
   constructor(containerId, options = {}) {
     this.debug = Boolean(options.debug || window.SYNCROEDIT_CONFIG?.DEBUG);
     this.container = document.getElementById(containerId);
-    if (this.container) this.container.innerHTML = ''; // Clear static content
+    if (this.container) this.container.replaceChildren(); // Clear static content
     this.quill = null; // Current active quill
     this.pageQuillInstances = new Map(); // pageId -> Quill
     this.pageBindings = new Map(); // pageId -> QuillBinding
@@ -275,12 +275,12 @@ export class Editor {
 
     localStorage.setItem(`doc-view-${docId}`, JSON.stringify(viewState));
 
-    // Save Instant Preview (HTML Snapshot)
-    // We grab the HTML of the currently active page (or page 0 if possible)
+    // Save Instant Preview (plain text snapshot)
+    // We grab the text of the currently active page (or page 0 if possible)
     // Since we paginate, page 0 is usually the most relevant for "First Contentful Paint".
     // But we can just use the current Quill instance if available.
     if (this.quill && this.currentPageIndex === 0) {
-      localStorage.setItem(`doc-preview-${docId}`, this.quill.root.innerHTML);
+      localStorage.setItem(`doc-preview-${docId}`, this.quill.getText());
     } else {
       // Fallback: Try to find Page 0
       const pages = this.yPages.toArray();
@@ -289,7 +289,7 @@ export class Editor {
         // We need the DOM element
         const firstEditor = document.querySelector(`#editor-${firstPageId} .ql-editor`);
         if (firstEditor) {
-          localStorage.setItem(`doc-preview-${docId}`, firstEditor.innerHTML);
+          localStorage.setItem(`doc-preview-${docId}`, firstEditor.textContent || '');
         }
       }
     }
@@ -590,12 +590,37 @@ export class Editor {
   _showSyncError() {
     const placeholder = this.container?.querySelector('.loading-placeholder');
     if (placeholder) {
-      placeholder.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:16px;color:#888;font-size:14px;">
-          <div style="font-size:32px;color:#e57373;">&#9888;</div>
-          <div>Could not connect to the document server.</div>
-          <button onclick="window.location.reload()" style="padding:8px 20px;background:#333;color:#e0e0e0;border:1px solid #555;border-radius:6px;cursor:pointer;font-size:13px;">Retry</button>
-        </div>`;
+      const errorContainer = document.createElement('div');
+      errorContainer.style.display = 'flex';
+      errorContainer.style.flexDirection = 'column';
+      errorContainer.style.alignItems = 'center';
+      errorContainer.style.justifyContent = 'center';
+      errorContainer.style.height = '300px';
+      errorContainer.style.gap = '16px';
+      errorContainer.style.color = '#888';
+      errorContainer.style.fontSize = '14px';
+
+      const warning = document.createElement('div');
+      warning.style.fontSize = '32px';
+      warning.style.color = '#e57373';
+      warning.textContent = '\u26A0';
+
+      const message = document.createElement('div');
+      message.textContent = 'Could not connect to the document server.';
+
+      const retryButton = document.createElement('button');
+      retryButton.style.padding = '8px 20px';
+      retryButton.style.background = '#333';
+      retryButton.style.color = '#e0e0e0';
+      retryButton.style.border = '1px solid #555';
+      retryButton.style.borderRadius = '6px';
+      retryButton.style.cursor = 'pointer';
+      retryButton.style.fontSize = '13px';
+      retryButton.textContent = 'Retry';
+      retryButton.addEventListener('click', () => window.location.reload());
+
+      errorContainer.append(warning, message, retryButton);
+      placeholder.replaceChildren(errorContainer);
       placeholder.style.opacity = '1';
     }
   }
@@ -635,7 +660,7 @@ export class Editor {
     this.plugins.clear();
     this.pageQuillInstances.clear();
     this.pageBindings.clear();
-    if (this.container) this.container.innerHTML = '';
+    if (this.container) this.container.replaceChildren();
   }
 
   updateUser(user) {
@@ -661,24 +686,45 @@ export class Editor {
     if (document.getElementById(placeholderId)) return;
 
     const docId = new URLSearchParams(window.location.search).get('doc');
-    const previewHtml = localStorage.getItem(`doc-preview-${docId}`);
+    const previewText = localStorage.getItem(`doc-preview-${docId}`);
 
     const newPageContainer = document.createElement('div');
     newPageContainer.className = 'editor-container loading-placeholder';
     newPageContainer.id = placeholderId;
-    newPageContainer.style.opacity = previewHtml ? '0.5' : '0.7'; // Less opacity if we have content
+    newPageContainer.style.opacity = previewText ? '0.5' : '0.7'; // Less opacity if we have content
 
-    const contentHtml = previewHtml || '';
-    const placeholderAttr = previewHtml ? '' : 'data-placeholder="Loading document..."';
+    const pageScaler = document.createElement('div');
+    pageScaler.className = 'page-scaler';
+    pageScaler.style.transformOrigin = 'top center';
+    pageScaler.style.height = '100%';
+    pageScaler.style.width = '100%';
 
-    newPageContainer.innerHTML = `
-              <div class="page-scaler" style="transform-origin: top center; height: 100%; width: 100%;">
-                <div class="page-border-inner" style="position: absolute; top: 20px; left: 20px; right: 20px; bottom: 20px; pointer-events: none; border: 1px solid transparent; z-index: 5;"></div>
-                <div class="page-editor ql-container ql-snow" style="position: relative; z-index: 1;">
-                    <div class="ql-editor" ${placeholderAttr} contenteditable="false">${contentHtml}</div>
-                </div>
-              </div>
-          `;
+    const borderInner = document.createElement('div');
+    borderInner.className = 'page-border-inner';
+    borderInner.style.position = 'absolute';
+    borderInner.style.top = '20px';
+    borderInner.style.left = '20px';
+    borderInner.style.right = '20px';
+    borderInner.style.bottom = '20px';
+    borderInner.style.pointerEvents = 'none';
+    borderInner.style.border = '1px solid transparent';
+    borderInner.style.zIndex = '5';
+
+    const pageEditor = document.createElement('div');
+    pageEditor.className = 'page-editor ql-container ql-snow';
+    pageEditor.style.position = 'relative';
+    pageEditor.style.zIndex = '1';
+
+    const qlEditor = document.createElement('div');
+    qlEditor.className = 'ql-editor';
+    qlEditor.contentEditable = 'false';
+    if (!previewText) {
+      qlEditor.dataset.placeholder = 'Loading document...';
+    }
+
+    pageEditor.append(qlEditor);
+    pageScaler.append(borderInner, pageEditor);
+    newPageContainer.replaceChildren(pageScaler);
 
     this.container.appendChild(newPageContainer);
     const borderElement = newPageContainer.querySelector('.page-border-inner');
@@ -1013,12 +1059,29 @@ export class Editor {
     newPageContainer.id = `page-container-${pageId}`;
     newPageContainer.dataset.pageId = pageId;
 
-    newPageContainer.innerHTML = `
-            <div class="page-scaler">
-                <div class="page-border-inner" style="position: absolute; top: 20px; left: 20px; right: 20px; bottom: 20px; pointer-events: none; border: 1px solid transparent; z-index: 5;"></div>
-                <div id="editor-${pageId}" class="page-editor" data-page-id="${pageId}" style="position: relative; z-index: 1;"></div>
-            </div>
-        `;
+    const pageScaler = document.createElement('div');
+    pageScaler.className = 'page-scaler';
+
+    const borderInner = document.createElement('div');
+    borderInner.className = 'page-border-inner';
+    borderInner.style.position = 'absolute';
+    borderInner.style.top = '20px';
+    borderInner.style.left = '20px';
+    borderInner.style.right = '20px';
+    borderInner.style.bottom = '20px';
+    borderInner.style.pointerEvents = 'none';
+    borderInner.style.border = '1px solid transparent';
+    borderInner.style.zIndex = '5';
+
+    const pageEditor = document.createElement('div');
+    pageEditor.id = `editor-${pageId}`;
+    pageEditor.className = 'page-editor';
+    pageEditor.dataset.pageId = pageId;
+    pageEditor.style.position = 'relative';
+    pageEditor.style.zIndex = '1';
+
+    pageScaler.append(borderInner, pageEditor);
+    newPageContainer.replaceChildren(pageScaler);
 
     if (insertBeforeNode) {
       this.container.insertBefore(newPageContainer, insertBeforeNode);
@@ -1106,7 +1169,7 @@ export class Editor {
 
     const editorDiv = document.getElementById(`editor-${pageId}`);
     if (editorDiv) {
-      editorDiv.innerHTML = '';
+      editorDiv.replaceChildren();
       editorDiv.className = 'page-editor';
       editorDiv.dataset.pageId = pageId;
     }
