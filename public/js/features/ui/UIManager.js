@@ -461,6 +461,12 @@ export class UIManager {
     const loader = document.getElementById('editorWorkspaceLoader');
     if (!loader) return;
 
+    // Must remove the HTML `hidden` attribute — browsers apply
+    // [hidden] { display: none !important } in their UA stylesheet which
+    // takes precedence over any CSS class-based or body-state display rule.
+    // Setting loader.hidden = false alone only clears the IDL property but
+    // does NOT remove the content attribute in all browser implementations.
+    loader.removeAttribute('hidden');
     loader.hidden = false;
     const titleEl = loader.querySelector('.loader-title');
     const subEl = loader.querySelector('.loader-subtitle');
@@ -471,6 +477,16 @@ export class UIManager {
   }
 
   hideEditorWorkspaceLoader() {
+    // Guard: never hide the workspace loader before the editor is confirmed
+    // ready. Premature hiding is the primary cause of the black workspace
+    // screen because the pages container is still opacity:0 at that point.
+    if (document.body.dataset.editorReady !== 'true') {
+      console.warn(
+        '[LOADER] Blocked hideEditorWorkspaceLoader — editor not ready yet (editorReady =',
+        document.body.dataset.editorReady + ')'
+      );
+      return;
+    }
     const loader = document.getElementById('editorWorkspaceLoader');
     if (loader) loader.hidden = true;
 

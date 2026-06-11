@@ -2453,7 +2453,7 @@ body.bg-code-mode .pages-container {
   box-shadow:
     0 10px 25px rgba(var(--accent-color-rgb), 0.4),
     0 4px 10px rgba(0, 0, 0, 0.3);
-  z-index: 9001;
+  z-index: 10001;
   font-size: 24px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -3213,6 +3213,22 @@ body[data-document-state='loading-content'] .editor-workspace-loader,
 body[data-document-state='initial-syncing'] .editor-workspace-loader,
 body:not([data-editor-ready='true']) .main-workspace.is-document-opening .editor-workspace-loader {
   display: grid;
+}
+
+/*
+ * Override the UA stylesheet [hidden] { display: none !important } so that
+ * CSS body-state rules can show #editorWorkspaceLoader even when the HTML
+ * `hidden` attribute is still present (e.g. before JS removes it).
+ * This is defense-in-depth alongside loader.removeAttribute('hidden') in JS.
+ */
+body[data-document-state='opening'] #editorWorkspaceLoader[hidden],
+body[data-document-state='creating'] #editorWorkspaceLoader[hidden],
+body[data-document-state='loading-content'] #editorWorkspaceLoader[hidden],
+body[data-document-state='initial-syncing'] #editorWorkspaceLoader[hidden],
+body:not([data-editor-ready='true'])
+  .main-workspace.is-document-opening
+  #editorWorkspaceLoader[hidden] {
+  display: grid !important;
 }
 
 .editor-workspace-loader-card {

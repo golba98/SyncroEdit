@@ -11,6 +11,7 @@ class AuthController {
   constructor() {
     this.synchro = null;
     this.currentForm = 'login';
+    this.usernameDebounceTimeout = null;
     this.init();
   }
 
@@ -65,6 +66,24 @@ class AuthController {
           this._updatePasswordStrength(e.target.value);
         }
       });
+
+      if (input.id === 'signupUsername') {
+        input.addEventListener('input', (e) => {
+          this._handleUsernameAvailability(e.target.value);
+        });
+      }
+
+      if (input.id === 'signupEmail') {
+        input.addEventListener('blur', (e) => {
+          this._checkEmailTypo(e.target.value);
+        });
+      }
+
+      if (input.id === 'signupPassword' || input.id === 'signupPasswordConfirm') {
+        input.addEventListener('input', () => {
+          this._checkPasswordMatch();
+        });
+      }
     });
 
     // Password visibility toggles
@@ -223,6 +242,19 @@ class AuthController {
     this._resetPasswordStrengthUI();
     this._resetPasswordVisibility();
 
+    // Hide username status/suggestions and email suggestions
+    const usernameStatusIcon = document.getElementById('usernameStatusIcon');
+    if (usernameStatusIcon) usernameStatusIcon.style.display = 'none';
+    const usernameSuggestions = document.getElementById('usernameSuggestions');
+    if (usernameSuggestions) usernameSuggestions.style.display = 'none';
+    const emailSuggestion = document.getElementById('emailSuggestion');
+    if (emailSuggestion) emailSuggestion.style.display = 'none';
+    const confirmInput = document.getElementById('signupPasswordConfirm');
+    if (confirmInput) {
+      confirmInput.style.borderColor = '';
+      confirmInput.style.boxShadow = '';
+    }
+
     this.synchro.formCompleteness = 'empty';
     this.synchro.applyState('idle');
 
@@ -303,6 +335,8 @@ class AuthController {
         : e.message?.replace('API error: ', '') || 'Login failed';
       if (statusEl) statusEl.textContent = msg;
       this.synchro.onError();
+      form.classList.add('shake-animation');
+      setTimeout(() => form.classList.remove('shake-animation'), 1000);
       setTimeout(() => this.synchro.applyState('idle'), 2000);
     }
   }
@@ -321,6 +355,8 @@ class AuthController {
         statusEl.className = 'status-message error';
       }
       this.synchro.onError();
+      form.classList.add('shake-animation');
+      setTimeout(() => form.classList.remove('shake-animation'), 1000);
       setTimeout(() => this.synchro.applyState('idle'), 2000);
     };
 
@@ -521,6 +557,107 @@ class AuthController {
     setTimeout(() => {
       window.location.href = docId ? `/?doc=${docId}` : '/';
     }, 1500);
+  }
+
+  _handleUsernameAvailability(username) {
+    if (this.usernameDebounceTimeout) {
+      clearTimeout(this.usernameDebounceTimeout);
+    }
+    
+    const icon = document.getElementById('usernameStatusIcon');
+    const suggestions = document.getElementById('usernameSuggestions');
+    if (!icon) return;
+
+    if (username.length < 3) {
+      icon.style.display = 'none';
+      if (suggestions) suggestions.style.display = 'none';
+      return;
+    }
+
+    icon.style.display = 'block';
+    icon.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: #666;"></i>';
+
+    this.usernameDebounceTimeout = setTimeout(async () => {
+      try {
+        const data = await Network.fetchAPI('/api/auth/check-username', {
+          method: 'POST',
+          body: JSON.stringify({ username }),
+        });
+        if (data.available) {
+          icon.innerHTML = '<i class="fas fa-check-circle" style="color: var(--success-color, #10b981);"></i>';
+          if (suggestions) suggestions.style.display = 'none';
+        } else {
+          icon.innerHTML = '<i class="fas fa-times-circle" style="color: var(--error-color, #ef4444);"></i>';
+          if (suggestions) {
+            suggestions.style.display = 'block';
+            suggestions.innerHTML = 'Taken! Try: ' + data.suggestions.map(s => 
+              `<span class="suggest-link" style="text-decoration: underline; cursor: pointer; margin-right: 8px;">${s}</span>`
+            ).join('');
+            suggestions.querySelectorAll('.suggest-link').forEach(link => {
+              link.onclick = () => {
+                const usernameInput = document.getElementById('signupUsername');
+                if (usernameInput) {
+                  usernameInput.value = link.textContent;
+                  this._handleUsernameAvailability(link.textContent);
+                }
+              };
+            });
+          }
+        }
+      } catch (e) {
+        icon.style.display = 'none';
+      }
+    }, 500);
+  }
+
+  _checkEmailTypo(email) {
+    const domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'];
+    const parts = email.split('@');
+    if (parts.length !== 2) return;
+    const [user, domain] = parts;
+    if (!domain) return;
+
+    const suggestion = document.getElementById('emailSuggestion');
+    if (!suggestion) return;
+
+    const match = domains.find(d => this._isSimilar(domain, d) && domain !== d);
+
+    if (match) {
+      suggestion.style.display = 'block';
+      suggestion.innerHTML = `Did you mean <span style="font-weight: bold; text-decoration: underline; cursor: pointer;">${user}@${match}</span>?`;
+      suggestion.querySelector('span').onclick = () => {
+        const emailInput = document.getElementById('signupEmail');
+        if (emailInput) {
+          emailInput.value = `${user}@${match}`;
+          suggestion.style.display = 'none';
+        }
+      };
+    } else {
+      suggestion.style.display = 'none';
+    }
+  }
+
+  _isSimilar(s1, s2) {
+    let diff = 0;
+    for (let i = 0; i < Math.min(s1.length, s2.length); i++) {
+      if (s1[i] !== s2[i]) diff++;
+    }
+    return diff === 1 && Math.abs(s1.length - s2.length) <= 1;
+  }
+
+  _checkPasswordMatch() {
+    const p1 = document.getElementById('signupPassword')?.value || '';
+    const p2 = document.getElementById('signupPasswordConfirm')?.value || '';
+    const el = document.getElementById('signupPasswordConfirm');
+    if (!el) return;
+
+    if (p1 === p2 && p1 !== '') {
+      el.style.borderColor = 'rgb(16, 185, 129)';
+      el.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.4)';
+    } else {
+      el.style.borderColor = '';
+      el.style.boxShadow = '';
+    }
   }
 }
 
