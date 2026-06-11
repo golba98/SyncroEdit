@@ -563,7 +563,7 @@ class AuthController {
     if (this.usernameDebounceTimeout) {
       clearTimeout(this.usernameDebounceTimeout);
     }
-    
+
     const icon = document.getElementById('usernameStatusIcon');
     const suggestions = document.getElementById('usernameSuggestions');
     if (!icon) return;
@@ -575,7 +575,7 @@ class AuthController {
     }
 
     icon.style.display = 'block';
-    icon.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: #666;"></i>';
+    this._setStatusIcon(icon, 'fas fa-spinner fa-spin', '#666');
 
     this.usernameDebounceTimeout = setTimeout(async () => {
       try {
@@ -584,16 +584,24 @@ class AuthController {
           body: JSON.stringify({ username }),
         });
         if (data.available) {
-          icon.innerHTML = '<i class="fas fa-check-circle" style="color: var(--success-color, #10b981);"></i>';
+          this._setStatusIcon(icon, 'fas fa-check-circle', 'var(--success-color, #10b981)');
           if (suggestions) suggestions.style.display = 'none';
         } else {
-          icon.innerHTML = '<i class="fas fa-times-circle" style="color: var(--error-color, #ef4444);"></i>';
+          this._setStatusIcon(icon, 'fas fa-times-circle', 'var(--error-color, #ef4444)');
           if (suggestions) {
             suggestions.style.display = 'block';
-            suggestions.innerHTML = 'Taken! Try: ' + data.suggestions.map(s => 
-              `<span class="suggest-link" style="text-decoration: underline; cursor: pointer; margin-right: 8px;">${s}</span>`
-            ).join('');
-            suggestions.querySelectorAll('.suggest-link').forEach(link => {
+            suggestions.replaceChildren(document.createTextNode('Taken! Try: '));
+            const links = (Array.isArray(data.suggestions) ? data.suggestions : []).map((s) => {
+              const link = document.createElement('span');
+              link.className = 'suggest-link';
+              link.style.textDecoration = 'underline';
+              link.style.cursor = 'pointer';
+              link.style.marginRight = '8px';
+              link.textContent = s;
+              suggestions.append(link);
+              return link;
+            });
+            links.forEach((link) => {
               link.onclick = () => {
                 const usernameInput = document.getElementById('signupUsername');
                 if (usernameInput) {
@@ -604,7 +612,7 @@ class AuthController {
             });
           }
         }
-      } catch (e) {
+      } catch {
         icon.style.display = 'none';
       }
     }, 500);
@@ -620,21 +628,38 @@ class AuthController {
     const suggestion = document.getElementById('emailSuggestion');
     if (!suggestion) return;
 
-    const match = domains.find(d => this._isSimilar(domain, d) && domain !== d);
+    const match = domains.find((d) => this._isSimilar(domain, d) && domain !== d);
 
     if (match) {
       suggestion.style.display = 'block';
-      suggestion.innerHTML = `Did you mean <span style="font-weight: bold; text-decoration: underline; cursor: pointer;">${user}@${match}</span>?`;
-      suggestion.querySelector('span').onclick = () => {
+      const suggestedEmail = `${user}@${match}`;
+      const suggestionLink = document.createElement('span');
+      suggestionLink.style.fontWeight = 'bold';
+      suggestionLink.style.textDecoration = 'underline';
+      suggestionLink.style.cursor = 'pointer';
+      suggestionLink.textContent = suggestedEmail;
+      suggestion.replaceChildren(
+        document.createTextNode('Did you mean '),
+        suggestionLink,
+        document.createTextNode('?')
+      );
+      suggestionLink.onclick = () => {
         const emailInput = document.getElementById('signupEmail');
         if (emailInput) {
-          emailInput.value = `${user}@${match}`;
+          emailInput.value = suggestedEmail;
           suggestion.style.display = 'none';
         }
       };
     } else {
       suggestion.style.display = 'none';
     }
+  }
+
+  _setStatusIcon(container, className, color) {
+    const statusIcon = document.createElement('i');
+    statusIcon.className = className;
+    statusIcon.style.color = color;
+    container.replaceChildren(statusIcon);
   }
 
   _isSimilar(s1, s2) {

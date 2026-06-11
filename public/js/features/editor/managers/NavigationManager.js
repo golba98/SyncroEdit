@@ -115,42 +115,52 @@ export class NavigationManager extends Plugin {
     });
 
     if (headings.length === 0) {
-      this.outlineContainer.innerHTML =
-        '<div style="padding: 20px; color: #666; font-size: 12px;">No headings found</div>';
+      const emptyMessage = document.createElement('div');
+      emptyMessage.style.padding = '20px';
+      emptyMessage.style.color = '#666';
+      emptyMessage.style.fontSize = '12px';
+      emptyMessage.textContent = 'No headings found';
+      this.outlineContainer.replaceChildren(emptyMessage);
       return;
     }
 
     // Sidebar Tree Folding Logic
     let hideBelowLevel = Infinity;
 
-    this.outlineContainer.innerHTML = headings
-      .map((h, i) => {
-        // Check if we should stop hiding
-        if (h.level <= hideBelowLevel) {
-          hideBelowLevel = Infinity;
-        }
+    const outlineItems = [];
 
-        // If we are currently hiding, return empty string (don't render this item)
-        if (hideBelowLevel !== Infinity) {
-          return '';
-        }
+    headings.forEach((h, i) => {
+      if (h.level <= hideBelowLevel) {
+        hideBelowLevel = Infinity;
+      }
 
-        // Check if this item is collapsed
-        const isCollapsed = this.collapsedSections.has(i);
-        if (isCollapsed) {
-          hideBelowLevel = h.level;
-        }
+      if (hideBelowLevel !== Infinity) {
+        return;
+      }
 
-        return `
-      <div class="outline-item outline-h${h.level} ${isCollapsed ? 'collapsed' : ''}" data-index="${i}">
-        <i class="fas ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'} fold-toggle" style="margin-right: 8px; width: 12px; cursor: pointer;"></i>
-        ${this.escapeHTML(h.text || 'Untitled Section')}
-      </div>
-    `;
-      })
-      .join('');
+      const isCollapsed = this.collapsedSections.has(i);
+      if (isCollapsed) {
+        hideBelowLevel = h.level;
+      }
 
-    this.outlineContainer.querySelectorAll('.outline-item').forEach((el) => {
+      const item = document.createElement('div');
+      item.className = `outline-item outline-h${h.level}`;
+      if (isCollapsed) item.classList.add('collapsed');
+      item.dataset.index = String(i);
+
+      const toggle = document.createElement('i');
+      toggle.className = `fas ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'} fold-toggle`;
+      toggle.style.marginRight = '8px';
+      toggle.style.width = '12px';
+      toggle.style.cursor = 'pointer';
+
+      item.append(toggle, document.createTextNode(h.text || 'Untitled Section'));
+      outlineItems.push(item);
+    });
+
+    this.outlineContainer.replaceChildren(...outlineItems);
+
+    outlineItems.forEach((el) => {
       const index = parseInt(el.dataset.index);
       const toggle = el.querySelector('.fold-toggle');
 
@@ -172,12 +182,6 @@ export class NavigationManager extends Plugin {
     });
   }
 
-  escapeHTML(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
   toggleSection(index) {
     if (this.collapsedSections.has(index)) {
       this.collapsedSections.delete(index);
@@ -193,7 +197,7 @@ export class NavigationManager extends Plugin {
     if (!this.minimapContainer || !this.isMinimapVisible) return;
 
     // Simplified Minimap: Create a scaled down version of the pages
-    this.minimapContainer.innerHTML = '';
+    this.minimapContainer.replaceChildren();
     const pagesContainer = document.getElementById('pagesContainer');
     if (!pagesContainer) return;
 
