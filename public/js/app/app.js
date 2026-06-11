@@ -278,6 +278,8 @@ export class App {
         description: 'Keeping local edits available while sync reconnects.',
       });
     }
+
+    this.uiManager.preventBlackEditorLoadingState();
   }
 
   setSaveState(status) {
@@ -314,6 +316,7 @@ export class App {
 
     if (!this.isEditorReadyForCurrentDocument()) {
       const loaderText = mode === 'creating' ? 'Creating document...' : 'Opening document...';
+      this.uiManager.showEditorWorkspaceLoader(loaderText, 'Preparing your workspace');
       this.uiManager.showDocumentOpeningLoader(loaderText);
       this.setDocumentLifecycleState(mode);
       this.uiManager.applyViewState('opening-document');
@@ -422,6 +425,7 @@ export class App {
         this.openingDocumentId = null;
         this.uiManager.updateMobileUIState();
       }
+      this.uiManager.preventBlackEditorLoadingState();
     }
   }
 

@@ -11,6 +11,17 @@ export class UIManager {
     this.saveStatusTimer = null;
     this.documentOpenState = 'idle';
     this.hasShownEditorReady = false;
+
+    // Bind and expose workspace loader helpers globally
+    this.showEditorWorkspaceLoader = this.showEditorWorkspaceLoader.bind(this);
+    this.hideEditorWorkspaceLoader = this.hideEditorWorkspaceLoader.bind(this);
+    this.revealPagesContainer = this.revealPagesContainer.bind(this);
+    this.preventBlackEditorLoadingState = this.preventBlackEditorLoadingState.bind(this);
+
+    window.showEditorWorkspaceLoader = this.showEditorWorkspaceLoader;
+    window.hideEditorWorkspaceLoader = this.hideEditorWorkspaceLoader;
+    window.revealPagesContainer = this.revealPagesContainer;
+    window.preventBlackEditorLoadingState = this.preventBlackEditorLoadingState;
   }
 
   setupEventListeners() {
@@ -418,6 +429,7 @@ export class UIManager {
     } else if (state === 'editor-error') {
       this.hideDocumentOpeningLoader();
     }
+    this.preventBlackEditorLoadingState();
   }
 
   showDocumentOpeningLoader(text = 'Opening document...') {
@@ -445,6 +457,55 @@ export class UIManager {
     }
   }
 
+  showEditorWorkspaceLoader(message = 'Opening document...', subtext = 'Preparing your workspace') {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    if (!loader) return;
+
+    loader.hidden = false;
+    const titleEl = loader.querySelector('.loader-title');
+    const subEl = loader.querySelector('.loader-subtitle');
+    if (titleEl) titleEl.textContent = message;
+    if (subEl) subEl.textContent = subtext;
+
+    document.querySelector('.main-workspace')?.classList.add('is-document-opening');
+  }
+
+  hideEditorWorkspaceLoader() {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    if (loader) loader.hidden = true;
+
+    document.querySelector('.main-workspace')?.classList.remove('is-document-opening');
+  }
+
+  revealPagesContainer() {
+    const pagesContainer = document.getElementById('pagesContainer');
+    if (pagesContainer) {
+      pagesContainer.hidden = false;
+      pagesContainer.style.opacity = '';
+      pagesContainer.style.transform = '';
+    }
+  }
+
+  preventBlackEditorLoadingState() {
+    const mainWorkspace = document.querySelector('.main-workspace');
+    const pagesContainer = document.getElementById('pagesContainer');
+    const loader = document.getElementById('editorWorkspaceLoader');
+
+    const editorVisible = mainWorkspace && getComputedStyle(mainWorkspace).display !== 'none';
+    const pagesHidden =
+      !pagesContainer ||
+      pagesContainer.hidden ||
+      getComputedStyle(pagesContainer).display === 'none' ||
+      getComputedStyle(pagesContainer).opacity === '0';
+
+    const editorReady = document.body.dataset.editorReady === 'true';
+
+    if (editorVisible && pagesHidden && !editorReady && (loader ? loader.hidden : true)) {
+      console.warn('[OPEN] Prevented black editor workspace: showing loader');
+      this.showEditorWorkspaceLoader('Opening document...', 'Preparing your workspace');
+    }
+  }
+
   setOpeningDocumentState() {
     if (this.hasShownEditorReady && this.app?.isEditorReadyForCurrentDocument?.()) {
       return;
@@ -456,18 +517,28 @@ export class UIManager {
 
     const error = document.getElementById('editorOpenError');
     if (error) error.hidden = true;
+
+    this.preventBlackEditorLoadingState();
   }
 
   clearOpeningDocumentState() {
     this.showSkeletonMessage(false);
     this.showSkeleton(false);
     this.hasShownEditorReady = true;
+
+    document.body.dataset.documentState = 'ready';
+    document.body.dataset.editorReady = 'true';
+    this.hideEditorWorkspaceLoader();
+    this.revealPagesContainer();
+
     this.setDocumentOpenState('ready');
 
     // Re-render final connection status badge when state becomes ready
     if (this.connectionPendingStatus) {
       this.renderConnectionStatus(this.connectionPendingStatus);
     }
+
+    this.preventBlackEditorLoadingState();
   }
 
   showSkeleton(visible) {
@@ -526,6 +597,21 @@ export class UIManager {
     this.documentOpenState = normalizedState;
     document.body.dataset.documentOpenState = normalizedState;
 
+    if (loadingStates.has(normalizedState)) {
+      document.body.dataset.editorReady = 'false';
+      if (normalizedState === 'idle') {
+        document.body.dataset.documentState = 'opening';
+      } else {
+        document.body.dataset.documentState = normalizedState;
+      }
+    } else if (normalizedState === 'ready') {
+      document.body.dataset.documentState = 'ready';
+      document.body.dataset.editorReady = 'true';
+    } else {
+      document.body.dataset.documentState = normalizedState;
+      document.body.dataset.editorReady = 'false';
+    }
+
     const skeleton = document.getElementById('editorSkeleton');
     const statusEl = document.getElementById('editorSkeletonStatus');
     const titleEl = document.getElementById('editorSkeletonTitle');
@@ -546,10 +632,18 @@ export class UIManager {
     if (titleEl) titleEl.textContent = options.title || title;
     if (descEl) descEl.textContent = options.description || description;
 
+    if (loadingStates.has(normalizedState)) {
+      this.showEditorWorkspaceLoader(options.status || title, options.description || description);
+    } else {
+      this.hideEditorWorkspaceLoader();
+    }
+
     if (skeleton) {
       skeleton.dataset.openState = normalizedState;
       if (normalizedState !== 'ready') this.showSkeleton(true);
     }
+
+    this.preventBlackEditorLoadingState();
   }
 
   showDocumentOpenError({ message, onRetry, onBack }) {

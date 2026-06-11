@@ -34,10 +34,21 @@ describe('Document Opening Flow', () => {
         </div>
         <div id="docLibrary" style="display: block;" class="view-visible"></div>
         <div id="libraryOverlay" style="display: block;" class="view-visible"></div>
-        <div id="editorSkeleton" class="hidden"></div>
         <div class="header"></div>
         <div class="ribbon-tabs"></div>
         <div class="ribbon-content"></div>
+        <div class="main-workspace">
+          <div id="editorSkeleton" class="hidden"></div>
+          <div id="editorWorkspaceLoader" hidden>
+            <div class="editor-workspace-loader-card">
+              <div class="loader-document-icon">⌁</div>
+              <div class="loader-title">Opening document...</div>
+              <div class="loader-subtitle">Preparing your workspace</div>
+              <div class="loader-progress"><span></span></div>
+            </div>
+          </div>
+          <div id="pagesContainer" style="opacity: 0;"></div>
+        </div>
     `;
 
     // Initialize Mock App and Managers
@@ -121,5 +132,97 @@ describe('Document Opening Flow', () => {
 
     expect(loader.hidden).toBe(false);
     expect(document.getElementById('documentOpeningTitle').textContent).toBe('Opening document...');
+  });
+
+  test('editor shell visible + document not ready shows workspace loader', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    expect(loader.hidden).toBe(true);
+
+    uiManager.setDocumentOpenState('opening');
+    expect(loader.hidden).toBe(false);
+  });
+
+  test('pagesContainer hidden before ready shows workspace loader', () => {
+    const pagesContainer = document.getElementById('pagesContainer');
+    pagesContainer.style.opacity = '0';
+
+    uiManager.preventBlackEditorLoadingState();
+
+    const loader = document.getElementById('editorWorkspaceLoader');
+    expect(loader.hidden).toBe(false);
+  });
+
+  test('workspace loader text is "Creating document..." for blank docs', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    uiManager.setDocumentOpenState('creating');
+
+    expect(loader.querySelector('.loader-title').textContent).toBe('Creating document...');
+  });
+
+  test('workspace loader text is "Opening document..." for existing docs', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    uiManager.setDocumentOpenState('opening');
+
+    expect(loader.querySelector('.loader-title').textContent).toBe('Opening document...');
+  });
+
+  test('workspace loader changes to "Syncing document..." during initial sync', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    uiManager.setDocumentOpenState('initial-syncing');
+
+    expect(loader.querySelector('.loader-title').textContent).toBe('Syncing document...');
+  });
+
+  test('workspace loader hides only after editor ready', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    uiManager.setDocumentOpenState('opening');
+    expect(loader.hidden).toBe(false);
+
+    uiManager.clearOpeningDocumentState();
+    expect(loader.hidden).toBe(true);
+  });
+
+  test('black workspace state is impossible: editor visible + pages hidden + loader hidden should auto-show loader', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    loader.hidden = true;
+    document.body.dataset.editorReady = 'false';
+
+    const mainWorkspace = document.querySelector('.main-workspace');
+    mainWorkspace.style.display = 'block';
+
+    const pagesContainer = document.getElementById('pagesContainer');
+    pagesContainer.style.opacity = '0';
+
+    uiManager.preventBlackEditorLoadingState();
+
+    expect(loader.hidden).toBe(false);
+  });
+
+  test('reconnect after ready does not show workspace loader', () => {
+    // Set to ready state
+    uiManager.clearOpeningDocumentState();
+
+    const loader = document.getElementById('editorWorkspaceLoader');
+    expect(loader.hidden).toBe(true);
+
+    // Call status change for reconnecting
+    app.isEditorReadyForCurrentDocument.mockReturnValue(true);
+    uiManager.setDocumentOpenState('initial-syncing');
+
+    // Should not show loader because we are already ready
+    expect(loader.hidden).toBe(true);
+  });
+
+  test('typing after ready does not show workspace loader', () => {
+    uiManager.clearOpeningDocumentState();
+
+    const loader = document.getElementById('editorWorkspaceLoader');
+    expect(loader.hidden).toBe(true);
+
+    // Attempting to set document open state again (e.g. from post-ready events)
+    app.isEditorReadyForCurrentDocument.mockReturnValue(true);
+    uiManager.setDocumentOpenState('loading-content');
+
+    expect(loader.hidden).toBe(true);
   });
 });
