@@ -207,6 +207,7 @@ export class LibraryManager {
     console.log('[OPEN] click', { action: 'create' });
     this.openLock = true;
     this.isTransitioning = true;
+    this.app.beginDocumentOpen?.({ mode: 'creating', isNewDocument: true });
     this.markCreateOpening(true);
     this.disableLibraryInteraction('create');
 
@@ -258,6 +259,7 @@ export class LibraryManager {
     console.log('[OPEN] click', { action: 'open', docId });
     this.openLock = true;
     this.isTransitioning = true;
+    this.app.beginDocumentOpen?.({ mode: 'opening', docId, isNewDocument: false });
     this.disableLibraryInteraction('open', docId);
 
     try {

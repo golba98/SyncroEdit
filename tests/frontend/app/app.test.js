@@ -42,6 +42,16 @@ describe('App Core Initialization', () => {
       <div id="connectionBadge" hidden></div>
       <div id="saveStatusIndicator"></div>
       <div id="serverOfflineOverlay"></div>
+      <div id="documentOpeningLoader" hidden>
+        <div id="documentOpeningTitle"></div>
+      </div>
+      <div class="main-workspace">
+        <div id="editorWorkspaceLoader" hidden>
+          <div class="loader-title">Opening document...</div>
+          <div class="loader-subtitle">Preparing your workspace</div>
+        </div>
+        <div id="pagesContainer"></div>
+      </div>
       <div id="editorSkeleton" class="hidden">
         <div id="editorSkeletonStatus"></div>
         <div id="editorSkeletonTitle"></div>
@@ -53,8 +63,7 @@ describe('App Core Initialization', () => {
           <button id="editorOpenBack"></button>
         </div>
       </div>
-      <div id="pagesContainer"></div>
-      
+
       <div id="userProfileTrigger">
         <img id="headerPfp" />
         <div id="headerInitials"></div>
@@ -438,6 +447,106 @@ describe('App Core Initialization', () => {
     expect(document.getElementById('editorSkeleton').classList.contains('hidden')).toBe(false);
   });
 
+  it('websocket connected does not mark editor ready or hide the workspace loader', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.documentId = 'doc-opening';
+    app.loadDocumentToken = 1;
+    app.editor = { currentDocId: 'doc-opening' };
+    app.beginDocumentOpen({ mode: 'opening', docId: 'doc-opening' });
+
+    const loader = document.getElementById('editorWorkspaceLoader');
+    app.handleEditorStatusChange('connected', 'doc-opening');
+
+    expect(app.connectionState).toBe('connected');
+    expect(app.hasReachedEditorReady).toBe(false);
+    expect(app.documentLoadState).toBe('opening');
+    expect(document.body.dataset.editorReady).toBe('false');
+    expect(loader.hidden).toBe(false);
+  });
+
+  it('document loaded before initial sync does not mark editor ready', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.documentId = 'doc-opening';
+    app.loadDocumentToken = 1;
+    app.editor = {
+      currentDocId: 'doc-opening',
+      isReadyForUser: () => false,
+      hasLoadedDocumentContent: () => true,
+    };
+    app.beginDocumentOpen({ mode: 'opening', docId: 'doc-opening' });
+    app.documentContentLoaded = true;
+
+    app.maybeMarkEditorReady(1, 'test-document-loaded');
+
+    expect(app.hasReachedEditorReady).toBe(false);
+    expect(app.documentLoadState).toBe('opening');
+    expect(document.getElementById('editorWorkspaceLoader').hidden).toBe(false);
+  });
+
+  it('editor ready cannot fire before document loaded', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.documentId = 'doc-opening';
+    app.loadDocumentToken = 1;
+    app.editor = {
+      currentDocId: 'doc-opening',
+      isReadyForUser: () => true,
+      hasLoadedDocumentContent: () => true,
+    };
+    app.beginDocumentOpen({ mode: 'opening', docId: 'doc-opening' });
+    app.initialSyncReceived = true;
+
+    app.maybeMarkEditorReady(1, 'test-before-document-loaded');
+
+    expect(app.hasReachedEditorReady).toBe(false);
+    expect(app.documentLoadState).toBe('opening');
+    expect(document.body.dataset.editorReady).toBe('false');
+  });
+
+  it('creating a new document shows loader even if the previous document was ready', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.documentId = 'doc-ready';
+    app.readyDocumentId = 'doc-ready';
+    app.hasReachedEditorReady = true;
+    app.documentLoadState = 'ready';
+    app.uiManager.hasShownEditorReady = true;
+    app.uiManager.setDocumentOpenState('ready');
+
+    app.beginDocumentOpen({ mode: 'creating', isNewDocument: true });
+
+    const loader = document.getElementById('editorWorkspaceLoader');
+    expect(app.hasReachedEditorReady).toBe(false);
+    expect(app.documentLoadState).toBe('creating');
+    expect(document.body.dataset.editorReady).toBe('false');
+    expect(loader.hidden).toBe(false);
+    expect(loader.querySelector('.loader-title').textContent).toBe('Creating document...');
+  });
+
+  it('repeated ready events only run cleanup once', async () => {
+    const app = new App();
+    await new Promise(process.nextTick);
+    app.documentId = 'doc-ready';
+    app.loadDocumentToken = 1;
+    app.editor = {
+      currentDocId: 'doc-ready',
+      isReadyForUser: () => true,
+      hasLoadedDocumentContent: () => true,
+    };
+    app.beginDocumentOpen({ mode: 'opening', docId: 'doc-ready' });
+    app.documentContentLoaded = true;
+    app.initialSyncReceived = true;
+    const cleanupSpy = jest.spyOn(app.libraryManager, 'clearOpeningStates');
+
+    app.maybeMarkEditorReady(1, 'first-ready');
+    app.maybeMarkEditorReady(1, 'second-ready');
+
+    expect(app.hasReachedEditorReady).toBe(true);
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('shows retry and back actions for document open errors', async () => {
     const app = new App();
     await new Promise(process.nextTick);
@@ -491,6 +600,13 @@ describe('App Core Initialization', () => {
     card.classList.add('is-opening');
 
     // Trigger successful open completion
+    app.documentId = 'doc-success';
+    app.documentContentLoaded = true;
+    app.initialSyncReceived = true;
+    app.editor = {
+      isReadyForUser: () => true,
+      hasLoadedDocumentContent: () => true,
+    };
     app.finishDocumentOpen(app.loadDocumentToken);
 
     expect(app.libraryManager.openLock).toBe(false);
@@ -656,6 +772,13 @@ describe('App Core Initialization', () => {
     app.libraryManager.openLock = true;
     app.libraryManager.isTransitioning = true;
     app.editor = { isReadyForUser: () => true };
+    app.documentId = 'doc-success';
+    app.documentContentLoaded = true;
+    app.initialSyncReceived = true;
+    app.editor = {
+      isReadyForUser: () => true,
+      hasLoadedDocumentContent: () => true,
+    };
 
     app.finishDocumentOpen(app.loadDocumentToken);
 
