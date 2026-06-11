@@ -8,7 +8,7 @@ test.describe('UI Interactions', () => {
     // Using dev-mode shortcut mentioned in login.html if available,
     // or just register a new user.
     // Since we want these tests to be independent, let's just register.
-    const testUser = `ui_user_${test.info().project.name}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const testUser = `i_${test.info().project.name.slice(0, 3)}_${Math.random().toString(36).slice(2, 10)}`;
     await page.click('#showSignup');
     await page.fill('#signupUsername', testUser);
     await page.fill('#signupEmail', `${testUser}@example.com`);
@@ -17,7 +17,12 @@ test.describe('UI Interactions', () => {
     await page.click('#signupBtn');
     await expect(page).toHaveURL(/\/(?:index\.html)?$/);
     await page.waitForTimeout(1000);
-    await page.click('#createNewDoc');
+    const isMobile = test.info().project.name === 'mobile';
+    if (isMobile) {
+      await page.click('#fabCreateDoc');
+    } else {
+      await page.click('#createNewDoc');
+    }
     await expect(page.locator('#docLibrary')).not.toBeVisible();
   });
 
@@ -31,7 +36,7 @@ test.describe('UI Interactions', () => {
     await page.keyboard.press('Control+a');
 
     // Click bold button (Quill uses .ql-bold)
-    const boldBtn = page.locator('.ql-bold');
+    const boldBtn = page.locator('.ql-bold:visible').first();
     await boldBtn.click();
 
     // Check if bold is applied (Quill wraps in <strong> or <b> or styles)
@@ -39,7 +44,7 @@ test.describe('UI Interactions', () => {
     await expect(boldText).toBeVisible();
 
     // Click italic button
-    const italicBtn = page.locator('.ql-italic');
+    const italicBtn = page.locator('.ql-italic:visible').first();
     await italicBtn.click();
     const italicText = editor.locator('em, i');
     await expect(italicText).toBeVisible();

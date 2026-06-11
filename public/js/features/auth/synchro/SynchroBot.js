@@ -15,6 +15,7 @@ export class SynchroBot {
     this.isProcessing = false;
     this.idleTimer = null;
     this.blinkTimer = null;
+    this.passwordToggleTimer = null;
     this.blinking = false;
     this.passwordVisible = false;
 
@@ -262,6 +263,7 @@ export class SynchroBot {
    * Called when a field receives focus
    */
   onFieldFocus(fieldName) {
+    this.clearPasswordToggleTimer();
     this.focusTarget = fieldName;
     this.resetIdleTimer();
 
@@ -299,12 +301,26 @@ export class SynchroBot {
    * Called when a field loses focus
    */
   onFieldBlur() {
+    this.clearPasswordToggleTimer();
     this.focusTarget = 'none';
     this.targetElement = null;
     this.stopTrackingLoop();
     this.resetEyePosition();
-    this.applyState('idle');
     this.resetIdleTimer();
+
+    setTimeout(() => {
+      if (this.focusTarget === 'none') {
+        const protectStates = new Set(['processing', 'success', 'error']);
+        if (protectStates.has(this.currentState) || this.isProcessing) {
+          return;
+        }
+        if (this.passwordVisible) {
+          this.applyState('peeking');
+        } else {
+          this.applyState('idle');
+        }
+      }
+    }, 50);
   }
 
   /**
@@ -326,24 +342,27 @@ export class SynchroBot {
    */
   onPasswordToggle(visible) {
     this.passwordVisible = visible;
+    this.clearPasswordToggleTimer();
 
-    if (this.focusTarget === 'password') {
-      setTimeout(() => {
-        if (visible) {
-          this.applyState('peeking');
-          const passwordInput = document.querySelector(
-            'input[type="text"][id*="password"], input[type="password"]'
-          );
-          if (passwordInput) {
-            this.setTargetElement(passwordInput);
-          }
-        } else {
-          this.applyState('secure');
-          this.resetEyePosition();
-          this.targetElement = null;
+    this.passwordToggleTimer = setTimeout(() => {
+      if (visible) {
+        this.applyState('peeking');
+        const passwordInput = document.querySelector(
+          'input[type="text"][id*="password"], input[type="password"]'
+        );
+        if (passwordInput) {
+          this.setTargetElement(passwordInput);
         }
-      }, this.config.transitionDuration);
-    }
+      } else {
+        if (this.focusTarget === 'password') {
+          this.applyState('secure');
+        } else {
+          this.applyState('idle');
+        }
+        this.resetEyePosition();
+        this.targetElement = null;
+      }
+    }, this.config.transitionDuration);
   }
 
   /**
@@ -375,6 +394,7 @@ export class SynchroBot {
    * Called when form is submitted
    */
   onSubmit() {
+    this.clearPasswordToggleTimer();
     this.isProcessing = true;
     this.targetElement = null;
     this.stopTrackingLoop();
@@ -386,6 +406,7 @@ export class SynchroBot {
    * Called on successful submission
    */
   onSuccess() {
+    this.clearPasswordToggleTimer();
     this.isProcessing = false;
     this.stopTrackingLoop();
     this.applyState('success');
@@ -396,6 +417,7 @@ export class SynchroBot {
    * Called on submission error
    */
   onError() {
+    this.clearPasswordToggleTimer();
     this.isProcessing = false;
     this.stopTrackingLoop();
     this.applyState('error');
@@ -425,12 +447,20 @@ export class SynchroBot {
     }
   }
 
+  clearPasswordToggleTimer() {
+    if (this.passwordToggleTimer) {
+      clearTimeout(this.passwordToggleTimer);
+      this.passwordToggleTimer = null;
+    }
+  }
+
   /**
    * Cleanup
    */
   destroy() {
     this.clearIdleTimer();
     this.clearBlinkTimer();
+    this.clearPasswordToggleTimer();
     this.stopTrackingLoop();
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);

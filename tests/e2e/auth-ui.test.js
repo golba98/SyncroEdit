@@ -78,7 +78,7 @@ test.describe('Forgot Password Tests', () => {
 
     // Navigation
     await page.click('a[href="forgot-password.html"]');
-    await expect(page).toHaveURL(/\/forgot-password\.html/);
+    await expect(page).toHaveURL(/\/forgot-password(?:\.html)?$/);
 
     // Functional Tests
     const emailInput = page.locator('#email');
@@ -103,7 +103,7 @@ test.describe('Forgot Password Tests', () => {
 
     // Back to Login
     await page.click('text=Back to Login');
-    await expect(page).toHaveURL(/\/pages\/login\.html/);
+    await expect(page).toHaveURL(/\/pages\/login(?:\.html)?$/);
   });
 });
 

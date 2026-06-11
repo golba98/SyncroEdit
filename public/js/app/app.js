@@ -316,6 +316,10 @@ export class App {
 
     if (!this.isEditorReadyForCurrentDocument()) {
       const loaderText = mode === 'creating' ? 'Creating document...' : 'Opening document...';
+      // Pre-set body dataset so CSS body-state rules and preventBlackEditorLoadingState
+      // can react immediately — before the JS state machine fully wires up.
+      document.body.dataset.documentState = mode === 'creating' ? 'creating' : 'opening';
+      document.body.dataset.editorReady = 'false';
       this.uiManager.showEditorWorkspaceLoader(loaderText, 'Preparing your workspace');
       this.uiManager.showDocumentOpeningLoader(loaderText);
       this.setDocumentLifecycleState(mode);

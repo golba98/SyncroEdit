@@ -11,6 +11,9 @@ module.exports = defineConfig({
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8787',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    extraHTTPHeaders: {
+      'x-bypass-rate-limit': 'true',
+    },
   },
   projects: [
     {

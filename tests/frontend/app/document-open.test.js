@@ -182,6 +182,27 @@ describe('Document Opening Flow', () => {
     expect(loader.hidden).toBe(true);
   });
 
+  test('workspace loader does not hide if hideEditorWorkspaceLoader is called before editor is ready', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    uiManager.setDocumentOpenState('opening');
+    expect(loader.hidden).toBe(false);
+
+    // Call hideEditorWorkspaceLoader while editorReady is 'false'
+    uiManager.hideEditorWorkspaceLoader();
+    // Loader should still be visible because editorReady is 'false'
+    expect(loader.hidden).toBe(false);
+  });
+
+  test('showEditorWorkspaceLoader removes the HTML hidden attribute', () => {
+    const loader = document.getElementById('editorWorkspaceLoader');
+    loader.setAttribute('hidden', '');
+    expect(loader.hasAttribute('hidden')).toBe(true);
+
+    uiManager.showEditorWorkspaceLoader();
+    expect(loader.hasAttribute('hidden')).toBe(false);
+    expect(loader.hidden).toBe(false);
+  });
+
   test('black workspace state is impossible: editor visible + pages hidden + loader hidden should auto-show loader', () => {
     const loader = document.getElementById('editorWorkspaceLoader');
     loader.hidden = true;

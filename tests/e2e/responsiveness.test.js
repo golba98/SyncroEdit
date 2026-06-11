@@ -23,7 +23,7 @@ test.describe('Responsiveness', () => {
   test('should display editor correctly on mobile', async ({ page }) => {
     // Login and create doc
     await page.goto('/pages/login.html');
-    const testUser = `resp_user_${test.info().project.name}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const testUser = `r_${test.info().project.name.slice(0, 3)}_${Math.random().toString(36).slice(2, 10)}`;
     await page.click('#showSignup');
     await page.fill('#signupUsername', testUser);
     await page.fill('#signupEmail', `${testUser}@example.com`);
@@ -32,14 +32,24 @@ test.describe('Responsiveness', () => {
     await page.click('#signupBtn');
     await expect(page).toHaveURL(/\/(?:index\.html)?$/);
     await page.waitForTimeout(1000);
-    await page.click('#createNewDoc');
+    const isMobile = test.info().project.name === 'mobile';
+    if (isMobile) {
+      await page.click('#fabCreateDoc');
+    } else {
+      await page.click('#createNewDoc');
+    }
 
     // Check editor container
     const editorContainer = page.locator('.editor-container');
     await expect(editorContainer).toBeVisible();
 
-    // Ribbon tabs should be accessible
-    const homeTab = page.locator('.ribbon-tab', { hasText: 'Home' });
-    await expect(homeTab).toBeVisible();
+    // Ribbon tabs should be accessible on desktop; edit button on mobile
+    if (!isMobile) {
+      const homeTab = page.locator('.ribbon-tab', { hasText: 'Home' });
+      await expect(homeTab).toBeVisible();
+    } else {
+      const fabEdit = page.locator('#fabEditDoc');
+      await expect(fabEdit).toBeVisible();
+    }
   });
 });
