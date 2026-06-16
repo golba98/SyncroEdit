@@ -21,6 +21,8 @@ export class ReadabilityManager extends Plugin {
     const addEvent = (id, event, handler) => {
       const el = document.getElementById(id);
       if (el) this.addDisposableListener(el, event, handler);
+      const elements = document.querySelectorAll('.' + id);
+      elements.forEach((element) => this.addDisposableListener(element, event, handler));
     };
 
     addEvent('canvasThemeSelect', 'change', (e) => this.setCanvasTheme(e.target.value));
@@ -28,19 +30,6 @@ export class ReadabilityManager extends Plugin {
     addEvent('toggleInvisibles', 'click', () => this.toggleInvisibles());
     addEvent('enterFocusMode', 'click', () => this.setFocusMode(true));
     addEvent('exitFocusMode', 'click', () => this.setFocusMode(false));
-
-    // Background Theme
-    const bgSelect = document.getElementById('backgroundThemeSelect');
-    if (bgSelect) {
-      // Initialize value from localStorage
-      const savedBg = localStorage.getItem('synchroEditBackgroundTheme') || 'dots';
-      bgSelect.value = savedBg;
-      this.addDisposableListener(bgSelect, 'change', (e) => {
-        if (window.app && window.app.background) {
-          window.app.background.setTheme(e.target.value);
-        }
-      });
-    }
 
     // Page Glow
     const glowToggle = document.getElementById('togglePageGlow');
@@ -91,6 +80,8 @@ export class ReadabilityManager extends Plugin {
   updateZoomDisplay() {
     const el = document.getElementById('zoomPercent');
     if (el) el.textContent = `${this.editor.currentZoom}%`;
+    const elements = document.querySelectorAll('.zoomPercent');
+    elements.forEach((element) => (element.textContent = `${this.editor.currentZoom}%`));
   }
 
   setCanvasTheme(theme) {

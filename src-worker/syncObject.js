@@ -420,6 +420,19 @@ export class DocumentSyncObject {
     });
 
     ws.addEventListener('error', (event) => {
+      const errMsg =
+        event?.message ||
+        event?.error?.message ||
+        (event?.error ? String(event.error) : '') ||
+        String(event);
+      if (errMsg && errMsg.includes('Network connection lost')) {
+        event.preventDefault?.();
+        console.log(
+          '[DO] WebSocket connection lost (client disconnected)',
+          this.getSocketLogContext('error-suppressed', event, ws, docId, meta)
+        );
+        return;
+      }
       console.error(
         '[DO] WebSocket error',
         this.getSocketLogContext('error', event, ws, docId, meta)

@@ -120,20 +120,20 @@ export const UI = {
 
     container.innerHTML = otherUsers
       .map((user, index) => {
-        const colors = ['#8b5cf6', '#a78bfa', '#c4b5fd', '#6366f1', '#818cf8', '#a5b4fc'];
+        const colors = ['#3b82f6', '#10b981', '#6366f1', '#14b8a6', '#06b6d4', '#64748b'];
         const color = colors[index % colors.length];
         const initial = escapeHTML(user.username.charAt(0).toUpperCase());
         const safeUsername = escapeHTML(user.username);
 
         if (user.profilePicture) {
           return `
-                <div title="${safeUsername}" style="width: 30px; height: 30px; border-radius: 50%; background: #ffffff; border: 2px solid var(--accent-color); margin-left: -8px; cursor: default; box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.4); overflow: hidden; position: relative;">
+                <div title="${safeUsername}" style="width: 30px; height: 30px; border-radius: 50%; background: #ffffff; border: 2px solid var(--border); margin-left: -8px; cursor: default; overflow: hidden; position: relative;">
                     <img src="${user.profilePicture}" style="width: 100%; height: 100%; object-fit: cover;" alt="${initial}">
                 </div>`;
         }
 
         return `
-                <div title="${safeUsername}" style="width: 30px; height: 30px; border-radius: 50%; background: ${color}; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; border: 2px solid #0a0a0a; margin-left: -8px; cursor: default; box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.4);">
+                <div title="${safeUsername}" style="width: 30px; height: 30px; border-radius: 50%; background: ${color}; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; border: 2px solid var(--bg); margin-left: -8px; cursor: default;">
                     ${initial}
                 </div>`;
       })

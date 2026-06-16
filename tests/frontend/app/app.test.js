@@ -404,7 +404,7 @@ describe('App Core Initialization', () => {
       const indicator = document.getElementById('saveStatusIndicator');
 
       app.setSaveState('unsaved');
-      expect(indicator.textContent).toBe('Saving...');
+      expect(indicator.textContent).toBe('Unsaved changes');
       expect(indicator.dataset.status).toBe('unsaved');
 
       app.setSaveState('saved');

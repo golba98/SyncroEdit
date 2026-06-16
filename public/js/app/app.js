@@ -421,6 +421,8 @@ export class App {
           onLifecycleChange: (state, detail) =>
             this.handleEditorLifecycleChange(state, detail, requestToken),
           onSaveStatusChange: (status) => this.setSaveState(status),
+          onStatsChange: (stats) => this.uiManager.updateStats(stats),
+          onSelectionStatsChange: (stats) => this.uiManager.updateSelectionStats(stats),
           onTitleChange: (title) => {
             try {
               const cache = localStorage.getItem('syncroedit_library_cache');
@@ -452,6 +454,8 @@ export class App {
       this.editor.onLifecycleChange = (state, detail) =>
         this.handleEditorLifecycleChange(state, detail, requestToken);
       this.editor.onSaveStatusChange = (status) => this.setSaveState(status);
+      this.editor.onStatsChange = (stats) => this.uiManager.updateStats(stats);
+      this.editor.onSelectionStatsChange = (stats) => this.uiManager.updateSelectionStats(stats);
 
       if (this.uiManager) {
         this.uiManager.updateMobileUIState();
