@@ -51,19 +51,29 @@
         width: 100%;
         height: 100%;
         background:
-          radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.16), transparent 32%),
-          rgba(0, 0, 0, 0.82);
+          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08), transparent 32%), #101418;
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 999999;
-        font-family: 'Roboto', 'Arial', sans-serif;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
         transition: opacity 0.2s ease-out;
       }
 
       #bootLoader.fading-out {
         opacity: 0;
         pointer-events: none;
+      }
+
+      body:not([data-view-state='booting']) #bootLoader {
+        display: none !important;
       }
 
       body[data-document-open-state='opening'] #pagesContainer,
@@ -97,7 +107,7 @@
         }
       }
     </style>
-    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="/css/styles.css" />
     <!-- File Extraction Libraries -->
     <!-- External Libraries (Deferred for speed) -->
     <script src="/vendor/mammoth/mammoth.browser.min.js" defer></script>
@@ -124,30 +134,19 @@
           gap: 24px;
           text-align: center;
           padding: 32px;
-          background: rgba(15, 15, 15, 0.7);
-          border: 1px solid rgba(139, 92, 246, 0.25);
-          border-radius: 16px;
-          backdrop-filter: blur(12px);
-          box-shadow:
-            0 20px 40px rgba(0, 0, 0, 0.5),
-            0 0 30px rgba(139, 92, 246, 0.15);
+          background: #151a20;
+          border: 1px solid #2a323d;
+          border-radius: 12px;
+          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
           max-width: 320px;
           width: calc(100% - 32px);
         "
       >
-        <div
-          style="
-            font-size: 48px;
-            filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
-            animation: float 3s ease-in-out infinite;
-          "
-        >
-          📄
-        </div>
+        <div style="font-size: 48px; animation: float 3s ease-in-out infinite">📄</div>
         <div>
           <h1
             style="
-              color: #ffffff;
+              color: #f3f4f6;
               font-size: 20px;
               font-weight: 700;
               margin: 0 0 8px 0;
@@ -158,7 +157,7 @@
           </h1>
           <p
             style="
-              color: #a78bfa;
+              color: #b0b7c3;
               font-size: 13px;
               font-weight: 500;
               margin: 0;
@@ -173,11 +172,10 @@
           style="
             width: 36px;
             height: 36px;
-            border: 3.5px solid rgba(139, 92, 246, 0.15);
-            border-top-color: #8b5cf6;
+            border: 3.5px solid rgba(59, 130, 246, 0.15);
+            border-top-color: #3b82f6;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
           "
         ></div>
       </div>
@@ -205,7 +203,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: #000000;
+        background: #101418;
         z-index: 100000;
         display: none;
         align-items: center;
@@ -243,9 +241,32 @@
     </div>
 
     <!-- Header -->
-    <div class="header">
-      <div class="header-left">
-        <button class="toolbar-btn" id="menuBtn" title="Document Menu">
+    <div
+      class="header"
+      style="
+        height: 56px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        background: var(--surface);
+      "
+    >
+      <div class="header-left" style="display: flex; align-items: center; gap: 12px; flex: 1">
+        <button
+          class="toolbar-btn"
+          id="menuBtn"
+          title="Document Menu"
+          style="
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px;
+            font-size: 16px;
+          "
+        >
           <i class="fas fa-bars"></i>
         </button>
         <input
@@ -257,58 +278,104 @@
           autocomplete="off"
           aria-label="Document Title"
           title="Document Title"
-          style="margin: 0; width: auto; flex: 1; max-width: 400px"
+          style="
+            margin: 0;
+            width: auto;
+            max-width: 280px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            padding: 4px 8px;
+            font-size: 15px;
+            font-weight: 600;
+            outline: none;
+            transition: all var(--transition-speed);
+          "
         />
+
         <div
           id="localModeBadge"
           style="
             display: none;
-            background: rgba(var(--accent-color-rgb), 0.2);
+            background: var(--accent-soft);
             color: var(--accent-color-light);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            border: 1px solid var(--accent-color);
-            margin-left: 15px;
-            letter-spacing: 0.5px;
-            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 10px;
+            border: 1px solid var(--accent-border);
+            margin-left: 8px;
+            font-weight: 600;
             text-transform: uppercase;
           "
         >
           Local Mode
         </div>
       </div>
-      <div class="header-right" style="display: flex; align-items: center; gap: 16px">
+      <div class="header-right" style="display: flex; align-items: center; gap: 12px">
         <div id="activeCollaborators" style="display: none; align-items: center">
           <!-- Active users will appear here -->
         </div>
 
-        <div style="display: flex; gap: 10px; align-items: center">
+        <div style="display: flex; gap: 8px; align-items: center">
+          <!-- Save button (primary filled) -->
           <button
-            class="toolbar-btn"
+            class="toolbar-btn save-button"
             id="saveBtn"
             title="Save Document"
-            style="background: var(--accent-color); color: white; padding: 3px 6px; font-size: 12px"
+            style="
+              background: var(--accent-color);
+              color: white;
+              border: 1px solid transparent;
+              border-radius: var(--radius-sm);
+              padding: 6px 14px;
+              font-size: 13px;
+              font-weight: 600;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            "
           >
             <i class="fas fa-save"></i> Save
           </button>
+
+          <!-- Share button (secondary outlined) next to Save button -->
+          <button
+            class="toolbar-btn share-button"
+            id="shareBtn"
+            title="Share Document"
+            style="
+              background: transparent;
+              border: 1px solid var(--border);
+              color: var(--text);
+              border-radius: var(--radius-sm);
+              padding: 6px 14px;
+              font-size: 13px;
+              font-weight: 600;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            "
+          >
+            <i class="fas fa-share-alt"></i> Share
+          </button>
+
+          <!-- Invisible saveAsBtn so we don't break JS querySelectors -->
           <button
             class="toolbar-btn header-save-as-btn"
             id="saveAsBtn"
             title="Save As"
-            style="padding: 3px 6px; font-size: 12px"
+            style="display: none"
           >
-            <i class="fas fa-file-export"></i> Save As
+            Save As
           </button>
-        </div>
-        <div id="saveStatusIndicator" class="save-status-indicator" data-status="saved">Saved</div>
-        <div id="connectionBadge" class="connection-badge" data-status="connecting" hidden>
-          Connecting
         </div>
 
         <div
           id="userProfileTrigger"
-          style="cursor: pointer; display: flex; align-items: center; gap: 8px"
+          style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-left: 4px"
           title="View Profile"
         >
           <img
@@ -319,7 +386,7 @@
               width: 32px;
               height: 32px;
               border-radius: 50%;
-              background: #ddd;
+              background: var(--surface-elevated);
               display: none;
               object-fit: cover;
             "
@@ -340,7 +407,7 @@
           <i
             id="headerUserIcon"
             class="fas fa-user-circle"
-            style="font-size: 24px; color: var(--accent-color-light)"
+            style="font-size: 28px; color: var(--text-soft)"
           ></i>
         </div>
       </div>
@@ -356,32 +423,31 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: #000000;
+        background: var(--bg);
         z-index: 9999;
         overflow-y: auto;
       "
     >
-      <div style="max-width: 1400px; margin: 0 auto; padding: 40px">
+      <div
+        class="dashboard-container"
+        style="max-width: 1180px; margin: 0 auto; padding: 32px 32px 48px"
+      >
         <!-- Header -->
         <div
+          class="app-header"
           style="
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 40px;
+            height: 60px;
+            border-bottom: 1px solid var(--border-soft);
+            margin-bottom: 32px;
           "
         >
-          <div style="display: flex; align-items: center; gap: 16px">
-            <div style="font-size: 32px">📄</div>
-            <h1
-              style="
-                margin: 0;
-                color: var(--accent-color-light);
-                font-size: 28px;
-                text-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.5);
-              "
-            >
-              SynchroEdit
+          <div style="display: flex; align-items: center; gap: 12px">
+            <div style="font-size: 24px">📄</div>
+            <h1 style="margin: 0; color: var(--text); font-size: 16px; font-weight: 600">
+              SyncroEdit
             </h1>
           </div>
           <div style="display: flex; align-items: center; gap: 20px">
@@ -398,7 +464,7 @@
                   width: 32px;
                   height: 32px;
                   border-radius: 50%;
-                  background: #1a1a1a;
+                  background: var(--surface-elevated);
                   display: none;
                   object-fit: cover;
                 "
@@ -419,13 +485,20 @@
               <i
                 id="libraryHeaderUserIcon"
                 class="fas fa-user-circle"
-                style="font-size: 32px; color: var(--accent-color-light)"
+                style="font-size: 32px; color: var(--text-soft)"
               ></i>
             </div>
             <button
               id="closeLibrary"
-              class="toolbar-btn close-btn-gradient"
-              style="padding: 10px 20px; border-radius: 6px; display: none"
+              class="toolbar-btn"
+              style="
+                padding: 6px 14px;
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                display: none;
+                background: transparent;
+                color: var(--text);
+              "
             >
               <i class="fas fa-times"></i> Close
             </button>
@@ -434,7 +507,12 @@
 
         <!-- New Document Section -->
         <div style="margin-bottom: 40px">
-          <h2 style="font-size: 20px; margin-bottom: 20px" class="section-title">New</h2>
+          <h2
+            style="font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text)"
+            class="section-title"
+          >
+            New
+          </h2>
           <div
             style="
               display: grid;
@@ -442,52 +520,121 @@
               gap: 20px;
             "
           >
-            <div id="createNewDoc" class="create-doc-card">
+            <div
+              id="createNewDoc"
+              class="create-doc-card"
+              style="
+                width: 168px;
+                min-height: 176px;
+                background: var(--surface-elevated);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                padding: 16px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all var(--transition-speed);
+                text-align: center;
+              "
+            >
               <div
                 style="
-                  width: 120px;
-                  height: 150px;
-                  background: #1a1a1a;
-                  border: 2px solid #333;
+                  width: 80px;
+                  height: 100px;
+                  background: var(--surface);
+                  border: 1px solid var(--border);
                   border-radius: 4px;
-                  margin-bottom: 16px;
+                  margin-bottom: 12px;
                   display: flex;
                   align-items: center;
                   justify-content: center;
-                  font-size: 48px;
-                  color: var(--accent-color-light);
+                  font-size: 24px;
+                  color: var(--text-soft);
+                  transition: all var(--transition-speed);
                 "
+                class="doc-thumbnail"
               >
-                <i class="fas fa-plus"></i>
+                <i class="far fa-file-alt"></i>
               </div>
-              <div style="color: #e0e0e0; font-weight: 500">Blank document</div>
+              <div
+                style="color: var(--text); font-size: 13px; font-weight: 600; margin-bottom: 2px"
+              >
+                Blank document
+              </div>
+              <div style="color: var(--text-soft); font-size: 11px">Start from scratch</div>
             </div>
-
-            <!-- Redundant inline styles removed -->
           </div>
         </div>
 
         <!-- Search and Filter -->
-        <div style="margin-bottom: 24px">
-          <input type="text" id="docSearch" placeholder="Search documents..." />
+        <div style="margin-bottom: 24px; display: flex; justify-content: flex-end">
+          <div style="position: relative; width: min(420px, 100%)">
+            <i
+              class="fas fa-search"
+              style="
+                position: absolute;
+                left: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: var(--text-soft);
+                font-size: 13px;
+              "
+            ></i>
+            <input
+              type="text"
+              id="docSearch"
+              placeholder="Search documents..."
+              class="document-search"
+              style="
+                width: 100%;
+                height: 40px;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                color: var(--text);
+                padding-left: 36px;
+                padding-right: 12px;
+                font-size: var(--font-md);
+                outline: none;
+                transition:
+                  border-color var(--transition-speed),
+                  box-shadow var(--transition-speed);
+              "
+            />
+          </div>
         </div>
-
-        <!-- Redundant inline styles removed -->
 
         <!-- Recent Documents -->
         <div>
-          <h2 style="font-size: 20px; margin-bottom: 20px" class="section-title">Recent</h2>
-          <div class="doc-list-container" style="border-radius: 8px; overflow: hidden">
+          <h2
+            style="font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text)"
+            class="section-title"
+          >
+            Recent
+          </h2>
+          <div
+            class="recent-documents-table-wrapper"
+            style="
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: var(--radius-md);
+              overflow: hidden;
+            "
+          >
             <table style="width: 100%; border-collapse: collapse">
-              <thead>
-                <tr class="doc-list-header">
+              <thead style="background: rgba(255, 255, 255, 0.01)">
+                <tr class="doc-list-header" style="border-bottom: 1px solid var(--border-soft)">
                   <th
                     style="
                       text-align: left;
-                      padding: 16px 24px;
-                      font-size: 12px;
-                      font-weight: 500;
+                      padding: 12px 24px;
+                      font-size: 11px;
+                      font-weight: 600;
                       text-transform: uppercase;
+                      color: var(--text-soft);
+                      letter-spacing: 0.04em;
                     "
                   >
                     Name
@@ -495,10 +642,12 @@
                   <th
                     style="
                       text-align: left;
-                      padding: 16px 24px;
-                      font-size: 12px;
-                      font-weight: 500;
+                      padding: 12px 24px;
+                      font-size: 11px;
+                      font-weight: 600;
                       text-transform: uppercase;
+                      color: var(--text-soft);
+                      letter-spacing: 0.04em;
                     "
                   >
                     Location
@@ -506,15 +655,17 @@
                   <th
                     style="
                       text-align: left;
-                      padding: 16px 24px;
-                      font-size: 12px;
-                      font-weight: 500;
+                      padding: 12px 24px;
+                      font-size: 11px;
+                      font-weight: 600;
                       text-transform: uppercase;
+                      color: var(--text-soft);
+                      letter-spacing: 0.04em;
                     "
                   >
-                    Date Modified
+                    Last Modified
                   </th>
-                  <th style="width: 60px; padding: 16px 24px"></th>
+                  <th style="width: 60px; padding: 12px 24px"></th>
                 </tr>
               </thead>
               <tbody id="documentList">
@@ -544,6 +695,7 @@
     <!-- Share Modal -->
     <div
       id="shareModal"
+      class="profile-modal-overlay"
       style="
         display: none;
         position: fixed;
@@ -551,65 +703,39 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.85);
         z-index: 10000;
         align-items: center;
         justify-content: center;
       "
     >
-      <div
-        style="
-          background: #000000;
-          padding: 32px;
-          border-radius: 8px;
-          max-width: 500px;
-          width: 90%;
-          border: 2px solid var(--accent-color);
-          box-shadow:
-            0 0 40px rgba(var(--accent-color-rgb), 0.5),
-            inset 0 0 20px rgba(var(--accent-color-rgb), 0.1);
-        "
-      >
-        <h2
-          style="
-            margin: 0 0 16px 0;
-            color: var(--accent-color-light);
-            text-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.8);
-            font-size: 24px;
-            letter-spacing: 0.5px;
-          "
-        >
+      <div class="profile-modal" style="padding: 24px 28px; max-width: 500px; width: 90%">
+        <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 650; color: var(--text)">
           Share this document
         </h2>
 
         <div
           style="
             margin-bottom: 24px;
-            background: rgba(var(--accent-color-rgb), 0.05);
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid rgba(var(--accent-color-rgb), 0.1);
+            background: var(--surface);
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-soft);
           "
         >
           <div style="display: flex; justify-content: space-between; align-items: center">
             <div>
               <div
-                style="
-                  color: var(--accent-color-light);
-                  font-weight: 600;
-                  font-size: 14px;
-                  margin-bottom: 4px;
-                "
+                style="color: var(--text); font-weight: 600; font-size: 14px; margin-bottom: 4px"
               >
                 Link Sharing
               </div>
-              <div style="color: #888; font-size: 11px">
+              <div style="color: var(--text-soft); font-size: 11px">
                 When enabled, anyone with the link can access this document.
               </div>
             </div>
             <label
               class="switch"
-              style="position: relative; display: inline-block; width: 40px; height: 24px"
+              style="position: relative; display: inline-block; width: 34px; height: 20px"
             >
               <input
                 type="checkbox"
@@ -627,63 +753,28 @@
                   bottom: 0;
                   background-color: #333;
                   transition: 0.4s;
-                  border-radius: 24px;
+                  border-radius: 20px;
                 "
               ></span>
             </label>
           </div>
           <div
             id="linkSharingStatus"
-            style="font-size: 11px; margin-top: 8px; color: #aaa; display: none"
+            style="font-size: 11px; margin-top: 8px; color: var(--text-soft); display: none"
           >
             <i class="fas fa-spinner fa-spin"></i> Updating...
           </div>
         </div>
 
-        <p style="color: #d0d0d0; margin-bottom: 8px; font-size: 12px; padding-left: 4px">
+        <p style="color: var(--text-muted); margin-bottom: 8px; font-size: 12px; padding-left: 4px">
           Share link:
         </p>
         <div
           id="shareLinkContainer"
           style="display: flex; gap: 8px; margin-bottom: 24px; transition: opacity 0.3s ease"
         >
-          <input
-            type="text"
-            id="shareLink"
-            readonly
-            style="
-              flex: 1;
-              padding: 12px;
-              border: 1px solid var(--accent-color);
-              border-radius: 4px;
-              font-size: 14px;
-              background: #1a1a1a;
-              color: var(--accent-color-lighter);
-              box-shadow: inset 0 0 10px rgba(var(--accent-color-rgb), 0.1);
-            "
-          />
-          <button
-            id="copyLinkBtn"
-            class="toolbar-btn"
-            style="
-              padding: 12px 24px;
-              background: var(--accent-color);
-              color: white;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-              box-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.4);
-              transition: all 0.3s ease;
-            "
-            onmouseover="
-              this.style.background = 'var(--accent-color-light)';
-              this.style.boxShadow = '0 0 30px rgba(var(--accent-color-rgb), 0.6)';
-            "
-            onmouseout="
-              this.style.background = 'var(--accent-color)';
-              this.style.boxShadow = '0 0 20px rgba(var(--accent-color-rgb), 0.4)';
-            "
-          >
+          <input type="text" id="shareLink" readonly class="profile-input" style="flex: 1" />
+          <button id="copyLinkBtn" class="profile-btn-primary" style="padding: 10px 16px">
             <i class="fas fa-copy"></i> Copy
           </button>
         </div>
@@ -691,22 +782,19 @@
         <p
           style="
             font-size: 12px;
-            color: var(--accent-color-lighter);
+            color: var(--text-muted);
             margin-bottom: 24px;
-            background: rgba(var(--accent-color-rgb), 0.1);
-            padding: 8px 12px;
-            border-radius: 4px;
+            background: var(--surface);
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
             border-left: 3px solid var(--accent-color);
+            margin-top: 0;
           "
         >
           <i class="fas fa-info-circle" style="color: var(--accent-color); margin-right: 8px"></i>
           Your friend will need to log in or create an account to start editing.
         </p>
-        <button
-          id="closeShareModal"
-          class="toolbar-btn close-btn-gradient"
-          style="width: 100%; padding: 12px; border-radius: 4px; cursor: pointer"
-        >
+        <button id="closeShareModal" class="profile-btn-secondary" style="width: 100%">
           Close
         </button>
       </div>
@@ -715,6 +803,7 @@
     <!-- History Modal -->
     <div
       id="historyModal"
+      class="profile-modal-overlay"
       style="
         display: none;
         position: fixed;
@@ -722,7 +811,6 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.85);
         z-index: 10000;
         align-items: center;
         justify-content: center;
@@ -730,1138 +818,465 @@
         padding: 20px;
       "
     >
-      <div
-        style="
-          background: linear-gradient(135deg, #0a0a0a 0%, #1a0f2e 50%, #0d0d0d 100%);
-          padding: 0;
-          border-radius: 12px;
-          width: 100%;
-          max-width: 600px;
-          box-shadow:
-            0 0 40px rgba(var(--accent-color-rgb), 0.4),
-            0 10px 30px rgba(0, 0, 0, 0.7);
-          border: 1px solid var(--accent-color);
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          max-height: 80vh;
-        "
-      >
+      <div class="profile-modal" style="width: 100%; max-width: 600px; max-height: 80vh">
         <!-- Header -->
         <div
-          style="
-            background: linear-gradient(
-              90deg,
-              rgba(var(--accent-color-rgb), 0.15) 0%,
-              transparent 50%,
-              rgba(var(--accent-color-rgb), 0.1) 100%
-            );
-            padding: 24px 24px 20px;
-            border-bottom: 1px solid rgba(var(--accent-color-rgb), 0.2);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          "
+          class="profile-modal-header"
+          style="display: flex; justify-content: space-between; align-items: center"
         >
-          <h2
-            style="
-              margin: 0;
-              color: var(--accent-color-light);
-              text-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
-              font-size: 18px;
-              letter-spacing: 0.5px;
-            "
-          >
-            Document History
-          </h2>
-          <button
-            id="closeHistoryModal"
-            class="toolbar-btn close-btn-gradient"
-            style="padding: 4px 12px; border-radius: 6px; cursor: pointer"
-          >
+          <h2 style="margin: 0">Document History</h2>
+          <button id="closeHistoryModal" class="profile-btn-secondary" style="padding: 6px 12px">
             <i class="fas fa-times"></i>
           </button>
         </div>
 
         <!-- Content -->
-        <div id="historyList" style="padding: 20px; overflow-y: auto; flex: 1">
+        <div id="historyList" class="profile-modal-body" style="flex: 1">
           <!-- History items will be injected here -->
-          <div style="text-align: center; color: #666; padding: 20px">Loading history...</div>
+          <div style="text-align: center; color: var(--text-soft); padding: 20px">
+            Loading history...
+          </div>
         </div>
 
         <!-- Footer -->
-        <div
-          style="
-            padding: 16px 24px;
-            border-top: 1px solid rgba(var(--accent-color-rgb), 0.2);
-            background: rgba(var(--accent-color-rgb), 0.05);
-            text-align: center;
-          "
-        >
-          <span style="font-size: 12px; color: #666">Showing recent activity</span>
+        <div class="profile-modal-footer" style="text-align: center; justify-content: center">
+          <span style="font-size: 12px; color: var(--text-soft)">Showing recent activity</span>
         </div>
       </div>
     </div>
 
     <!-- Profile Modal -->
-    <div
-      id="profileModal"
-      style="
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        z-index: 10000;
-        align-items: center;
-        justify-content: center;
-        overflow-y: auto;
-        padding: 20px;
-      "
-    >
-      <div
-        style="
-          background: linear-gradient(135deg, #0a0a0a 0%, #1a0f2e 50%, #0d0d0d 100%);
-          padding: 0;
-          border-radius: 12px;
-          width: 100%;
-          max-width: 500px;
-          box-shadow:
-            0 0 40px rgba(var(--accent-color-rgb), 0.4),
-            0 10px 30px rgba(0, 0, 0, 0.7);
-          border: 1px solid var(--accent-color);
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        "
-      >
-        <!-- Header (simplified) -->
-        <div
-          style="
-            background: linear-gradient(
-              90deg,
-              rgba(var(--accent-color-rgb), 0.15) 0%,
-              transparent 50%,
-              rgba(var(--accent-color-rgb), 0.1) 100%
-            );
-            padding: 24px 24px 20px;
-            border-bottom: 1px solid rgba(var(--accent-color-rgb), 0.2);
-            text-align: center;
-          "
-        >
-          <h2
-            style="
-              margin: 0;
-              color: var(--accent-color-light);
-              text-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
-              font-size: 18px;
-              letter-spacing: 0.5px;
-            "
-          >
-            User Profile
-          </h2>
+    <div id="profileModal" class="modal-overlay" style="display: none">
+      <div class="profile-modal">
+        <!-- Header -->
+        <div class="profile-modal-header">
+          <h2>User Profile</h2>
+          <p class="profile-modal-subtitle">
+            Manage your account, appearance, and security settings.
+          </p>
         </div>
 
-        <!-- Profile Tabs -->
-        <div
-          style="
-            display: flex;
-            gap: 8px;
-            padding: 16px 24px 0;
-            margin-top: 0;
-            justify-content: center;
-            border-bottom: 1px solid #2a2a2a;
-          "
-        >
-          <button
-            class="profile-tab active"
-            data-tab="general"
-            style="
-              flex: 1;
-              height: 36px;
-              background: transparent;
-              color: var(--accent-color-lighter);
-              border: none;
-              border-bottom: 2px solid var(--accent-color);
-              cursor: pointer;
-              font-weight: 600;
-              font-size: 11px;
-              text-transform: uppercase;
-              letter-spacing: 0.6px;
-              transition: all 0.3s ease;
-            "
-          >
-            General
-          </button>
-          <button
-            class="profile-tab"
-            data-tab="appearance"
-            style="
-              flex: 1;
-              height: 36px;
-              background: transparent;
-              color: #6b7280;
-              border: none;
-              border-bottom: 2px solid transparent;
-              cursor: pointer;
-              font-weight: 600;
-              font-size: 11px;
-              text-transform: uppercase;
-              letter-spacing: 0.6px;
-              transition: all 0.3s ease;
-            "
-          >
-            Appearance
-          </button>
-          <button
-            class="profile-tab"
-            data-tab="security"
-            style="
-              flex: 1;
-              height: 36px;
-              background: transparent;
-              color: #6b7280;
-              border: none;
-              border-bottom: 2px solid transparent;
-              cursor: pointer;
-              font-weight: 600;
-              font-size: 11px;
-              text-transform: uppercase;
-              letter-spacing: 0.6px;
-              transition: all 0.3s ease;
-            "
-          >
-            Security
-          </button>
-        </div>
+        <div class="profile-settings-layout">
+          <!-- Profile Tabs -->
+          <div class="profile-tabs-container" role="tablist" aria-label="Profile Settings Tabs">
+            <button
+              id="tab-general"
+              class="profile-tab active"
+              data-tab="general"
+              role="tab"
+              aria-selected="true"
+              aria-controls="general-content"
+            >
+              <i class="fas fa-user-cog"></i> <span>General</span>
+            </button>
+            <button
+              id="tab-appearance"
+              class="profile-tab"
+              data-tab="appearance"
+              role="tab"
+              aria-selected="false"
+              aria-controls="appearance-content"
+            >
+              <i class="fas fa-palette"></i> <span>Appearance</span>
+            </button>
+            <button
+              id="tab-security"
+              class="profile-tab"
+              data-tab="security"
+              role="tab"
+              aria-selected="false"
+              aria-controls="security-content"
+            >
+              <i class="fas fa-shield-alt"></i> <span>Security</span>
+            </button>
+          </div>
 
-        <!-- Tab Content Container -->
-        <div style="padding: 24px; flex: 1; overflow-y: auto">
-          <!-- General Tab Content -->
-          <div class="profile-tab-content active" id="general-content" style="display: block">
-            <!-- Photo Management Section -->
+          <!-- Tab Content Container -->
+          <div class="profile-modal-body">
+            <!-- General Tab Content -->
             <div
-              style="
-                margin-bottom: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-              "
+              class="profile-tab-content active"
+              id="general-content"
+              role="tabpanel"
+              tabindex="0"
+              aria-labelledby="tab-general"
+              style="display: block"
             >
-              <div style="position: relative; width: 80px; height: 80px; margin-bottom: 12px">
-                <img
-                  id="profilePfp"
-                  src=""
-                  alt="Profile"
-                  style="
-                    width: 80px;
-                    height: 80px;
-                    border-radius: 50%;
-                    background: #1a1a1a;
-                    object-fit: cover;
-                    border: 3px solid var(--accent-color);
-                    box-shadow:
-                      0 0 20px rgba(var(--accent-color-rgb), 0.5),
-                      inset 0 0 15px rgba(var(--accent-color-rgb), 0.1);
-                    display: none;
-                  "
-                />
-                <div
-                  id="profileInitials"
-                  class="avatar-initials"
-                  style="
-                    width: 80px;
-                    height: 80px;
-                    font-size: 32px;
-                    border-radius: 50%;
-                    border: 3px solid var(--accent-color);
-                    box-shadow: 0 0 20px rgba(var(--accent-color-rgb), 0.5);
-                    display: none;
-                    align-items: center;
-                    justify-content: center;
-                  "
-                ></div>
-                <div
-                  id="profilePfpPlaceholder"
-                  style="
-                    width: 80px;
-                    height: 80px;
-                    border-radius: 50%;
-                    background: #1a1a1a;
-                    border: 3px solid var(--accent-color);
-                    box-shadow:
-                      0 0 20px rgba(var(--accent-color-rgb), 0.5),
-                      inset 0 0 15px rgba(var(--accent-color-rgb), 0.1);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                  "
-                >
-                  <i
-                    class="fas fa-user"
-                    style="font-size: 40px; color: var(--accent-color-light)"
-                  ></i>
-                </div>
-                <label
-                  for="pfpUpload"
-                  style="
-                    position: absolute;
-                    bottom: -2px;
-                    right: -2px;
-                    background: linear-gradient(
-                      135deg,
-                      var(--accent-color),
-                      var(--accent-color-light)
-                    );
-                    color: white;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    border: 2px solid #000000;
-                    box-shadow: 0 0 12px rgba(var(--accent-color-rgb), 0.6);
-                    transition: all 0.3s ease;
-                    font-size: 10px;
-                  "
-                  title="Upload new photo (Max 1MB)"
-                >
-                  <i class="fas fa-camera"></i>
-                </label>
-                <input type="file" id="pfpUpload" accept="image/*" style="display: none" />
-              </div>
-              <span style="font-size: 9px; color: #666; margin-top: -8px; margin-bottom: 12px"
-                >Max 1MB</span
-              >
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 16px">
-              <div>
-                <label
-                  for="profileEmailInput"
-                  class="profile-label"
-                  style="
-                    font-size: 10px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                    display: block;
-                    margin-bottom: 6px;
-                  "
-                  >Email Address</label
-                >
-                <div style="display: flex; align-items: center; gap: 10px">
-                  <input
-                    type="text"
-                    id="profileEmailInput"
-                    name="email"
-                    readonly
-                    class="profile-input"
-                  />
-                  <div
-                    id="emailVerificationBadge"
-                    style="
-                      display: flex;
-                      align-items: center;
-                      gap: 4px;
-                      font-size: 10px;
-                      font-weight: 600;
-                      text-transform: uppercase;
-                      letter-spacing: 0.5px;
-                    "
-                  >
-                    <!-- Will be populated by JS -->
-                  </div>
-                </div>
-                <div id="resendVerificationContainer" style="display: none; margin-top: 8px">
-                  <button
-                    id="resendVerificationBtn"
-                    style="
-                      background: none;
-                      border: none;
-                      color: var(--accent-color-light);
-                      font-size: 10px;
-                      cursor: pointer;
-                      text-decoration: underline;
-                      padding: 0;
-                    "
-                  >
-                    Resend verification code
-                  </button>
-                  <span
-                    id="resendTimer"
-                    style="font-size: 10px; color: #666; margin-left: 8px; display: none"
-                  ></span>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  for="profileUsernameInput"
-                  class="profile-label"
-                  style="
-                    font-size: 10px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                    display: block;
-                    margin-bottom: 6px;
-                  "
-                  >Username</label
-                >
-                <input
-                  type="text"
-                  id="profileUsernameInput"
-                  name="username"
-                  readonly
-                  class="profile-input"
-                />
-              </div>
-
-              <div>
-                <label
-                  for="profileBioInput"
-                  class="profile-label"
-                  style="
-                    font-size: 10px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                    display: block;
-                    margin-bottom: 6px;
-                  "
-                  >Bio</label
-                >
-                <textarea
-                  id="profileBioInput"
-                  name="bio"
-                  rows="4"
-                  placeholder="Tell us about yourself..."
-                  class="profile-input"
-                  style="resize: none"
-                ></textarea>
-              </div>
-
-              <button
-                id="saveGeneralBtn"
-                style="
-                  padding: 10px 12px;
-                  background: linear-gradient(
-                    135deg,
-                    var(--accent-color),
-                    var(--accent-color-light)
-                  );
-                  color: white;
-                  border: none;
-                  border-radius: 6px;
-                  cursor: pointer;
-                  font-weight: 600;
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.3px;
-                  box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
-                "
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-
-          <!-- Appearance Tab Content -->
-          <div class="profile-tab-content" id="appearance-content" style="display: none">
-            <!-- Theme Selection -->
-            <div style="margin-bottom: 20px">
-              <h3
-                class="profile-section-title"
-                style="
-                  margin-bottom: 12px;
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.8px;
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                "
-              >
-                <i
-                  class="fas fa-circle-half-stroke"
-                  style="color: var(--accent-color); font-size: 10px"
-                ></i
-                >Theme
-              </h3>
-              <div style="display: flex; gap: 8px">
-                <button
-                  id="darkThemeBtn"
-                  style="
-                    flex: 1;
-                    padding: 10px 12px;
-                    background: linear-gradient(
-                      135deg,
-                      var(--accent-color),
-                      var(--accent-color-light)
-                    );
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
-                    transition: all 0.3s ease;
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                  "
-                >
-                  🌙 Dark
-                </button>
-                <button
-                  id="lightThemeBtn"
-                  style="
-                    flex: 1;
-                    padding: 10px 12px;
-                    background: #f0f0f0;
-                    color: var(--accent-color);
-                    border: 2px solid var(--accent-color);
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    transition: all 0.3s ease;
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                  "
-                >
-                  ☀️ Light
-                </button>
-              </div>
-            </div>
-
-            <!-- Accent Color Selection -->
-            <div style="margin-bottom: 20px">
-              <h3
-                style="
-                  margin-bottom: 12px;
-                  color: var(--accent-color-lighter);
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.8px;
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                "
-              >
-                <i class="fas fa-palette" style="color: var(--accent-color); font-size: 10px"></i
-                >Accent Color
-              </h3>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
-                <button
-                  class="accent-color-btn"
-                  data-color="#8b5cf6"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #8b5cf6;
-                    border: 2px solid #a78bfa;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Purple"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#ec4899"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #ec4899;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Pink"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#3b82f6"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #3b82f6;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Blue"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#10b981"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #10b981;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Green"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#f59e0b"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #f59e0b;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Amber"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#ef4444"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #ef4444;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Red"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#06b6d4"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #06b6d4;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Cyan"
-                ></button>
-                <button
-                  class="accent-color-btn"
-                  data-color="#39ff14"
-                  style="
-                    width: 100%;
-                    aspect-ratio: 1;
-                    background: #39ff14;
-                    border: 2px solid transparent;
-                    border-radius: 6px;
-                    cursor: pointer;
-                  "
-                  title="Neon Green"
-                ></button>
-              </div>
-            </div>
-
-            <!-- Background Theme Selection -->
-            <div style="margin-bottom: 20px">
-              <h3
-                style="
-                  margin-bottom: 12px;
-                  color: var(--accent-color-lighter);
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.8px;
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                "
-              >
-                <i class="fas fa-magic" style="color: var(--accent-color); font-size: 10px"></i
-                ><label for="backgroundThemeSelect">Background Theme</label>
-              </h3>
-              <select
-                id="backgroundThemeSelect"
-                name="backgroundTheme"
-                class="profile-input"
-                style="width: 100%; height: 36px"
-              >
-                <option value="dots">Connected Dots (Classic)</option>
-                <option value="math">Floating Math Symbols</option>
-                <option value="code">Floating Code Blocks</option>
-                <option value="nature">Floating Nature Elements</option>
-                <option value="none">None</option>
-              </select>
-            </div>
-
-            <!-- Editor Preferences -->
-            <div>
-              <h3
-                style="
-                  margin-bottom: 12px;
-                  color: var(--accent-color-lighter);
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.8px;
-                "
-              >
-                Editor Preferences
-              </h3>
-              <div
-                class="preference-row"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  padding: 10px 12px;
-                  background: rgba(var(--accent-color-rgb), 0.05);
-                  border-radius: 6px;
-                  border: 1px solid rgba(var(--accent-color-rgb), 0.1);
-                "
-              >
-                <div style="display: flex; flex-direction: column; gap: 2px">
-                  <span class="preference-label" style="font-size: 12px; font-weight: 500"
-                    >Page Glow</span
-                  >
-                  <span class="preference-desc" style="font-size: 10px"
-                    >Adds a radiant light effect around the document</span
-                  >
-                </div>
-                <label
-                  class="switch"
-                  style="position: relative; display: inline-block; width: 34px; height: 20px"
-                >
-                  <input
-                    type="checkbox"
-                    id="togglePageGlow"
-                    style="opacity: 0; width: 0; height: 0"
-                  />
-                  <span
-                    class="slider"
-                    style="
-                      position: absolute;
-                      cursor: pointer;
-                      top: 0;
-                      left: 0;
-                      right: 0;
-                      bottom: 0;
-                      background-color: #333;
-                      transition: 0.4s;
-                      border-radius: 20px;
-                    "
-                  ></span>
-                </label>
-              </div>
-
-              <div
-                class="preference-row"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  padding: 10px 12px;
-                  background: rgba(var(--accent-color-rgb), 0.05);
-                  border-radius: 6px;
-                  border: 1px solid rgba(var(--accent-color-rgb), 0.1);
-                  margin-top: 8px;
-                "
-              >
-                <div style="display: flex; flex-direction: column; gap: 2px">
-                  <span class="preference-label" style="font-size: 12px; font-weight: 500"
-                    >Page Border Accent</span
-                  >
-                  <span class="preference-desc" style="font-size: 10px"
-                    >Shows your accent color around the page perimeter</span
-                  >
-                </div>
-                <label
-                  class="switch"
-                  style="position: relative; display: inline-block; width: 34px; height: 20px"
-                >
-                  <input
-                    type="checkbox"
-                    id="togglePageBorder"
-                    style="opacity: 0; width: 0; height: 0"
-                  />
-                  <span
-                    class="slider"
-                    style="
-                      position: absolute;
-                      cursor: pointer;
-                      top: 0;
-                      left: 0;
-                      right: 0;
-                      bottom: 0;
-                      background-color: #333;
-                      transition: 0.4s;
-                      border-radius: 20px;
-                    "
-                  ></span>
-                </label>
-              </div>
-            </div>
-
-            <style>
-              .switch input:checked + .slider {
-                background-color: var(--accent-color);
-              }
-              .slider:before {
-                position: absolute;
-                content: '';
-                height: 14px;
-                width: 14px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: 0.4s;
-                border-radius: 50%;
-              }
-              .switch input:checked + .slider:before {
-                transform: translateX(14px);
-              }
-            </style>
-          </div>
-
-          <!-- Security Tab Content -->
-          <div class="profile-tab-content" id="security-content" style="display: none">
-            <h3
-              style="
-                margin-bottom: 16px;
-                color: var(--accent-color-lighter);
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.8px;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-              "
-            >
-              <i class="fas fa-lock" style="color: var(--accent-color); font-size: 10px"></i>Change
-              Password
-            </h3>
-            <div style="display: flex; flex-direction: column; gap: 10px">
-              <div style="position: relative">
-                <label
-                  for="newPassword"
-                  class="profile-label"
-                  style="
-                    font-size: 10px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                    display: block;
-                    margin-bottom: 6px;
-                  "
-                  >New Password</label
-                >
-                <input
-                  type="password"
-                  id="newPassword"
-                  name="newPassword"
-                  class="profile-input"
-                  placeholder="Enter new password"
-                  style="
-                    width: 100%;
-                    padding: 10px 12px;
-                    border-radius: 6px;
-                    font-size: 11px;
-                    transition: all 0.3s ease;
-                  "
-                />
-                <!-- Password Strength Meter -->
-                <div style="margin-top: 8px">
-                  <div class="entropy-bar" style="margin-bottom: 8px">
+              <div class="profile-general-grid">
+                <!-- Photo Management Section -->
+                <div class="profile-avatar-card">
+                  <div class="profile-avatar-wrapper">
+                    <img
+                      id="profilePfp"
+                      class="profile-avatar"
+                      src=""
+                      alt="Profile"
+                      style="object-fit: cover; display: none"
+                    />
                     <div
-                      id="passwordStrengthBar"
+                      id="profileInitials"
+                      class="avatar-initials profile-avatar"
                       style="
-                        height: 100%;
-                        width: 0%;
-                        transition: all 0.3s ease;
-                        background: #ef4444;
+                        font-size: 32px;
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
                       "
                     ></div>
+                    <div
+                      id="profilePfpPlaceholder"
+                      class="profile-avatar"
+                      style="display: flex; align-items: center; justify-content: center"
+                    >
+                      <i class="fas fa-user" style="font-size: 40px; color: var(--text-soft)"></i>
+                    </div>
                   </div>
-                  <ul
-                    id="passwordRequirements"
-                    style="
-                      list-style: none;
-                      padding: 0;
-                      margin: 0;
-                      display: grid;
-                      grid-template-columns: 1fr 1fr;
-                      gap: 4px;
-                    "
+                  <label
+                    for="pfpUpload"
+                    class="profile-btn-secondary avatar-upload-btn"
+                    title="Upload new photo (Max 1MB)"
                   >
-                    <li
-                      data-req="length"
-                      style="
-                        font-size: 9px;
-                        color: #666;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                      "
-                    >
-                      <i class="fas fa-circle" style="font-size: 4px"></i> 8+ Characters
-                    </li>
-                    <li
-                      data-req="upper"
-                      style="
-                        font-size: 9px;
-                        color: #666;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                      "
-                    >
-                      <i class="fas fa-circle" style="font-size: 4px"></i>
-                      Uppercase
-                    </li>
-                    <li
-                      data-req="number"
-                      style="
-                        font-size: 9px;
-                        color: #666;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                      "
-                    >
-                      <i class="fas fa-circle" style="font-size: 4px"></i>
-                      Number
-                    </li>
-                    <li
-                      data-req="symbol"
-                      style="
-                        font-size: 9px;
-                        color: #666;
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                      "
-                    >
-                      <i class="fas fa-circle" style="font-size: 4px"></i>
-                      Symbol
-                    </li>
-                  </ul>
+                    <i class="fas fa-camera"></i> Change Photo
+                  </label>
+                  <input type="file" id="pfpUpload" accept="image/*" style="display: none" />
+                  <span class="profile-helper-text">PNG or JPG, max 1MB</span>
                 </div>
-              </div>
-              <button
-                id="updatePasswordBtn"
-                style="
-                  padding: 10px 12px;
-                  background: linear-gradient(
-                    135deg,
-                    var(--accent-color),
-                    var(--accent-color-light)
-                  );
-                  color: white;
-                  border: none;
-                  border-radius: 6px;
-                  cursor: pointer;
-                  font-weight: 600;
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.3px;
-                  box-shadow: 0 0 15px rgba(var(--accent-color-rgb), 0.3);
-                  transition: all 0.3s ease;
-                  margin-top: 4px;
-                "
-              >
-                Update Password
-              </button>
-            </div>
 
-            <div style="margin-top: 24px">
-              <div
-                class="collapsible-header"
-                id="toggleLoginHistory"
-                style="
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  margin-bottom: 8px;
-                "
-              >
-                <h3
-                  class="profile-section-title"
-                  style="
-                    margin: 0;
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.8px;
-                  "
-                >
-                  Login History
-                </h3>
-                <i
-                  class="fas fa-chevron-down"
-                  style="font-size: 10px; color: #666; transition: transform 0.3s"
-                ></i>
-              </div>
-              <div
-                id="loginHistoryContainer"
-                style="
-                  display: none;
-                  background: #0d0520;
-                  border-radius: 6px;
-                  border: 1px solid #2a2a2a;
-                  overflow: hidden;
-                "
-              >
-                <table style="width: 100%; border-collapse: collapse; font-size: 10px">
-                  <tbody id="loginHistoryTableBody">
-                    <!-- Populated by JS -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                <div class="profile-form-container">
+                  <div class="profile-form-group">
+                    <label for="profileEmailInput" class="profile-label">Email Address</label>
+                    <div style="display: flex; align-items: center; gap: 10px">
+                      <input
+                        type="text"
+                        id="profileEmailInput"
+                        name="email"
+                        readonly
+                        class="profile-input"
+                      />
+                      <div
+                        id="emailVerificationBadge"
+                        style="display: flex; align-items: center; flex-shrink: 0"
+                      >
+                        <!-- Will be populated by JS -->
+                      </div>
+                    </div>
+                    <div id="resendVerificationContainer" style="display: none; margin-top: 8px">
+                      <button id="resendVerificationBtn" class="profile-text-action">
+                        Resend verification code
+                      </button>
+                      <span
+                        id="resendTimer"
+                        style="
+                          font-size: 12px;
+                          color: var(--text-soft);
+                          margin-left: 8px;
+                          display: none;
+                        "
+                      ></span>
+                    </div>
+                  </div>
 
-            <div style="margin-top: 24px">
-              <div
-                class="collapsible-header"
-                id="toggleSessions"
-                style="
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  margin-bottom: 12px;
-                "
-              >
-                <div style="display: flex; align-items: center; gap: 10px">
-                  <h3
-                    class="profile-section-title"
-                    style="
-                      margin: 0;
-                      font-size: 11px;
-                      text-transform: uppercase;
-                      letter-spacing: 0.8px;
-                    "
-                  >
-                    Sessions
-                  </h3>
+                  <div class="profile-form-group">
+                    <label for="profileUsernameInput" class="profile-label">Username</label>
+                    <input
+                      type="text"
+                      id="profileUsernameInput"
+                      name="username"
+                      readonly
+                      class="profile-input"
+                    />
+                  </div>
+
+                  <div class="profile-form-group">
+                    <label for="profileBioInput" class="profile-label">Bio</label>
+                    <textarea
+                      id="profileBioInput"
+                      name="bio"
+                      rows="4"
+                      placeholder="Tell us about yourself..."
+                      class="profile-textarea"
+                      style="resize: none"
+                    ></textarea>
+                  </div>
+
                   <button
-                    id="revokeAllOthersBtn"
-                    style="
-                      background: none;
-                      border: none;
-                      color: #ef4444;
-                      font-size: 9px;
-                      text-transform: uppercase;
-                      cursor: pointer;
-                      letter-spacing: 0.5px;
-                      font-weight: 600;
-                    "
+                    id="saveGeneralBtn"
+                    class="profile-btn-primary"
+                    style="align-self: flex-start"
                   >
-                    Revoke Others
+                    Save Changes
                   </button>
                 </div>
-                <i
-                  class="fas fa-chevron-down"
-                  style="font-size: 10px; color: #666; transition: transform 0.3s"
-                ></i>
-              </div>
-              <div
-                id="sessionListContainer"
-                style="display: none; flex-direction: column; gap: 8px"
-              >
-                <!-- Dynamically populated -->
               </div>
             </div>
 
-            <div style="margin-top: 24px">
-              <h3
-                style="
-                  margin-bottom: 12px;
-                  color: var(--accent-color-lighter);
-                  font-size: 11px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.8px;
-                "
-              >
-                Privacy
-              </h3>
-              <div
-                class="privacy-row"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  background: #0d0520;
-                  padding: 12px;
-                  border-radius: 6px;
-                  border: 1px solid #2a2a2a;
-                "
-              >
-                <div style="display: flex; flex-direction: column">
-                  <span style="font-size: 12px; color: #e0e0e0" class="privacy-text-main"
-                    >Show my online status to others</span
-                  >
-                  <span class="preference-desc" style="font-size: 10px; margin-top: 2px"
-                    >When off, your cursor and presence are hidden from collaborators.</span
-                  >
+            <!-- Appearance Tab Content -->
+            <div
+              class="profile-tab-content"
+              id="appearance-content"
+              role="tabpanel"
+              tabindex="0"
+              aria-labelledby="tab-appearance"
+              style="display: none"
+            >
+              <!-- Theme Selection -->
+              <div class="settings-card">
+                <h3 class="settings-card-title">
+                  <i
+                    class="fas fa-circle-half-stroke"
+                    style="color: var(--accent-color); font-size: 14px; margin-right: 8px"
+                  ></i
+                  >Theme
+                </h3>
+                <div class="theme-choice-group">
+                  <button id="darkThemeBtn" class="theme-choice active">🌙 Dark</button>
+                  <button id="lightThemeBtn" class="theme-choice">☀️ Light</button>
                 </div>
-                <i
-                  id="privacyToggle"
-                  class="fas fa-toggle-on"
-                  style="color: var(--accent-color-light); font-size: 20px; cursor: pointer"
-                ></i>
+              </div>
+
+              <!-- Accent Color Selection -->
+              <div class="settings-card">
+                <h3 class="settings-card-title">
+                  <i
+                    class="fas fa-palette"
+                    style="color: var(--accent-color); font-size: 14px; margin-right: 8px"
+                  ></i
+                  >Accent Color
+                </h3>
+                <div class="accent-color-grid">
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#3b82f6"
+                    style="background: #3b82f6"
+                    title="Blue"
+                  ></button>
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#64748b"
+                    style="background: #64748b"
+                    title="Slate"
+                  ></button>
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#14b8a6"
+                    style="background: #14b8a6"
+                    title="Teal"
+                  ></button>
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#10b981"
+                    style="background: #10b981"
+                    title="Green"
+                  ></button>
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#6366f1"
+                    style="background: #6366f1"
+                    title="Muted Indigo"
+                  ></button>
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#94a3b8"
+                    style="background: #94a3b8"
+                    title="Neutral Gray"
+                  ></button>
+                  <button
+                    class="accent-color-btn accent-swatch"
+                    data-color="#8b5cf6"
+                    style="background: #8b5cf6"
+                    title="Purple"
+                  ></button>
+                </div>
+              </div>
+
+              <!-- Editor Preferences -->
+              <div class="settings-card">
+                <h3 class="settings-card-title">Editor Preferences</h3>
+                <div class="preference-list">
+                  <div class="preference-row">
+                    <div style="display: flex; flex-direction: column; gap: 2px">
+                      <span class="preference-title">Page Glow</span>
+                      <span class="preference-description"
+                        >Adds a radiant light effect around the document</span
+                      >
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="togglePageGlow" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="preference-row">
+                    <div style="display: flex; flex-direction: column; gap: 2px">
+                      <span class="preference-title">Page Border Accent</span>
+                      <span class="preference-description"
+                        >Shows your accent color around the page perimeter</span
+                      >
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="togglePageBorder" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Security Tab Content -->
+            <div
+              class="profile-tab-content"
+              id="security-content"
+              role="tabpanel"
+              tabindex="0"
+              aria-labelledby="tab-security"
+              style="display: none"
+            >
+              <!-- Change Password -->
+              <div class="settings-card">
+                <h3 class="settings-card-title">
+                  <i
+                    class="fas fa-lock"
+                    style="color: var(--accent-color); font-size: 14px; margin-right: 8px"
+                  ></i
+                  >Change Password
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <div class="profile-form-group" style="margin-bottom: 0">
+                    <label for="newPassword" class="profile-label">New Password</label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      name="newPassword"
+                      class="profile-input"
+                      placeholder="Enter new password"
+                    />
+                    <!-- Password Strength Meter -->
+                    <div style="margin-top: 8px">
+                      <div class="entropy-bar" style="margin-bottom: 8px">
+                        <div
+                          id="passwordStrengthBar"
+                          style="
+                            height: 100%;
+                            width: 0%;
+                            transition: all 0.3s ease;
+                            background: #ef4444;
+                          "
+                        ></div>
+                      </div>
+                      <ul id="passwordRequirements" class="password-requirements">
+                        <li data-req="length">
+                          <i class="fas fa-circle" style="font-size: 4px"></i> 8+ Characters
+                        </li>
+                        <li data-req="upper">
+                          <i class="fas fa-circle" style="font-size: 4px"></i> Uppercase
+                        </li>
+                        <li data-req="number">
+                          <i class="fas fa-circle" style="font-size: 4px"></i> Number
+                        </li>
+                        <li data-req="symbol">
+                          <i class="fas fa-circle" style="font-size: 4px"></i> Symbol
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                  <button
+                    id="updatePasswordBtn"
+                    class="profile-btn-primary"
+                    style="align-self: flex-start; margin-top: 4px"
+                  >
+                    Update Password
+                  </button>
+                </div>
+              </div>
+
+              <!-- Login History -->
+              <div class="settings-card profile-collapsible">
+                <div class="profile-collapsible-header" id="toggleLoginHistory">
+                  <i class="fas fa-chevron-down accordion-chevron"></i>
+                  <div class="accordion-header-left">
+                    <i class="fas fa-history accordion-icon"></i>
+                    <div class="accordion-header-text">
+                      <span class="accordion-title">Login History</span>
+                      <span class="accordion-summary">View your recent login activity.</span>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  id="loginHistoryContainer"
+                  style="display: none; border-top: 1px solid var(--border-soft)"
+                >
+                  <table style="width: 100%; border-collapse: collapse">
+                    <tbody id="loginHistoryTableBody">
+                      <!-- Populated by JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Sessions -->
+              <div class="settings-card profile-collapsible">
+                <div class="profile-collapsible-header" id="toggleSessions">
+                  <i class="fas fa-chevron-down accordion-chevron"></i>
+                  <div class="accordion-header-left">
+                    <i class="fas fa-desktop accordion-icon"></i>
+                    <div class="accordion-header-text">
+                      <span class="accordion-title">Active Sessions</span>
+                      <span class="accordion-summary"
+                        >Manage your active sessions on other devices.</span
+                      >
+                    </div>
+                  </div>
+                  <div class="accordion-header-right">
+                    <button id="revokeAllOthersBtn" class="profile-btn-danger-sm">
+                      Revoke Others
+                    </button>
+                  </div>
+                </div>
+                <div
+                  id="sessionListContainer"
+                  style="
+                    display: none;
+                    flex-direction: column;
+                    gap: 8px;
+                    padding: 12px;
+                    border-top: 1px solid var(--border-soft);
+                  "
+                >
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+
+              <!-- Privacy -->
+              <div class="settings-card">
+                <h3 class="settings-card-title">Privacy</h3>
+                <div class="preference-row">
+                  <div style="display: flex; flex-direction: column">
+                    <span class="preference-title">Show my online status to others</span>
+                    <span class="preference-description"
+                      >When off, your cursor and presence are hidden from collaborators.</span
+                    >
+                  </div>
+                  <i
+                    id="privacyToggle"
+                    class="fas fa-toggle-on"
+                    role="switch"
+                    aria-checked="true"
+                    aria-label="Show my online status to others"
+                    tabindex="0"
+                    style="color: var(--accent-color-light); font-size: 20px; cursor: pointer"
+                  ></i>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Footer with Buttons -->
-        <div
-          style="
-            padding: 16px 24px;
-            border-top: 1px solid rgba(var(--accent-color-rgb), 0.2);
-            background: rgba(var(--accent-color-rgb), 0.05);
-            display: flex;
-            gap: 12px;
-          "
-        >
-          <button
-            id="logoutBtnProfile"
-            class="toolbar-btn"
-            style="
-              flex: 1;
-              padding: 10px 12px;
-              background: rgba(239, 68, 68, 0.1);
-              border: 2px solid #ef4444;
-              border-radius: 6px;
-              cursor: pointer;
-              color: #ef4444;
-              transition: all 0.3s ease;
-              font-weight: 600;
-              font-size: 11px;
-              text-transform: uppercase;
-              letter-spacing: 0.3px;
-            "
-            onmouseover="
-              this.style.background = 'rgba(239, 68, 68, 0.2)';
-              this.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.25)';
-            "
-            onmouseout="
-              this.style.background = 'rgba(239, 68, 68, 0.1)';
-              this.style.boxShadow = 'none';
-            "
-          >
+        <!-- Footer -->
+        <div class="profile-modal-footer">
+          <button id="logoutBtnProfile" class="profile-btn-danger">
             <i class="fas fa-sign-out-alt"></i> Logout
           </button>
-          <button
-            id="closeProfileModal"
-            class="toolbar-btn close-btn-gradient"
-            style="
-              flex: 1;
-              padding: 10px 12px;
-              border-radius: 6px;
-              cursor: pointer;
-              font-size: 11px;
-            "
-          >
-            ✕ Close
-          </button>
+          <button id="closeProfileModal" class="profile-btn-secondary">✕ Close</button>
         </div>
       </div>
     </div>
@@ -2598,13 +2013,88 @@
     </div>
 
     <!-- Status Bar -->
-    <div class="status-bar">
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
-        <div style="display: flex; gap: 16px">
-          <span id="pageIndicator" style="color: #5f6368; font-size: 12px">Page 1</span>
-          | <span id="charCount">Characters: 0</span> |
-          <span id="wordCount">Words: 0</span>
-        </div>
+    <div class="status-bar" role="status" aria-live="polite">
+      <div class="status-bar-left">
+        <span id="pageIndicator" class="status-item">Page 1 of 1</span>
+        <span class="status-divider" aria-hidden="true"></span>
+
+        <span id="wordCount" class="status-item" data-count="0"
+          ><span class="status-label">0 words</span></span
+        >
+        <span class="status-divider" aria-hidden="true"></span>
+
+        <span id="charCount" class="status-item" data-count="0"
+          ><span class="status-label">0 characters</span></span
+        >
+
+        <span id="selectionStatsContainer" class="status-item-group" style="display: none">
+          <span class="status-divider" aria-hidden="true"></span>
+          <span id="selectionStats" class="status-item selection-stats"
+            >Selected: 0 words · 0 characters</span
+          >
+        </span>
+
+        <span class="status-divider" aria-hidden="true"></span>
+        <span id="saveStatusIndicator" class="status-item save-status-indicator" data-status="saved"
+          >Saved</span
+        >
+        <span
+          id="connectionBadge"
+          class="status-item connection-badge"
+          data-status="connected"
+          hidden
+          >Connected</span
+        >
+      </div>
+      <div class="status-bar-right">
+        <button
+          class="toolbar-btn zoomOutBtn"
+          title="Zoom out"
+          aria-label="Zoom out"
+          style="
+            padding: 2px 6px;
+            font-size: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-soft);
+            cursor: pointer;
+          "
+        >
+          <i class="fas fa-minus"></i>
+        </button>
+        <button
+          class="zoomPercent zoom100"
+          title="Reset Zoom"
+          aria-label="Reset Zoom (currently 100%)"
+          style="
+            font-size: 11px;
+            min-width: 32px;
+            text-align: center;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            padding: 0;
+          "
+        >
+          100%
+        </button>
+        <button
+          class="toolbar-btn zoomInBtn"
+          title="Zoom in"
+          aria-label="Zoom in"
+          style="
+            padding: 2px 6px;
+            font-size: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-soft);
+            cursor: pointer;
+          "
+        >
+          <i class="fas fa-plus"></i>
+        </button>
       </div>
     </div>
 

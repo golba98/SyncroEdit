@@ -9,7 +9,7 @@ export class DynamicBackground {
     this.lastTypeTime = 0;
 
     // Theme Configuration
-    this.currentTheme = localStorage.getItem('synchroEditBackgroundTheme') || 'dots';
+    this.currentTheme = 'dots';
 
     this.themes = {
       dots: {
@@ -45,50 +45,15 @@ export class DynamicBackground {
     };
 
     this.config = {
-      color: 'rgba(139, 92, 246, 0.4)',
-      lineColor: 'rgba(139, 92, 246, 0.15)',
+      color: 'rgba(59, 130, 246, 0.18)',
+      lineColor: 'rgba(125, 135, 148, 0.12)',
     };
 
     this.init();
   }
 
   setTheme(themeName) {
-    if (themeName === 'none') {
-      this.currentTheme = 'none';
-      localStorage.setItem('synchroEditBackgroundTheme', 'none');
-      this.particles = [];
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      if (this.animationFrameId) {
-        cancelAnimationFrame(this.animationFrameId);
-        this.animationFrameId = null;
-      }
-      return;
-    }
-
-    if (this.themes[themeName]) {
-      if (window.app && window.app.theme) {
-        window.app.theme.showThemeToast('Updating Background...');
-      }
-
-      this.currentTheme = themeName;
-
-      localStorage.setItem('synchroEditBackgroundTheme', themeName);
-
-      this.createParticles();
-
-      // Re-append to workspace to ensure correct layering
-      const target = document.querySelector('.main-workspace');
-      if (target && this.canvas.parentElement !== target) {
-        target.prepend(this.canvas);
-      }
-
-      // Code theme uses a darker workspace background
-      if (themeName === 'code') {
-        document.body.classList.add('bg-code-mode');
-      } else {
-        document.body.classList.remove('bg-code-mode');
-      }
-    }
+    // No-op as background theme is now constant ('dots')
   }
 
   init() {
@@ -101,6 +66,8 @@ export class DynamicBackground {
     this.canvas.style.height = '100%';
     this.canvas.style.zIndex = '0'; // Behind text but above container base
     this.canvas.style.pointerEvents = 'none';
+    this.canvas.style.display = 'none';
+    this.canvas.style.visibility = 'hidden';
 
     // cleanup existing
     const existing = document.getElementById('dynamic-background');
@@ -109,7 +76,7 @@ export class DynamicBackground {
     // Find workspace or fallback to body
     const target = document.querySelector('.main-workspace') || document.body;
     target.style.position = 'relative';
-    target.prepend(this.canvas);
+    // target.prepend(this.canvas); // Disabled dynamic background entirely per user request
 
     // Listeners
     window.addEventListener('resize', () => this.handleResize());
@@ -129,12 +96,8 @@ export class DynamicBackground {
     });
 
     this.resize();
-    this.setTheme(this.currentTheme); // Initial particles
-
-    // Only animate if not 'none' (setTheme handles the none check but animate is called explicitly here)
-    if (this.currentTheme !== 'none') {
-      this.animate();
-    }
+    this.createParticles(); // Initial particles
+    this.animate();
 
     window.addEventListener('theme-update', () => this.updateThemeColors());
 
@@ -255,6 +218,7 @@ export class DynamicBackground {
   }
 
   animate() {
+    if (!this.canvas.parentElement || this.canvas.style.display === 'none') return;
     this.animationFrameId = requestAnimationFrame(() => this.animate());
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 

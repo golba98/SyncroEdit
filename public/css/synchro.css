@@ -5,12 +5,12 @@
 
 /* ==================== CSS VARIABLES ==================== */
 :root {
-  --synchro-accent: #8b5cf6;
-  --synchro-accent-glow: rgba(139, 92, 246, 0.6);
-  --synchro-success: #10b981;
-  --synchro-warning: #fbbf24;
+  --synchro-accent: #3b82f6;
+  --synchro-accent-glow: rgba(59, 130, 246, 0.15);
+  --synchro-success: #22c55e;
+  --synchro-warning: #eab308;
   --synchro-error: #ef4444;
-  --synchro-blue: #3b82f6;
+  --synchro-blue: #2563eb;
 }
 
 /* ==================== GLOBAL TRANSITION SMOOTHING ==================== */

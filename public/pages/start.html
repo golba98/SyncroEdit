@@ -12,13 +12,20 @@
       }
 
       body {
-        font-family: 'Arial', sans-serif;
-        background: #000000;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: #101418;
         display: flex;
         justify-content: center;
         align-items: center;
         min-height: 100vh;
-        color: white;
+        color: #f3f4f6;
       }
 
       .container {
@@ -31,33 +38,30 @@
         font-size: 48px;
         margin-bottom: 20px;
         animation: fadeIn 1s ease-in;
-        color: #a78bfa;
-        text-shadow: 0 0 30px rgba(167, 139, 250, 0.8);
+        color: #3b82f6;
       }
 
       .logo {
         font-size: 72px;
         margin-bottom: 30px;
         animation: bounce 2s infinite;
-        filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.6));
       }
 
       p {
         font-size: 18px;
         margin-bottom: 30px;
         opacity: 0.9;
-        color: #e0e0e0;
+        color: #b0b7c3;
       }
 
       .loading {
         display: inline-block;
         width: 50px;
         height: 50px;
-        border: 5px solid rgba(139, 92, 246, 0.3);
-        border-top-color: #8b5cf6;
+        border: 5px solid rgba(59, 130, 246, 0.15);
+        border-top-color: #3b82f6;
         border-radius: 50%;
         animation: spin 1s linear infinite;
-        box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
       }
 
       @keyframes spin {

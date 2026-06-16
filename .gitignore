@@ -68,6 +68,8 @@ gemini.md
 GEMINI.md
 CLAUDE.md
 AGENTS.md
+.dev.vars
+.codexa/
 
 # Cloudflare Wrangler local state
 .wrangler/

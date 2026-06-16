@@ -74,9 +74,13 @@ export class UIManager {
     profileTabs.forEach((tab) => {
       tab.addEventListener('click', () => {
         const targetTab = tab.dataset.tab;
-        profileTabs.forEach((t) => t.classList.remove('active'));
+        profileTabs.forEach((t) => {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
         profileTabContents.forEach((c) => (c.style.display = 'none'));
         tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
         const targetContent = document.getElementById(`${targetTab}-content`);
         if (targetContent) targetContent.style.display = 'block';
 
@@ -348,14 +352,24 @@ export class UIManager {
         bootLoader.style.display !== 'none' &&
         !bootLoader.classList.contains('fading-out')
       ) {
+        console.log('[BOOTLOADER] Hiding bootloader, state:', state);
         bootLoader.classList.add('fading-out');
-        const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 200;
+        const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 200;
+        console.log('[BOOTLOADER] Duration:', duration);
         if (duration === 0) {
+          console.log('[BOOTLOADER] Hiding bootloader synchronously');
           bootLoader.style.display = 'none';
         } else {
           setTimeout(() => {
+            console.log(
+              '[BOOTLOADER] Timeout fired, current state:',
+              document.body.dataset.viewState
+            );
             if (document.body.dataset.viewState !== 'booting') {
+              console.log('[BOOTLOADER] Hiding bootloader');
               bootLoader.style.display = 'none';
+            } else {
+              console.log('[BOOTLOADER] Keeping bootloader because state is booting');
             }
           }, duration);
         }
@@ -384,7 +398,7 @@ export class UIManager {
     }
 
     if (fadingDashboard) {
-      const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
+      const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 180;
       setTimeout(() => {
         if (
           document.body.dataset.viewState !== 'dashboard' &&
@@ -748,28 +762,64 @@ export class UIManager {
   }
 
   updateStatus(pageIndex) {
+    this.updatePageIndicator(pageIndex);
+  }
+
+  updatePageIndicator(pageIndex) {
     const pageIndicator = document.getElementById('pageIndicator');
     if (!pageIndicator) return;
 
-    pageIndicator.textContent = `Page ${pageIndex + 1}`;
-    const totalPages = this.app.editor ? this.app.editor.pages.length : 1;
-    pageIndicator.textContent += ` of ${totalPages}`;
+    const idx =
+      typeof pageIndex === 'number'
+        ? pageIndex
+        : this.app.editor
+          ? this.app.editor.currentPageIndex
+          : 0;
+    const totalPages = this.app.editor ? this.app.editor.yPages.length : 1;
+    pageIndicator.textContent = `Page ${idx + 1} of ${Math.max(1, totalPages)}`;
+  }
 
-    if (this.statusTimeout) clearTimeout(this.statusTimeout);
-    this.statusTimeout = setTimeout(() => {
-      if (this.app.editor && this.app.editor.quill) {
-        const text = this.app.editor.quill.getText();
-        const chars = text.replace(/\s/g, '').length;
-        const words = text
-          .trim()
-          .split(/\s+/)
-          .filter((word) => word.length > 0).length;
-        const charEl = document.getElementById('charCount');
-        const wordEl = document.getElementById('wordCount');
-        if (charEl) charEl.textContent = `Characters: ${Math.max(0, chars)}`;
-        if (wordEl) wordEl.textContent = `Words: ${words}`;
-      }
-    }, 500);
+  updateStats(stats) {
+    const wordEl = document.getElementById('wordCount');
+    const charEl = document.getElementById('charCount');
+    if (!wordEl || !charEl) return;
+
+    const words = stats.wordCount;
+    const chars = stats.charCount;
+
+    wordEl.dataset.count = words;
+    charEl.dataset.count = chars;
+
+    const wordLabel = wordEl.querySelector('.status-label');
+    if (wordLabel) {
+      wordLabel.textContent = words === 1 ? '1 word' : `${words} words`;
+    } else {
+      wordEl.textContent = words === 1 ? '1 word' : `${words} words`;
+    }
+
+    const charLabel = charEl.querySelector('.status-label');
+    if (charLabel) {
+      charLabel.textContent = chars === 1 ? '1 character' : `${chars} characters`;
+    } else {
+      charEl.textContent = chars === 1 ? '1 character' : `${chars} characters`;
+    }
+
+    this.updatePageIndicator();
+  }
+
+  updateSelectionStats(stats) {
+    const container = document.getElementById('selectionStatsContainer');
+    const statsEl = document.getElementById('selectionStats');
+    if (!container || !statsEl) return;
+
+    if (stats && stats.hasSelection && stats.charCount > 0) {
+      const wordsLabel = stats.wordCount === 1 ? '1 word' : `${stats.wordCount} words`;
+      const charsLabel = stats.charCount === 1 ? '1 character' : `${stats.charCount} characters`;
+      statsEl.textContent = `Selected: ${wordsLabel} · ${charsLabel}`;
+      container.style.display = 'inline-flex';
+    } else {
+      container.style.display = 'none';
+    }
   }
 
   handleWSStatusChange(status) {
@@ -842,8 +892,8 @@ export class UIManager {
 
     const stateMap = {
       saved: 'Saved',
-      saving: 'Saving...',
-      unsaved: 'Saving...',
+      saving: 'Saving…',
+      unsaved: 'Unsaved changes',
       offline: 'Offline',
       failed: 'Save failed',
     };
@@ -851,12 +901,6 @@ export class UIManager {
     indicator.textContent = stateMap[status] || stateMap.saved;
     indicator.dataset.status = status;
     indicator.hidden = false;
-
-    if (status === 'saved' || status === 'offline') {
-      this.saveStatusTimer = setTimeout(() => {
-        indicator.hidden = true;
-      }, 2000);
-    }
   }
 
   cleanupTimers() {

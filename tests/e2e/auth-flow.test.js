@@ -2,6 +2,8 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Auth and Basic Document Flow', () => {
   test('should register, login, create doc, edit, save, and logout', async ({ page }) => {
+    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+    page.on('pageerror', (err) => console.error('PAGE ERROR:', err.stack || err.message));
     // 1. Registration
     await page.goto('/pages/login.html');
     await page.click('#showSignup');

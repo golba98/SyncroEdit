@@ -68,6 +68,8 @@ const AUTH_RATE_LIMITS = {
     windowSeconds: 300,
   },
   '/api/auth/ws-ticket': { route: 'ws-ticket', limit: 120, windowSeconds: 300 },
+  '/api/auth/resend-code': { route: 'resend-code', limit: 5, windowSeconds: 300 },
+  '/api/auth/verify-email': { route: 'verify-email', limit: 10, windowSeconds: 300 },
 };
 
 app.use('/api/auth/*', async (c, next) => {
@@ -330,6 +332,102 @@ app.post('/api/auth/refresh-token', async (c) => {
     return c.json({ token: accessToken });
   } catch {
     return c.json({ message: 'Invalid refresh token' }, 401);
+  }
+});
+
+app.post('/api/auth/resend-code', async (c) => {
+  try {
+    const db = requireDb(c.env);
+    const { email } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateEmail(email);
+
+    const user = await db
+      .prepare('SELECT id, username FROM users WHERE email = ?')
+      .bind(normalizedEmail)
+      .first();
+
+    if (!user) {
+      return c.json({ message: 'User not found' }, 404);
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    await db
+      .prepare('UPDATE users SET verificationCode = ?, verificationCodeExpires = ? WHERE id = ?')
+      .bind(code, expires, user.id)
+      .run();
+
+    console.log(`[VERIFICATION CODE] Sent to ${normalizedEmail}: ${code}`);
+
+    return c.json({ message: 'Verification code resent' });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'Internal Server Error', 'resend_code_failed');
+  }
+});
+
+app.post('/api/auth/verify-email', async (c) => {
+  try {
+    const db = requireDb(c.env);
+    const { email, verificationCode } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateEmail(email);
+    const trimmedCode = String(verificationCode || '').trim();
+
+    if (!trimmedCode) {
+      throw new AppError(400, 'Verification code required', 'code_required');
+    }
+
+    const user = await db
+      .prepare(
+        'SELECT id, username, email, verificationCode, verificationCodeExpires FROM users WHERE email = ?'
+      )
+      .bind(normalizedEmail)
+      .first();
+
+    if (!user) {
+      throw new AppError(404, 'User not found', 'user_not_found');
+    }
+
+    if (!user.verificationCode || user.verificationCode !== trimmedCode) {
+      throw new AppError(400, 'Invalid verification code', 'invalid_code');
+    }
+
+    const expires = new Date(user.verificationCodeExpires);
+    if (isNaN(expires.getTime()) || expires.getTime() < Date.now()) {
+      throw new AppError(400, 'Verification code expired', 'code_expired');
+    }
+
+    await db
+      .prepare(
+        'UPDATE users SET isEmailVerified = 1, verificationCode = NULL, verificationCodeExpires = NULL WHERE id = ?'
+      )
+      .bind(user.id)
+      .run();
+
+    const { accessToken, refreshToken } = await generateTokens(
+      { id: user.id, username: user.username, email: user.email },
+      c.env,
+      c.req.header('user-agent'),
+      c.req.header('cf-connecting-ip')
+    );
+
+    setCookie(c, 'refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: '/',
+    });
+
+    return c.json({
+      token: accessToken,
+      username: user.username,
+      email: user.email,
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'Internal Server Error', 'verification_failed');
   }
 });
 

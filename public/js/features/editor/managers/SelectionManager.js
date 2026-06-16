@@ -70,6 +70,9 @@ export class SelectionManager extends Plugin {
 
   handleMouseUp() {
     this.isSelecting = false;
+    if (this.editor && typeof this.editor.updateSelectionStats === 'function') {
+      this.editor.updateSelectionStats();
+    }
   }
 
   clearOverlays() {

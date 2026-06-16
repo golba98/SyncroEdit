@@ -36,13 +36,22 @@ export class Profile {
     // Revoke all others listener
     const revokeOthersBtn = document.getElementById('revokeAllOthersBtn');
     if (revokeOthersBtn) {
-      revokeOthersBtn.addEventListener('click', () => this.revokeAllOtherSessions());
+      revokeOthersBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.revokeAllOtherSessions();
+      });
     }
 
     // Privacy toggle listener
     const privacyToggle = document.getElementById('privacyToggle');
     if (privacyToggle) {
       privacyToggle.addEventListener('click', () => this.togglePrivacy());
+      privacyToggle.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          this.togglePrivacy();
+        }
+      });
     }
 
     // PFP upload listener with validation
@@ -61,6 +70,20 @@ export class Profile {
     const container = document.getElementById(containerId);
     if (!header || !container) return;
 
+    // Accessibility attributes
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', 'false');
+    header.setAttribute('aria-controls', containerId);
+
+    // Keyboard support
+    header.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        header.click();
+      }
+    });
+
     header.addEventListener('click', () => {
       const isHidden = container.style.display === 'none';
       container.style.display = isHidden
@@ -68,7 +91,8 @@ export class Profile {
           ? 'flex'
           : 'block'
         : 'none';
-      const icon = header.querySelector('i');
+      header.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      const icon = header.querySelector('.accordion-chevron');
       if (icon) {
         icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
       }
@@ -123,9 +147,11 @@ export class Profile {
     if (this.user.showOnlineStatus) {
       toggle.className = 'fas fa-toggle-on';
       toggle.style.color = 'var(--accent-color-light)';
+      toggle.setAttribute('aria-checked', 'true');
     } else {
       toggle.className = 'fas fa-toggle-off';
       toggle.style.color = '#666';
+      toggle.setAttribute('aria-checked', 'false');
     }
   }
 
@@ -250,11 +276,11 @@ export class Profile {
 
     if (this.user.isEmailVerified) {
       badge.innerHTML =
-        '<i class="fas fa-check-circle" style="color: #10b981;"></i> <span style="color: #10b981;">Verified</span>';
+        '<span class="status-pill status-pill-verified"><i class="fas fa-check-circle"></i> Verified</span>';
       if (resendContainer) resendContainer.style.display = 'none';
     } else {
       badge.innerHTML =
-        '<i class="fas fa-exclamation-circle" style="color: #f59e0b;"></i> <span style="color: #f59e0b;">Unverified</span>';
+        '<span class="status-pill status-pill-unverified"><i class="fas fa-exclamation-circle"></i> Unverified</span>';
       if (resendContainer) resendContainer.style.display = 'block';
     }
   }
