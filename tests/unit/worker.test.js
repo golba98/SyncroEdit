@@ -151,6 +151,61 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(JSON.stringify(data)).not.toContain('stack');
   });
 
+  it('logs the failing signup step when a database query throws', async () => {
+    const failingDb = {
+      prepare(sql) {
+        return {
+          bind(...args) {
+            return {
+              async first() {
+                throw new Error(`db exploded for ${sql} with ${args.length} params`);
+              },
+            };
+          },
+        };
+      },
+    };
+    const logSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await app.request(
+      '/api/auth/signup',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'cf-ray': 'test-ray-id' },
+        body: JSON.stringify({
+          username: 'alice',
+          email: 'alice@example.com',
+          password: PASSWORD,
+        }),
+      },
+      {
+        DB: failingDb,
+        JWT_SECRET: env.JWT_SECRET,
+        RATE_LIMIT_OBJECT: rateLimitBinding(),
+      }
+    );
+
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.code).toBe('signup_failed');
+    expect(JSON.stringify(data)).not.toContain('stack');
+
+    expect(logSpy).toHaveBeenCalledWith(
+      'Signup route failed:',
+      expect.objectContaining({
+        route: '/api/auth/signup',
+        requestId: 'test-ray-id',
+        step: 'check_existing_user',
+        errorName: 'Error',
+        message: expect.stringContaining('db exploded'),
+        stack: expect.stringContaining('db exploded'),
+      })
+    );
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain(PASSWORD);
+
+    logSpy.mockRestore();
+  });
+
   it('validates signup input', async () => {
     const res = await app.request(
       '/api/auth/signup',

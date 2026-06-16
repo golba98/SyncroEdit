@@ -33,6 +33,21 @@ export { RateLimitObject };
 
 const app = new Hono();
 
+function getRequestIdentifier(c) {
+  return c.req.header('cf-ray') || crypto.randomUUID();
+}
+
+function logSignupFailure(c, step, err) {
+  console.error('Signup route failed:', {
+    route: '/api/auth/signup',
+    requestId: getRequestIdentifier(c),
+    step,
+    errorName: err && err.name ? err.name : 'Error',
+    message: err && err.message ? err.message : 'Unknown error',
+    stack: err && err.stack ? err.stack : undefined,
+  });
+}
+
 app.onError((err, c) => {
   if (err instanceof AppError) {
     return jsonError(c, err.status, err.message, err.code);
@@ -142,14 +157,21 @@ app.get('/api/config', (c) => {
 // -------------------------------------------------------------
 
 app.post('/api/auth/signup', async (c) => {
+  let signupStep = 'initialize';
   try {
+    signupStep = 'load_database';
     const db = requireDb(c.env);
+
+    signupStep = 'read_request_body';
     const { username, email, password } = await readJson(c, LIMITS.authBody);
+
+    signupStep = 'validate_request_fields';
     const trimmedUsername = validateUsername(username);
     const normalizedEmail = validateEmail(email);
     validatePassword(password);
 
     // Check uniqueness
+    signupStep = 'check_existing_user';
     const existingUser = await db
       .prepare('SELECT id FROM users WHERE username = ? OR email = ?')
       .bind(trimmedUsername, normalizedEmail)
@@ -159,9 +181,13 @@ app.post('/api/auth/signup', async (c) => {
       return c.json({ message: 'Unable to create account with those credentials' }, 400);
     }
 
+    signupStep = 'hash_password';
     const hashedPassword = await hashPassword(password);
+
+    signupStep = 'generate_user_id';
     const userId = crypto.randomUUID();
 
+    signupStep = 'insert_user';
     await db
       .prepare(
         'INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)'
@@ -174,6 +200,7 @@ app.post('/api/auth/signup', async (c) => {
       username: trimmedUsername,
       email: normalizedEmail,
     };
+    signupStep = 'generate_tokens';
     const { accessToken, refreshToken } = await generateTokens(
       userObj,
       c.env,
@@ -181,6 +208,7 @@ app.post('/api/auth/signup', async (c) => {
       c.req.header('cf-connecting-ip')
     );
 
+    signupStep = 'set_refresh_cookie';
     setCookie(c, 'refreshToken', refreshToken, {
       httpOnly: true,
       secure: true,
@@ -198,6 +226,7 @@ app.post('/api/auth/signup', async (c) => {
       201
     );
   } catch (err) {
+    logSignupFailure(c, signupStep, err);
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'Internal Server Error', 'signup_failed');
   }
