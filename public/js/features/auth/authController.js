@@ -335,9 +335,7 @@ class AuthController {
         this._goToVerification(email, 'Verify your email before signing in.');
         return;
       }
-      const msg = e.message?.includes('401')
-        ? 'Invalid username or password'
-        : e.message?.replace('API error: ', '') || 'Login failed';
+      const msg = this._getAuthErrorMessage(e, 'Invalid username or password', 'Login failed');
       if (statusEl) statusEl.textContent = msg;
       this.synchro.onError();
       form.classList.add('shake-animation');
@@ -407,7 +405,7 @@ class AuthController {
       }
       this._goToVerification(email, data.message || 'Check your email for a verification code.');
     } catch (e) {
-      showError(e.message || 'Signup failed. Please try again.');
+      showError(this._getAuthErrorMessage(e, '', 'Signup failed. Please try again.'));
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -494,6 +492,19 @@ class AuthController {
         }
       };
     }
+  }
+
+  _getAuthErrorMessage(error, unauthorizedMessage, fallbackMessage) {
+    if (error?.status === 401) {
+      return unauthorizedMessage;
+    }
+
+    const code = error?.data?.code;
+    if (code === 'missing_email_code_pepper' || code === 'missing_email_delivery_config') {
+      return 'Email verification is temporarily unavailable. Please contact support.';
+    }
+
+    return error?.message?.replace('API error: ', '') || fallbackMessage;
   }
 
   _updatePasswordStrength(password) {
