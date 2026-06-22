@@ -296,6 +296,8 @@ app.post('/api/auth/signup', async (c) => {
     return c.json(
       {
         ok: true,
+        emailVerified: false,
+        isEmailVerified: false,
         verificationRequired: true,
         message: 'Check your email for a verification code.',
         username: trimmedUsername,
@@ -343,6 +345,8 @@ app.post('/api/auth/login', async (c) => {
         {
           message: 'Email verification required',
           code: 'email_verification_required',
+          emailVerified: false,
+          isEmailVerified: false,
           verificationRequired: true,
           email: user.email,
         },
@@ -369,6 +373,8 @@ app.post('/api/auth/login', async (c) => {
       token: accessToken,
       username: user.username,
       email: user.email,
+      emailVerified: Boolean(user.email_verified_at),
+      isEmailVerified: Boolean(user.email_verified_at),
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -428,7 +434,7 @@ app.post('/api/auth/refresh-token', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT username, email FROM users WHERE id = ?')
+      .prepare('SELECT username, email, email_verified_at FROM users WHERE id = ?')
       .bind(decoded.id)
       .first();
     if (!user) {
@@ -451,7 +457,11 @@ app.post('/api/auth/refresh-token', async (c) => {
       .bind(decoded.sessionId)
       .run();
 
-    return c.json({ token: accessToken });
+    return c.json({
+      token: accessToken,
+      emailVerified: Boolean(user.email_verified_at),
+      isEmailVerified: Boolean(user.email_verified_at),
+    });
   } catch {
     return c.json({ message: 'Invalid refresh token' }, 401);
   }
@@ -490,9 +500,9 @@ app.post('/api/auth/resend-code', async (c) => {
 app.post('/api/auth/verify-email', async (c) => {
   try {
     const db = requireDb(c.env);
-    const { email, code, verificationCode, purpose } = await readJson(c, LIMITS.authBody);
+    const { email, code, purpose } = await readJson(c, LIMITS.authBody);
     const normalizedEmail = validateVerificationEmail(email);
-    const submittedCode = String(code || verificationCode || '').trim();
+    const submittedCode = String(code || '').trim();
     const verificationPurpose = validateVerificationPurpose(purpose);
 
     if (!/^\d{6}$/.test(submittedCode)) {
@@ -554,6 +564,8 @@ app.post('/api/auth/verify-email', async (c) => {
 
     return c.json({
       ok: true,
+      emailVerified: true,
+      isEmailVerified: true,
       message: 'Email verified.',
     });
   } catch (err) {
@@ -599,6 +611,7 @@ app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) =>
   return c.json({
     ...profile,
     showOnlineStatus: profile.showOnlineStatus === 1,
+    emailVerified: Boolean(profile.email_verified_at),
     isEmailVerified: Boolean(profile.email_verified_at),
   });
 });

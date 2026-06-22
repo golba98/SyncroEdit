@@ -95,7 +95,13 @@ export class MockD1 {
       return firstOnly ? found : found ? [found] : [];
     }
 
-    // 5. SELECT username, email FROM users WHERE id = ?
+    // 5. SELECT username, email, email_verified_at FROM users WHERE id = ?
+    if (sql.includes('SELECT username, email, email_verified_at FROM users WHERE id = ?')) {
+      const [id] = args;
+      const found = this.users.find((u) => u.id === id);
+      return firstOnly ? found : found ? [found] : [];
+    }
+
     if (sql.includes('SELECT username, email FROM users WHERE id = ?')) {
       const [id] = args;
       const found = this.users.find((u) => u.id === id);

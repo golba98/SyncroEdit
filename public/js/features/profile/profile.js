@@ -274,7 +274,7 @@ export class Profile {
     const resendContainer = document.getElementById('resendVerificationContainer');
     if (!badge) return;
 
-    if (this.user.isEmailVerified) {
+    if (this.user.emailVerified) {
       badge.innerHTML =
         '<span class="status-pill status-pill-verified"><i class="fas fa-check-circle"></i> Verified</span>';
       if (resendContainer) resendContainer.style.display = 'none';

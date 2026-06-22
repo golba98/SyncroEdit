@@ -114,5 +114,19 @@ describe('Profile UI', () => {
       const initialsEl = document.getElementById('profileInitials');
       expect(initialsEl.style.display).toBe('none');
     });
+
+    it('should render the verification badge from emailVerified instead of the legacy flag', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        emailVerified: false,
+        isEmailVerified: true,
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
+      expect(document.getElementById('resendVerificationContainer').style.display).toBe('block');
+    });
   });
 });

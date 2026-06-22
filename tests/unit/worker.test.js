@@ -57,7 +57,6 @@ async function signup(env, username, email) {
 async function signupVerified(env, username, email) {
   const result = await signup(env, username, email);
   result.user.email_verified_at = Math.floor(Date.now() / 1000);
-  result.user.isEmailVerified = 1;
 
   const login = await app.request(
     '/api/auth/login',
@@ -161,7 +160,6 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   it('returns a clean error when JWT secret is missing', async () => {
     const setup = await signup(env, 'alice', 'alice@example.com');
     setup.user.email_verified_at = Math.floor(Date.now() / 1000);
-    setup.user.isEmailVerified = 1;
 
     const res = await app.request(
       '/api/auth/login',
@@ -266,7 +264,11 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     const signupResult = await signup(env, 'alice', 'alice@example.com');
     expect(signupResult.res.status).toBe(201);
     expect(signupResult.data.token).toBeUndefined();
+    expect(signupResult.data.emailVerified).toBe(false);
+    expect(signupResult.data.isEmailVerified).toBe(false);
     expect(signupResult.data.verificationRequired).toBe(true);
+    expect(signupResult.user.email_verified_at).toBeNull();
+    expect(signupResult.user.isEmailVerified).toBe(0);
 
     const unverifiedLogin = await app.request(
       '/api/auth/login',
@@ -278,7 +280,14 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       env
     );
     expect(unverifiedLogin.status).toBe(403);
-    expect((await unverifiedLogin.json()).code).toBe('email_verification_required');
+    await expect(unverifiedLogin.json()).resolves.toEqual({
+      code: 'email_verification_required',
+      email: 'alice@example.com',
+      emailVerified: false,
+      isEmailVerified: false,
+      message: 'Email verification required',
+      verificationRequired: true,
+    });
 
     const failedLogin = await app.request(
       '/api/auth/login',
@@ -298,7 +307,6 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(unauthenticated.status).toBe(401);
 
     signupResult.user.email_verified_at = Math.floor(Date.now() / 1000);
-    signupResult.user.isEmailVerified = 1;
     const verifiedLogin = await app.request(
       '/api/auth/login',
       {
@@ -311,6 +319,8 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     const verifiedLoginData = await verifiedLogin.json();
     expect(verifiedLogin.status).toBe(200);
     expect(verifiedLoginData.token).toBeDefined();
+    expect(verifiedLoginData.emailVerified).toBe(true);
+    expect(verifiedLoginData.isEmailVerified).toBe(true);
 
     const profile = await app.request(
       '/api/user/profile',
@@ -318,10 +328,16 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       env
     );
     expect(profile.status).toBe(200);
-    expect((await profile.json()).username).toBe('alice');
+    await expect(profile.json()).resolves.toEqual(
+      expect.objectContaining({
+        username: 'alice',
+        emailVerified: true,
+        isEmailVerified: true,
+      })
+    );
   });
 
-  it('stores hashed verification codes and verifies email without exposing raw codes', async () => {
+  it('stores hashed verification codes, rejects wrong codes, and verifies email without exposing raw codes', async () => {
     const signupResult = await signup(env, 'verifyuser', 'verify@example.com');
     expect(signupResult.res.status).toBe(201);
     expect(env.DB.email_verification_codes).toHaveLength(1);
@@ -329,6 +345,25 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(row.email).toBe('verify@example.com');
     expect(row.code_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(row.code_hash).not.toBe('123456');
+    expect(signupResult.user.email_verified_at).toBeNull();
+
+    const wrongRes = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'verify@example.com', code: '000000', purpose: 'signup' }),
+      },
+      env
+    );
+
+    expect(wrongRes.status).toBe(400);
+    await expect(wrongRes.json()).resolves.toEqual({
+      code: 'invalid_code',
+      message: 'Invalid or expired verification code',
+    });
+    expect(signupResult.user.email_verified_at).toBeNull();
+    expect(row.attempts).toBe(1);
 
     const emailBody = JSON.parse(global.fetch.mock.calls[0][1].body);
     const code = emailBody.html.match(/letter-spacing:6px[^>]*>(\d{6})/)[1];
@@ -343,9 +378,124 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, message: 'Email verified.' });
+    await expect(res.json()).resolves.toEqual({
+      ok: true,
+      emailVerified: true,
+      isEmailVerified: true,
+      message: 'Email verified.',
+    });
     expect(row.consumed_at).toBeTruthy();
     expect(signupResult.user.email_verified_at).toBeTruthy();
+  });
+
+  it('persists verified state across login and refresh after correct verification', async () => {
+    const signupResult = await signup(env, 'persistuser', 'persist@example.com');
+    const emailBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const code = emailBody.html.match(/letter-spacing:6px[^>]*>(\d{6})/)[1];
+    const verifyRes = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'persist@example.com', code, purpose: 'signup' }),
+      },
+      env
+    );
+    expect(verifyRes.status).toBe(200);
+    expect(signupResult.user.email_verified_at).toBeTruthy();
+
+    const loginRes = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'persistuser', password: PASSWORD }),
+      },
+      env
+    );
+    const loginData = await loginRes.json();
+    expect(loginRes.status).toBe(200);
+    expect(loginData.emailVerified).toBe(true);
+
+    const cookie = loginRes.headers.get('set-cookie');
+    expect(cookie).toContain('refreshToken=');
+
+    const refreshRes = await app.request(
+      '/api/auth/refresh-token',
+      {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+        },
+      },
+      env
+    );
+    expect(refreshRes.status).toBe(200);
+    await expect(refreshRes.json()).resolves.toEqual(
+      expect.objectContaining({
+        token: expect.any(String),
+        emailVerified: true,
+        isEmailVerified: true,
+      })
+    );
+  });
+
+  it('does not treat the legacy isEmailVerified flag alone as verified', async () => {
+    const signupResult = await signup(env, 'legacyuser', 'legacy@example.com');
+    signupResult.user.isEmailVerified = 1;
+    signupResult.user.email_verified_at = null;
+
+    const loginRes = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'legacyuser', password: PASSWORD }),
+      },
+      env
+    );
+    expect(loginRes.status).toBe(403);
+    await expect(loginRes.json()).resolves.toEqual({
+      code: 'email_verification_required',
+      email: 'legacy@example.com',
+      emailVerified: false,
+      isEmailVerified: false,
+      message: 'Email verification required',
+      verificationRequired: true,
+    });
+
+    const forgedToken = await sign(
+      {
+        id: signupResult.user.id,
+        username: 'legacyuser',
+        sessionId: 'legacy-session',
+        exp: Math.floor(Date.now() / 1000) + 60,
+      },
+      env.JWT_SECRET
+    );
+    env.DB.sessions.push({
+      id: 'legacy-session',
+      userId: signupResult.user.id,
+      refreshToken: 'legacy-refresh',
+      userAgent: 'jest',
+      ipAddress: '127.0.0.1',
+      lastActive: new Date().toISOString(),
+    });
+
+    const profileRes = await app.request(
+      '/api/user/profile',
+      {
+        headers: {
+          Authorization: `Bearer ${forgedToken}`,
+        },
+      },
+      env
+    );
+    expect(profileRes.status).toBe(403);
+    await expect(profileRes.json()).resolves.toEqual({
+      code: 'email_verification_required',
+      message: 'Email verification required',
+    });
   });
 
   it('limits verification attempts and active sends', async () => {
