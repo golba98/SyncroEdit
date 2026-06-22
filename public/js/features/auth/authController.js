@@ -511,6 +511,9 @@ class AuthController {
     }
 
     const code = error?.data?.code;
+    if (code === 'ACCOUNT_EXISTS') {
+      return 'That username or email is already in use. Try logging in or use a different one.';
+    }
     if (code === 'EMAIL_NOT_CONFIGURED') {
       const isProduction =
         window.location.hostname === 'syncroedit.online' ||
