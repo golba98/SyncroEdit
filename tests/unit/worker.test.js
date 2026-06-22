@@ -641,7 +641,6 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       global.fetch = originalFetch;
     }
   });
-
   it('limits verification attempts and active sends', async () => {
     await signup(env, 'limiteduser', 'limited@example.com');
     let latest = env.DB.email_verification_codes[0];
