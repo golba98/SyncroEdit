@@ -198,6 +198,7 @@
         font-size: 13px;
         min-height: 18px;
         text-align: center;
+        white-space: pre-wrap;
       }
 
       .status.error {
@@ -339,7 +340,7 @@
         />
 
         <div class="actions">
-          <button id="verifyBtn" class="btn btn-primary">Confirm</button>
+          <button id="verifyBtn" class="btn btn-primary">Verify code</button>
           <button id="resendBtn" class="btn btn-secondary">Resend code</button>
         </div>
 
@@ -422,17 +423,50 @@
         window.location.href = 'login.html';
       } else {
         emailValueEl.textContent = email;
-        introTextEl.textContent = `We sent a 6-digit code to ${email}. Open your inbox and paste it below.`;
         lastMessage.textContent = verificationMessage;
 
-        // Check if we just sent a code from the login page
-        const codeJustSent = sessionStorage.getItem('codeJustSent');
-        if (codeJustSent === 'true') {
-          sessionStorage.removeItem('codeJustSent');
+        const codeSent = sessionStorage.getItem('codeSent') === 'true';
+        const signupSuccess = sessionStorage.getItem('signupSuccess') === 'true';
+        const verificationErrorCode = sessionStorage.getItem('verificationErrorCode');
+
+        // Consume session storage flags
+        sessionStorage.removeItem('codeSent');
+        sessionStorage.removeItem('signupSuccess');
+        sessionStorage.removeItem('verificationErrorCode');
+
+        if (codeSent) {
+          if (signupSuccess) {
+            introTextEl.textContent = `Account created.\nWe sent a 6-digit verification code to ${email}.`;
+          } else {
+            introTextEl.textContent = `We sent a 6-digit verification code to ${email}.`;
+          }
+          resendBtn.textContent = 'Resend code';
           setStatus('Code sent. Check your email.', 'success');
+          startResendCooldown();
         } else {
-          // Send a fresh code on arrival to this page
-          sendCode();
+          if (signupSuccess) {
+            introTextEl.textContent = `Account created.\nSend a verification code to ${email}.`;
+          } else {
+            introTextEl.textContent = `Send a verification code to ${email}.`;
+          }
+          resendBtn.textContent = 'Send code';
+
+          if (verificationErrorCode === 'EMAIL_NOT_CONFIGURED') {
+            const isProduction =
+              window.location.hostname === 'syncroedit.online' ||
+              window.location.hostname === 'www.syncroedit.online';
+            if (isProduction) {
+              setStatus(
+                'Email verification is temporarily unavailable. Please contact support.',
+                'error'
+              );
+            } else {
+              setStatus(
+                'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.',
+                'error'
+              );
+            }
+          }
         }
       }
 
@@ -484,6 +518,9 @@
         setStatus('Sending code...', '');
         synchro?.onSubmit();
         resendBtn.disabled = true;
+        const isResend = resendBtn.textContent === 'Resend code';
+        resendBtn.textContent = isResend ? 'Resending...' : 'Sending...';
+
         try {
           await Network.fetchAPI('/api/auth/send-verification', {
             method: 'POST',
@@ -491,16 +528,42 @@
           });
           synchro?.applyState('idle');
           setStatus('Code sent. Check your email.', 'success');
+          introTextEl.textContent = `We sent a 6-digit verification code to ${email}.`;
+          resendBtn.textContent = 'Resend code';
           codeInput.value = '';
           codeInput.focus();
           startResendCooldown();
         } catch (err) {
           console.error('Resend error:', err);
           synchro?.onError();
-          setStatus(
-            err.message.replace('API error: ', 'Error ') || 'Unable to send code. Try again.',
-            'error'
-          );
+          resendBtn.textContent = isResend ? 'Resend code' : 'Send code';
+
+          const code = err.data?.code;
+          if (
+            code === 'EMAIL_NOT_CONFIGURED' ||
+            code === 'missing_email_code_pepper' ||
+            code === 'missing_email_delivery_config'
+          ) {
+            const isProduction =
+              window.location.hostname === 'syncroedit.online' ||
+              window.location.hostname === 'www.syncroedit.online';
+            if (isProduction) {
+              setStatus(
+                'Email verification is temporarily unavailable. Please contact support.',
+                'error'
+              );
+            } else {
+              setStatus(
+                'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.',
+                'error'
+              );
+            }
+          } else {
+            setStatus(
+              err.message.replace('API error: ', 'Error ') || 'Unable to send code. Try again.',
+              'error'
+            );
+          }
           resendBtn.disabled = false;
         }
       }
@@ -508,6 +571,7 @@
       function startResendCooldown() {
         let remaining = 30;
         resendBtn.textContent = `Resend in ${remaining}s`;
+        resendBtn.disabled = true;
         const interval = setInterval(() => {
           remaining -= 1;
           if (remaining <= 0) {
@@ -530,6 +594,9 @@
 
         synchro?.onSubmit();
         setStatus('Verifying...', '');
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = 'Verifying...';
+
         try {
           const data = await Network.fetchAPI('/api/auth/verify-email', {
             method: 'POST',
@@ -551,10 +618,35 @@
         } catch (err) {
           console.error('Verification error:', err);
           synchro?.onError();
-          setStatus(
-            err.message.replace('API error: ', 'Error ') || 'Invalid code. Try again.',
-            'error'
-          );
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = 'Verify code';
+
+          const errCode = err.data?.code;
+          if (
+            errCode === 'EMAIL_NOT_CONFIGURED' ||
+            errCode === 'missing_email_code_pepper' ||
+            errCode === 'missing_email_delivery_config'
+          ) {
+            const isProduction =
+              window.location.hostname === 'syncroedit.online' ||
+              window.location.hostname === 'www.syncroedit.online';
+            if (isProduction) {
+              setStatus(
+                'Email verification is temporarily unavailable. Please contact support.',
+                'error'
+              );
+            } else {
+              setStatus(
+                'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.',
+                'error'
+              );
+            }
+          } else {
+            setStatus(
+              err.message.replace('API error: ', 'Error ') || 'Invalid code. Try again.',
+              'error'
+            );
+          }
         }
       }
 

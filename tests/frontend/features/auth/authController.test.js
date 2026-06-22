@@ -136,4 +136,25 @@ describe('AuthController DOM rendering', () => {
       '✗ Email verification is temporarily unavailable. Please contact support.'
     );
   });
+
+  it('shows a detailed environment error on signup when EMAIL_NOT_CONFIGURED is returned', async () => {
+    Network.fetchAPI.mockRejectedValue({
+      message: 'Internal Server Error',
+      status: 500,
+      data: { code: 'EMAIL_NOT_CONFIGURED' },
+    });
+
+    const controller = new AuthController();
+    const form = document.getElementById('signupForm');
+    const status = document.getElementById('signupStatusMessage');
+
+    document.getElementById('signupUsername').value = 'newuser';
+    document.getElementById('signupEmail').value = 'newuser@example.com';
+
+    await controller._handleSignup(form);
+
+    expect(status.textContent).toBe(
+      '✗ Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.'
+    );
+  });
 });

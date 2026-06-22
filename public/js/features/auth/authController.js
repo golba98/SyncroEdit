@@ -403,7 +403,12 @@ class AuthController {
         statusEl.textContent = '✓ ' + (data.message || 'Check your email for a verification code.');
         statusEl.className = 'status-message success';
       }
-      this._goToVerification(email, data.message || 'Check your email for a verification code.');
+      this._goToVerification(
+        email,
+        data.message || 'Check your email for a verification code.',
+        data.codeSent !== false,
+        data.code
+      );
     } catch (e) {
       showError(this._getAuthErrorMessage(e, '', 'Signup failed. Please try again.'));
     } finally {
@@ -414,12 +419,18 @@ class AuthController {
     }
   }
 
-  _goToVerification(email, message) {
+  _goToVerification(email, message, codeSent = true, code = null) {
     if (!email) return;
     const docId = new URLSearchParams(window.location.search).get('doc');
     sessionStorage.setItem('verificationEmail', email);
     sessionStorage.setItem('verificationMessage', message || 'Use the code we just sent.');
-    sessionStorage.setItem('codeJustSent', 'true');
+    sessionStorage.setItem('codeSent', codeSent ? 'true' : 'false');
+    sessionStorage.setItem('signupSuccess', 'true');
+    if (code) {
+      sessionStorage.setItem('verificationErrorCode', code);
+    } else {
+      sessionStorage.removeItem('verificationErrorCode');
+    }
     if (docId) {
       sessionStorage.setItem('postLoginDocId', docId);
     }
@@ -500,6 +511,16 @@ class AuthController {
     }
 
     const code = error?.data?.code;
+    if (code === 'EMAIL_NOT_CONFIGURED') {
+      const isProduction =
+        window.location.hostname === 'syncroedit.online' ||
+        window.location.hostname === 'www.syncroedit.online';
+      if (isProduction) {
+        return 'Email verification is temporarily unavailable. Please contact support.';
+      } else {
+        return 'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.';
+      }
+    }
     if (code === 'missing_email_code_pepper' || code === 'missing_email_delivery_config') {
       return 'Email verification is temporarily unavailable. Please contact support.';
     }

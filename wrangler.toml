@@ -47,3 +47,7 @@ class_name = "DocumentSyncObject"
 [[env.staging.durable_objects.bindings]]
 name = "RATE_LIMIT_OBJECT"
 class_name = "RateLimitObject"
+
+[env.staging.vars]
+EMAIL_FROM = "SyncroEdit <onboarding@resend.dev>"
+APP_NAME = "SyncroEdit"
