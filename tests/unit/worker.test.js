@@ -581,6 +581,66 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(legacyData.code).toBe('invalid_code');
   });
 
+  it('returns 409 Conflict and ACCOUNT_EXISTS code if username or email already exists', async () => {
+    // First signup succeeds
+    await signup(env, 'duplicateuser', 'duplicate@example.com');
+
+    // Second signup with same username/email fails with 409 Conflict
+    const res = await app.request(
+      '/api/auth/signup',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: 'duplicateuser',
+          email: 'duplicate@example.com',
+          password: PASSWORD,
+        }),
+      },
+      env
+    );
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.code).toBe('ACCOUNT_EXISTS');
+    expect(data.error).toBe('Username or email already in use.');
+  });
+
+  it('succeeds signup even if a generic email delivery failure occurs, returning codeSent: false', async () => {
+    // Temporarily mock global fetch to fail to simulate email delivery failure
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 502,
+        json: () => Promise.resolve({}),
+      })
+    );
+
+    try {
+      const res = await app.request(
+        '/api/auth/signup',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'sendfailuser',
+            email: 'sendfail@example.com',
+            password: PASSWORD,
+          }),
+        },
+        env
+      );
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.verificationRequired).toBe(true);
+      expect(data.codeSent).toBe(false);
+      expect(data.code).toBe('email_send_failed');
+    } finally {
+      // Restore global fetch
+      global.fetch = originalFetch;
+    }
+  });
   it('limits verification attempts and active sends', async () => {
     await signup(env, 'limiteduser', 'limited@example.com');
     let latest = env.DB.email_verification_codes[0];

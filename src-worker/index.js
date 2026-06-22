@@ -273,7 +273,14 @@ app.post('/api/auth/signup', async (c) => {
       .first();
 
     if (existingUser) {
-      return c.json({ message: 'Unable to create account with those credentials' }, 400);
+      return c.json(
+        {
+          error: 'Username or email already in use.',
+          message: 'Username or email already in use.',
+          code: 'ACCOUNT_EXISTS',
+        },
+        409
+      );
     }
 
     signupStep = 'hash_password';
@@ -292,22 +299,29 @@ app.post('/api/auth/signup', async (c) => {
 
     signupStep = 'send_verification_code';
     let codeSent = false;
-    let configError = null;
+    let errorCode = null;
+    let errorMessage = 'Check your email for a verification code.';
     try {
       await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
       codeSent = true;
     } catch (err) {
-      if (
-        err instanceof AppError &&
-        (err.code === 'missing_email_code_pepper' || err.code === 'missing_email_delivery_config')
-      ) {
-        configError = 'EMAIL_NOT_CONFIGURED';
+      if (err instanceof AppError) {
+        if (
+          err.code === 'missing_email_code_pepper' ||
+          err.code === 'missing_email_delivery_config'
+        ) {
+          errorCode = 'EMAIL_NOT_CONFIGURED';
+        } else {
+          errorCode = err.code;
+        }
+        errorMessage = err.message;
       } else {
-        throw err;
+        errorCode = 'email_send_failed';
+        errorMessage = 'Unable to send verification email.';
       }
     }
 
-    if (configError) {
+    if (!codeSent) {
       return c.json(
         {
           ok: true,
@@ -315,8 +329,11 @@ app.post('/api/auth/signup', async (c) => {
           isEmailVerified: false,
           verificationRequired: true,
           codeSent: false,
-          code: 'EMAIL_NOT_CONFIGURED',
-          message: 'Account created. Email verification is not configured.',
+          code: errorCode,
+          message:
+            errorCode === 'EMAIL_NOT_CONFIGURED'
+              ? 'Account created. Email verification is not configured.'
+              : `Account created. ${errorMessage}`,
           username: trimmedUsername,
           email: normalizedEmail,
         },
