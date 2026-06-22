@@ -560,7 +560,8 @@
             }
           } else {
             setStatus(
-              err.message.replace('API error: ', 'Error ') || 'Unable to send code. Try again.',
+              (err.message || '').replace('API error: ', 'Error ') ||
+                'Unable to send code. Try again.',
               'error'
             );
           }
@@ -643,7 +644,7 @@
             }
           } else {
             setStatus(
-              err.message.replace('API error: ', 'Error ') || 'Invalid code. Try again.',
+              (err.message || '').replace('API error: ', 'Error ') || 'Invalid code. Try again.',
               'error'
             );
           }

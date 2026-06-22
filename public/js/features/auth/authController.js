@@ -332,7 +332,7 @@ class AuthController {
     } catch (e) {
       if (e.message === 'Email verification required') {
         const email = e.data?.email || form.querySelector('#loginUsername')?.value?.trim();
-        this._goToVerification(email, 'Verify your email before signing in.');
+        this._goToVerification(email, 'Verify your email before signing in.', true, null, false);
         return;
       }
       const msg = this._getAuthErrorMessage(e, 'Invalid username or password', 'Login failed');
@@ -407,7 +407,8 @@ class AuthController {
         email,
         data.message || 'Check your email for a verification code.',
         data.codeSent !== false,
-        data.code
+        data.code,
+        true
       );
     } catch (e) {
       showError(this._getAuthErrorMessage(e, '', 'Signup failed. Please try again.'));
@@ -419,13 +420,17 @@ class AuthController {
     }
   }
 
-  _goToVerification(email, message, codeSent = true, code = null) {
+  _goToVerification(email, message, codeSent = true, code = null, signupSuccess = false) {
     if (!email) return;
     const docId = new URLSearchParams(window.location.search).get('doc');
     sessionStorage.setItem('verificationEmail', email);
     sessionStorage.setItem('verificationMessage', message || 'Use the code we just sent.');
     sessionStorage.setItem('codeSent', codeSent ? 'true' : 'false');
-    sessionStorage.setItem('signupSuccess', 'true');
+    if (signupSuccess) {
+      sessionStorage.setItem('signupSuccess', 'true');
+    } else {
+      sessionStorage.removeItem('signupSuccess');
+    }
     if (code) {
       sessionStorage.setItem('verificationErrorCode', code);
     } else {
