@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { registerVerifyAndLogin } = require('./helpers/auth');
 
 test.describe('Responsiveness', () => {
   test('should fit elements in viewport on mobile', async ({ page }) => {
@@ -21,16 +22,8 @@ test.describe('Responsiveness', () => {
   });
 
   test('should display editor correctly on mobile', async ({ page }) => {
-    // Login and create doc
-    await page.goto('/pages/login.html');
     const testUser = `r_${test.info().project.name.slice(0, 3)}_${Math.random().toString(36).slice(2, 10)}`;
-    await page.click('#showSignup');
-    await page.fill('#signupUsername', testUser);
-    await page.fill('#signupEmail', `${testUser}@example.com`);
-    await page.fill('#signupPassword', 'Password123!');
-    await page.fill('#signupPasswordConfirm', 'Password123!');
-    await page.click('#signupBtn');
-    await expect(page).toHaveURL(/\/(?:index\.html)?$/);
+    await registerVerifyAndLogin(page, testUser);
     await page.waitForTimeout(1000);
     const isMobile = test.info().project.name === 'mobile';
     if (isMobile) {

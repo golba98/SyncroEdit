@@ -24,6 +24,10 @@ function baseEnv() {
   return {
     DB: new MockD1(),
     JWT_SECRET: 'test-secret-key-123',
+    EMAIL_CODE_PEPPER: 'test-email-code-pepper-123',
+    RESEND_API_KEY: 'test-resend-api-key',
+    EMAIL_FROM: 'SyncroEdit <verify@example.com>',
+    APP_NAME: 'SyncroEdit',
     RATE_LIMIT_OBJECT: rateLimitBinding(),
     DOCUMENT_SYNC_OBJECT: {
       idFromName: (name) => name,
@@ -48,6 +52,24 @@ async function signup(env, username, email) {
   );
   const data = await res.json();
   return { res, data, user: env.DB.users.find((u) => u.username === username) };
+}
+
+async function signupVerified(env, username, email) {
+  const result = await signup(env, username, email);
+  result.user.email_verified_at = Math.floor(Date.now() / 1000);
+  result.user.isEmailVerified = 1;
+
+  const login = await app.request(
+    '/api/auth/login',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password: PASSWORD }),
+    },
+    env
+  );
+  const data = await login.json();
+  return { ...result, login, data };
 }
 
 async function createDocument(env, token, title = 'Document', content = 'Hello') {
@@ -95,6 +117,11 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
 
   beforeEach(() => {
     env = baseEnv();
+    jest.spyOn(global, 'fetch').mockResolvedValue(Response.json({ id: 'email-id' }));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('returns health, config, and security headers', async () => {
@@ -132,18 +159,28 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('returns a clean error when JWT secret is missing', async () => {
+    const setup = await signup(env, 'alice', 'alice@example.com');
+    setup.user.email_verified_at = Math.floor(Date.now() / 1000);
+    setup.user.isEmailVerified = 1;
+
     const res = await app.request(
-      '/api/auth/signup',
+      '/api/auth/login',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: 'alice',
-          email: 'alice@example.com',
           password: PASSWORD,
         }),
       },
-      { DB: env.DB, RATE_LIMIT_OBJECT: rateLimitBinding() }
+      {
+        DB: env.DB,
+        RATE_LIMIT_OBJECT: rateLimitBinding(),
+        EMAIL_CODE_PEPPER: env.EMAIL_CODE_PEPPER,
+        RESEND_API_KEY: env.RESEND_API_KEY,
+        EMAIL_FROM: env.EMAIL_FROM,
+        APP_NAME: env.APP_NAME,
+      }
     );
     expect(res.status).toBe(500);
     const data = await res.json();
@@ -225,10 +262,23 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(data.code).toBe('invalid_username');
   });
 
-  it('signs up, rejects vague login failures, and returns authenticated profile', async () => {
+  it('signs up unverified, rejects vague login failures, and returns verified authenticated profile', async () => {
     const signupResult = await signup(env, 'alice', 'alice@example.com');
     expect(signupResult.res.status).toBe(201);
-    expect(signupResult.data.token).toBeDefined();
+    expect(signupResult.data.token).toBeUndefined();
+    expect(signupResult.data.verificationRequired).toBe(true);
+
+    const unverifiedLogin = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'alice', password: PASSWORD }),
+      },
+      env
+    );
+    expect(unverifiedLogin.status).toBe(403);
+    expect((await unverifiedLogin.json()).code).toBe('email_verification_required');
 
     const failedLogin = await app.request(
       '/api/auth/login',
@@ -247,19 +297,139 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     const unauthenticated = await app.request('/api/user/profile', {}, env);
     expect(unauthenticated.status).toBe(401);
 
+    signupResult.user.email_verified_at = Math.floor(Date.now() / 1000);
+    signupResult.user.isEmailVerified = 1;
+    const verifiedLogin = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'alice', password: PASSWORD }),
+      },
+      env
+    );
+    const verifiedLoginData = await verifiedLogin.json();
+    expect(verifiedLogin.status).toBe(200);
+    expect(verifiedLoginData.token).toBeDefined();
+
     const profile = await app.request(
       '/api/user/profile',
-      { headers: { Authorization: `Bearer ${signupResult.data.token}` } },
+      { headers: { Authorization: `Bearer ${verifiedLoginData.token}` } },
       env
     );
     expect(profile.status).toBe(200);
     expect((await profile.json()).username).toBe('alice');
   });
 
+  it('stores hashed verification codes and verifies email without exposing raw codes', async () => {
+    const signupResult = await signup(env, 'verifyuser', 'verify@example.com');
+    expect(signupResult.res.status).toBe(201);
+    expect(env.DB.email_verification_codes).toHaveLength(1);
+    const row = env.DB.email_verification_codes[0];
+    expect(row.email).toBe('verify@example.com');
+    expect(row.code_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row.code_hash).not.toBe('123456');
+
+    const emailBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const code = emailBody.html.match(/letter-spacing:6px[^>]*>(\d{6})/)[1];
+    const res = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'verify@example.com', code, purpose: 'signup' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, message: 'Email verified.' });
+    expect(row.consumed_at).toBeTruthy();
+    expect(signupResult.user.email_verified_at).toBeTruthy();
+  });
+
+  it('limits verification attempts and active sends', async () => {
+    await signup(env, 'limiteduser', 'limited@example.com');
+    let latest = env.DB.email_verification_codes[0];
+
+    const wrong = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'limited@example.com', code: '000000', purpose: 'signup' }),
+      },
+      env
+    );
+    expect(wrong.status).toBe(400);
+    expect(latest.attempts).toBe(1);
+
+    for (let i = 0; i < 2; i++) {
+      const res = await app.request(
+        '/api/auth/send-verification',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'limited@example.com', purpose: 'signup' }),
+        },
+        env
+      );
+      expect(res.status).toBe(200);
+    }
+
+    const limited = await app.request(
+      '/api/auth/send-verification',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'limited@example.com', purpose: 'signup' }),
+      },
+      env
+    );
+    env.DB.email_verification_codes.forEach((row) => {
+      row.attempts = 5;
+    });
+
+    expect(limited.status).toBe(429);
+
+    const tooManyAttempts = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'limited@example.com', code: '123456', purpose: 'signup' }),
+      },
+      env
+    );
+    expect(tooManyAttempts.status).toBe(400);
+    expect((await tooManyAttempts.json()).code).toBe('too_many_attempts');
+  });
+
+  it('does not leave an active verification code when email delivery fails', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      text: async () => 'service unavailable',
+    });
+
+    const res = await app.request(
+      '/api/auth/send-verification',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'delivery-fail@example.com', purpose: 'signup' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(502);
+    expect(env.DB.email_verification_codes).toHaveLength(0);
+  });
+
   it('prevents private document IDOR reads and enforces editor/viewer writes', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
-    const bob = await signup(env, 'bob', 'bob@example.com');
-    const carol = await signup(env, 'carol', 'carol@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
+    const bob = await signupVerified(env, 'bob', 'bob@example.com');
+    const carol = await signupVerified(env, 'carol', 'carol@example.com');
     const doc = await createDocument(env, alice.data.token, 'Private Doc');
 
     const deniedRead = await app.request(
@@ -335,8 +505,8 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('rejects unauthorized realtime room access', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
-    const bob = await signup(env, 'bob', 'bob@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
+    const bob = await signupVerified(env, 'bob', 'bob@example.com');
     const doc = await createDocument(env, alice.data.token, 'Realtime Private');
     const ticket = await sign(
       {
@@ -356,7 +526,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('rejects malformed realtime messages cleanly', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'Realtime Doc');
     const object = new DocumentSyncObject({}, env);
     const socket = new FakeSocket();
@@ -375,7 +545,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   // -------------------------------------------------------
 
   it('GET /ws/:documentId without Upgrade header returns 426', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
 
     const res = await app.request(
@@ -393,7 +563,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('GET /ws/:documentId with missing ticket returns 401', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
 
     const res = await app.request(
@@ -411,7 +581,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('GET /ws/:documentId with invalid ticket returns 401', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
 
     const res = await app.request(
@@ -429,7 +599,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('GET /ws/:documentId with wrong-type ticket returns 401', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'WS Test Doc');
 
     // Sign a valid JWT but with wrong type (access token, not ws-ticket)
@@ -458,8 +628,8 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('GET /ws/:documentId with unauthorized user ticket returns 403', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
-    const bob = await signup(env, 'bob', 'bob@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
+    const bob = await signupVerified(env, 'bob', 'bob@example.com');
     const doc = await createDocument(env, alice.data.token, 'Private WS Doc');
 
     // Bob has a valid ticket but no access to Alice's document
@@ -488,7 +658,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('GET /ws/:documentId with authorized ticket forwards to Durable Object (101)', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'Authorized WS Doc');
 
     const ticket = await sign(
@@ -537,7 +707,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('/ws/:documentId without Upgrade returns 426 JSON with security headers', async () => {
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'Header Guard Doc');
 
     const res = await app.request(`/ws/${doc.data.id}?ticket=anything`, { method: 'GET' }, env);
@@ -553,7 +723,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     // This test would throw "Can't modify immutable headers" in production if the
     // middleware guard is missing. In the test harness the mock DO returns 200 (not 101)
     // so we verify no exception is thrown and the DO response is passed through intact.
-    const alice = await signup(env, 'alice', 'alice@example.com');
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'Middleware Guard Doc');
 
     const ticket = await sign(

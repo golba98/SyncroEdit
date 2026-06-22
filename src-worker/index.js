@@ -1,7 +1,25 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { sign, verify } from 'hono/jwt';
-import { hashPassword, verifyPassword, generateTokens, authenticateUser } from './auth.js';
+import {
+  hashPassword,
+  verifyPassword,
+  generateTokens,
+  authenticateUser,
+  requireVerifiedAuth,
+  requireVerifiedUser,
+} from './auth.js';
+import {
+  CODE_TTL_SECONDS,
+  MAX_ACTIVE_CODES_PER_EMAIL,
+  SEND_WINDOW_SECONDS,
+  generateCode,
+  hashCode,
+  isValidEmail,
+  normalizeEmail,
+  requireEmailCodePepper,
+  sendVerificationEmail,
+} from './emailVerification.js';
 import { RateLimitObject } from './rateLimitObject.js';
 import {
   AppError,
@@ -83,6 +101,11 @@ const AUTH_RATE_LIMITS = {
     windowSeconds: 300,
   },
   '/api/auth/ws-ticket': { route: 'ws-ticket', limit: 120, windowSeconds: 300 },
+  '/api/auth/send-verification': {
+    route: 'send-verification',
+    limit: 5,
+    windowSeconds: 300,
+  },
   '/api/auth/resend-code': { route: 'resend-code', limit: 5, windowSeconds: 300 },
   '/api/auth/verify-email': { route: 'verify-email', limit: 10, windowSeconds: 300 },
 };
@@ -131,6 +154,78 @@ async function logHistory(db, docId, userId, username, action, details = '') {
   } catch (err) {
     console.error('Failed to log history event:', err);
   }
+}
+
+function validateVerificationPurpose(purpose) {
+  const clean = typeof purpose === 'string' && purpose.trim() ? purpose.trim() : 'signup';
+  if (!/^[a-z][a-z0-9_-]{0,31}$/i.test(clean)) {
+    throw new AppError(400, 'Invalid verification purpose', 'invalid_purpose');
+  }
+  return clean.toLowerCase();
+}
+
+function validateVerificationEmail(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) {
+    throw new AppError(400, 'Invalid email address', 'invalid_email');
+  }
+  return normalizedEmail;
+}
+
+async function createAndSendVerificationCode(env, db, email, purpose = 'signup') {
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - SEND_WINDOW_SECONDS;
+  const active = await db
+    .prepare(
+      `
+        SELECT COUNT(*) as count
+        FROM email_verification_codes
+        WHERE email = ?
+          AND purpose = ?
+          AND consumed_at IS NULL
+          AND created_at >= ?
+      `
+    )
+    .bind(email, purpose, windowStart)
+    .first();
+
+  if ((active && Number(active.count)) >= MAX_ACTIVE_CODES_PER_EMAIL) {
+    throw new AppError(429, 'Too many verification codes requested', 'verification_rate_limited');
+  }
+
+  const code = env.NODE_ENV === 'test' ? '123456' : generateCode();
+  const pepper = requireEmailCodePepper(env);
+  const codeHash = await hashCode({ email, code, pepper });
+  const expiresAt = now + CODE_TTL_SECONDS;
+  const codeId = crypto.randomUUID();
+
+  await db
+    .prepare(
+      `
+        INSERT INTO email_verification_codes
+          (id, email, code_hash, purpose, attempts, expires_at, consumed_at, created_at)
+        VALUES (?, ?, ?, ?, 0, ?, NULL, ?)
+      `
+    )
+    .bind(codeId, email, codeHash, purpose, expiresAt, now)
+    .run();
+
+  try {
+    await sendVerificationEmail(env, email, code);
+  } catch (err) {
+    await db
+      .prepare('DELETE FROM email_verification_codes WHERE id = ? AND consumed_at IS NULL')
+      .bind(codeId)
+      .run();
+    throw err;
+  }
+}
+
+function verificationSentResponse(c) {
+  return c.json({
+    ok: true,
+    message: 'If the email can receive verification codes, a code was sent.',
+  });
 }
 
 // -------------------------------------------------------------
@@ -190,36 +285,19 @@ app.post('/api/auth/signup', async (c) => {
     signupStep = 'insert_user';
     await db
       .prepare(
-        'INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)'
+        'INSERT INTO users (id, username, email, password, isEmailVerified, email_verified_at) VALUES (?, ?, ?, ?, 0, NULL)'
       )
       .bind(userId, trimmedUsername, normalizedEmail, hashedPassword)
       .run();
 
-    const userObj = {
-      id: userId,
-      username: trimmedUsername,
-      email: normalizedEmail,
-    };
-    signupStep = 'generate_tokens';
-    const { accessToken, refreshToken } = await generateTokens(
-      userObj,
-      c.env,
-      c.req.header('user-agent'),
-      c.req.header('cf-connecting-ip')
-    );
-
-    signupStep = 'set_refresh_cookie';
-    setCookie(c, 'refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    });
+    signupStep = 'send_verification_code';
+    await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
 
     return c.json(
       {
-        token: accessToken,
+        ok: true,
+        verificationRequired: true,
+        message: 'Check your email for a verification code.',
         username: trimmedUsername,
         email: normalizedEmail,
       },
@@ -242,7 +320,9 @@ app.post('/api/auth/login', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT id, username, email, password FROM users WHERE username = ?')
+      .prepare(
+        'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
+      )
       .bind(trimmedUsername)
       .first();
 
@@ -255,6 +335,19 @@ app.post('/api/auth/login', async (c) => {
     const isMatch = await verifyPassword(password, user.password);
     if (!isMatch) {
       return c.json({ message: 'Invalid username or password' }, 401);
+    }
+
+    if (!user.email_verified_at) {
+      await createAndSendVerificationCode(c.env, db, user.email, 'signup');
+      return c.json(
+        {
+          message: 'Email verification required',
+          code: 'email_verification_required',
+          verificationRequired: true,
+          email: user.email,
+        },
+        403
+      );
     }
 
     const { accessToken, refreshToken } = await generateTokens(
@@ -364,32 +457,30 @@ app.post('/api/auth/refresh-token', async (c) => {
   }
 });
 
+app.post('/api/auth/send-verification', async (c) => {
+  try {
+    const db = requireDb(c.env);
+    const { email, purpose } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateVerificationEmail(email);
+    const verificationPurpose = validateVerificationPurpose(purpose);
+
+    await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
+    return verificationSentResponse(c);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'Internal Server Error', 'send_verification_failed');
+  }
+});
+
 app.post('/api/auth/resend-code', async (c) => {
   try {
     const db = requireDb(c.env);
-    const { email } = await readJson(c, LIMITS.authBody);
-    const normalizedEmail = validateEmail(email);
+    const { email, purpose } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateVerificationEmail(email);
+    const verificationPurpose = validateVerificationPurpose(purpose);
 
-    const user = await db
-      .prepare('SELECT id, username FROM users WHERE email = ?')
-      .bind(normalizedEmail)
-      .first();
-
-    if (!user) {
-      return c.json({ message: 'User not found' }, 404);
-    }
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-
-    await db
-      .prepare('UPDATE users SET verificationCode = ?, verificationCodeExpires = ? WHERE id = ?')
-      .bind(code, expires, user.id)
-      .run();
-
-    console.log(`[VERIFICATION CODE] Sent to ${normalizedEmail}: ${code}`);
-
-    return c.json({ message: 'Verification code resent' });
+    await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
+    return verificationSentResponse(c);
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'Internal Server Error', 'resend_code_failed');
@@ -399,60 +490,71 @@ app.post('/api/auth/resend-code', async (c) => {
 app.post('/api/auth/verify-email', async (c) => {
   try {
     const db = requireDb(c.env);
-    const { email, verificationCode } = await readJson(c, LIMITS.authBody);
-    const normalizedEmail = validateEmail(email);
-    const trimmedCode = String(verificationCode || '').trim();
+    const { email, code, verificationCode, purpose } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateVerificationEmail(email);
+    const submittedCode = String(code || verificationCode || '').trim();
+    const verificationPurpose = validateVerificationPurpose(purpose);
 
-    if (!trimmedCode) {
-      throw new AppError(400, 'Verification code required', 'code_required');
+    if (!/^\d{6}$/.test(submittedCode)) {
+      throw new AppError(400, 'Verification code must be 6 digits', 'invalid_code');
     }
 
-    const user = await db
+    const row = await db
       .prepare(
-        'SELECT id, username, email, verificationCode, verificationCodeExpires FROM users WHERE email = ?'
+        `
+          SELECT id, email, code_hash, attempts, expires_at, consumed_at
+          FROM email_verification_codes
+          WHERE email = ?
+            AND purpose = ?
+            AND consumed_at IS NULL
+          ORDER BY created_at DESC
+          LIMIT 1
+        `
       )
-      .bind(normalizedEmail)
+      .bind(normalizedEmail, verificationPurpose)
       .first();
 
-    if (!user) {
-      throw new AppError(404, 'User not found', 'user_not_found');
+    if (!row) {
+      throw new AppError(400, 'Invalid or expired verification code', 'invalid_code');
     }
 
-    if (!user.verificationCode || user.verificationCode !== trimmedCode) {
-      throw new AppError(400, 'Invalid verification code', 'invalid_code');
+    const now = Math.floor(Date.now() / 1000);
+    if (Number(row.expires_at) < now) {
+      throw new AppError(400, 'Invalid or expired verification code', 'code_expired');
     }
 
-    const expires = new Date(user.verificationCodeExpires);
-    if (isNaN(expires.getTime()) || expires.getTime() < Date.now()) {
-      throw new AppError(400, 'Verification code expired', 'code_expired');
+    if (Number(row.attempts) >= 5) {
+      throw new AppError(400, 'Too many failed verification attempts', 'too_many_attempts');
+    }
+
+    const pepper = requireEmailCodePepper(c.env);
+    const submittedHash = await hashCode({
+      email: normalizedEmail,
+      code: submittedCode,
+      pepper,
+    });
+
+    if (submittedHash !== row.code_hash) {
+      await db
+        .prepare('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = ?')
+        .bind(row.id)
+        .run();
+      throw new AppError(400, 'Invalid or expired verification code', 'invalid_code');
     }
 
     await db
-      .prepare(
-        'UPDATE users SET isEmailVerified = 1, verificationCode = NULL, verificationCodeExpires = NULL WHERE id = ?'
-      )
-      .bind(user.id)
+      .prepare('UPDATE email_verification_codes SET consumed_at = ? WHERE id = ?')
+      .bind(now, row.id)
       .run();
 
-    const { accessToken, refreshToken } = await generateTokens(
-      { id: user.id, username: user.username, email: user.email },
-      c.env,
-      c.req.header('user-agent'),
-      c.req.header('cf-connecting-ip')
-    );
-
-    setCookie(c, 'refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    });
+    await db
+      .prepare('UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE email = ?')
+      .bind(now, normalizedEmail)
+      .run();
 
     return c.json({
-      token: accessToken,
-      username: user.username,
-      email: user.email,
+      ok: true,
+      message: 'Email verified.',
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -460,7 +562,7 @@ app.post('/api/auth/verify-email', async (c) => {
   }
 });
 
-app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
+app.get('/api/auth/ws-ticket', authenticateUser, requireVerifiedAuth, async (c) => {
   const user = c.get('user');
   const jwtSecret = requireJwtSecret(c.env);
 
@@ -483,12 +585,12 @@ app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
 // User Profile & Session Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/user/profile', authenticateUser, async (c) => {
+app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const profile = await db
     .prepare(
-      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, createdAt FROM users WHERE id = ?'
+      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, email_verified_at, createdAt FROM users WHERE id = ?'
     )
     .bind(user.id)
     .first();
@@ -497,10 +599,11 @@ app.get('/api/user/profile', authenticateUser, async (c) => {
   return c.json({
     ...profile,
     showOnlineStatus: profile.showOnlineStatus === 1,
+    isEmailVerified: Boolean(profile.email_verified_at),
   });
 });
 
-app.put('/api/user/profile', authenticateUser, async (c) => {
+app.put('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { profilePicture, accentColor, bio, showOnlineStatus } = await readJson(
@@ -560,7 +663,7 @@ app.put('/api/user/profile', authenticateUser, async (c) => {
   });
 });
 
-app.put('/api/user/password', authenticateUser, async (c) => {
+app.put('/api/user/password', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { currentPassword, newPassword } = await readJson(c, LIMITS.authBody);
@@ -585,7 +688,7 @@ app.put('/api/user/password', authenticateUser, async (c) => {
   return c.json({ message: 'Password updated successfully' });
 });
 
-app.get('/api/user/sessions', authenticateUser, async (c) => {
+app.get('/api/user/sessions', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const sessions = await db
@@ -603,7 +706,7 @@ app.get('/api/user/sessions', authenticateUser, async (c) => {
   return c.json(mapped);
 });
 
-app.delete('/api/user/sessions/:sessionId', authenticateUser, async (c) => {
+app.delete('/api/user/sessions/:sessionId', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const sessionId = validateUuid(c.req.param('sessionId'), 'session id');
@@ -614,7 +717,7 @@ app.delete('/api/user/sessions/:sessionId', authenticateUser, async (c) => {
   return c.json({ message: 'Session revoked' });
 });
 
-app.delete('/api/user/sessions', authenticateUser, async (c) => {
+app.delete('/api/user/sessions', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   await db
@@ -628,7 +731,7 @@ app.delete('/api/user/sessions', authenticateUser, async (c) => {
 // Document CRUD Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/documents', authenticateUser, async (c) => {
+app.get('/api/documents', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
@@ -689,7 +792,7 @@ app.get('/api/documents', authenticateUser, async (c) => {
   });
 });
 
-app.post('/api/documents', authenticateUser, async (c) => {
+app.post('/api/documents', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const body = await readJson(c, LIMITS.documentBody);
@@ -732,7 +835,7 @@ app.post('/api/documents', authenticateUser, async (c) => {
   );
 });
 
-app.patch('/api/documents/:id', authenticateUser, async (c) => {
+app.patch('/api/documents/:id', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -791,7 +894,7 @@ app.patch('/api/documents/:id', authenticateUser, async (c) => {
   });
 });
 
-app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
+app.post('/api/documents/:id/recent', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -825,7 +928,7 @@ app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
   return c.json({ message: 'Added to recent' });
 });
 
-app.get('/api/documents/:id/settings', authenticateUser, async (c) => {
+app.get('/api/documents/:id/settings', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -840,7 +943,7 @@ app.get('/api/documents/:id/settings', authenticateUser, async (c) => {
   });
 });
 
-app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
+app.patch('/api/documents/:id/settings', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -858,7 +961,7 @@ app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
   });
 });
 
-app.delete('/api/documents/:id', authenticateUser, async (c) => {
+app.delete('/api/documents/:id', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -903,7 +1006,7 @@ app.delete('/api/documents/:id', authenticateUser, async (c) => {
   return c.json({ message: 'Document deleted', action: 'deleted' });
 });
 
-app.post('/api/documents/:id/transfer', authenticateUser, async (c) => {
+app.post('/api/documents/:id/transfer', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -955,7 +1058,7 @@ app.post('/api/documents/:id/transfer', authenticateUser, async (c) => {
   });
 });
 
-app.get('/api/documents/:id/history', authenticateUser, async (c) => {
+app.get('/api/documents/:id/history', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -972,7 +1075,7 @@ app.get('/api/documents/:id/history', authenticateUser, async (c) => {
   return c.json(history.results || []);
 });
 
-app.get('/api/documents/:id/info', authenticateUser, async (c) => {
+app.get('/api/documents/:id/info', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -1029,6 +1132,7 @@ app.get('/ws/:documentId', async (c) => {
   // Task 4: Check document read permission before forwarding to DO.
   const db = requireDb(c.env);
   try {
+    await requireVerifiedUser(c.env, ticketPayload.sub);
     const access = await getDocumentAccess(db, documentId, ticketPayload.sub);
     assertDocumentReadable(access);
     console.log('[WS] Permission granted', {

@@ -73,6 +73,15 @@ Set the production secret key for JWT session tokens:
 
 ```bash
 npx wrangler secret put JWT_SECRET
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put EMAIL_CODE_PEPPER
+```
+
+Set non-secret email metadata in your Worker environment or local `.dev.vars`:
+
+```txt
+EMAIL_FROM="SyncroEdit <verify@yourdomain.com>"
+APP_NAME="SyncroEdit"
 ```
 
 ### 4. Deploy Static Assets and Worker
@@ -99,6 +108,10 @@ If you receive 401 Unauthorized errors in local development, ensure that a local
 
 ```env
 JWT_SECRET = "replace-with-a-long-random-local-secret"
+RESEND_API_KEY = "re_test_key"
+EMAIL_CODE_PEPPER = "replace-with-a-long-random-local-pepper"
+EMAIL_FROM = "SyncroEdit <verify@yourdomain.com>"
+APP_NAME = "SyncroEdit"
 ```
 
 _Note: Do not commit `.dev.vars` to Git._

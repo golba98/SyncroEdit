@@ -303,15 +303,17 @@ test.describe('Element Overlap & Z-Index', () => {
     expect(labelMsg.y).toBeLessThan(inputMsg.y + inputMsg.height / 2);
   });
 
-  test('Modal Overlay', async ({ page }) => {
-    // Trigger modal by mocking signup response to return success but no token
-    // (See authController.js: if data.token is missing, it shows modal)
+  test('Verification Page Redirect', async ({ page }) => {
     await page.click('#showSignup');
 
     await page.route('/api/auth/signup', (route) =>
       route.fulfill({
         status: 200,
-        body: JSON.stringify({ message: 'Verification needed' }), // No token
+        body: JSON.stringify({
+          verificationRequired: true,
+          message: 'Verification needed',
+          email: 'verify@test.com',
+        }),
       })
     );
 
@@ -322,18 +324,9 @@ test.describe('Element Overlap & Z-Index', () => {
 
     await page.click('#signupBtn');
 
-    const modal = page.locator('#emailVerificationModal');
-    await expect(modal).toBeVisible();
-
-    // Check z-index
-    const zIndex = await modal.evaluate((el) => window.getComputedStyle(el).zIndex);
-    expect(parseInt(zIndex)).toBeGreaterThan(100);
-
-    // Check coverage (width/height)
-    const viewport = page.viewportSize();
-    const modalBox = await modal.boundingBox();
-    expect(modalBox.width).toBeCloseTo(viewport.width, 0);
-    expect(modalBox.height).toBeCloseTo(viewport.height, 0);
+    await expect(page).toHaveURL(/\/pages\/verify(?:\.html)?/);
+    await expect(page.locator('#emailValue')).toHaveText('verify@test.com');
+    await expect(page.locator('#codeInput')).toBeVisible();
   });
 });
 

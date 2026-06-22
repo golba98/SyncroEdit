@@ -3,6 +3,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { verify } from 'hono/jwt';
+import { requireVerifiedUser } from './auth.js';
 import {
   AppError,
   LIMITS,
@@ -256,6 +257,7 @@ export class DocumentSyncObject {
 
       const { userId, username, sessionId } = ticketInfo;
       const db = requireDb(this.env);
+      await requireVerifiedUser(this.env, userId);
       const access = await getDocumentAccess(db, docId, userId);
       assertDocumentReadable(access);
 

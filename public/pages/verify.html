@@ -406,7 +406,6 @@
       const params = new URLSearchParams(window.location.search);
       const storedEmail = sessionStorage.getItem('verificationEmail');
       const email = storedEmail || params.get('email');
-      const storedUsername = sessionStorage.getItem('verificationUsername');
       const verificationMessage =
         sessionStorage.getItem('verificationMessage') || 'Use the code we just sent to continue.';
       const docId = sessionStorage.getItem('postLoginDocId');
@@ -460,7 +459,7 @@
         });
         // Show ready state when code is complete
         if (isComplete) {
-          synchro?.transition('hover-ready');
+          synchro?.applyState('hover-ready');
         }
       });
 
@@ -484,15 +483,17 @@
       async function sendCode() {
         setStatus('Sending code...', '');
         synchro?.onSubmit();
+        resendBtn.disabled = true;
         try {
-          await Network.fetchAPI('/api/auth/resend-code', {
+          await Network.fetchAPI('/api/auth/send-verification', {
             method: 'POST',
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email, purpose: 'signup' }),
           });
-          synchro?.transition('idle');
+          synchro?.applyState('idle');
           setStatus('Code sent. Check your email.', 'success');
           codeInput.value = '';
           codeInput.focus();
+          startResendCooldown();
         } catch (err) {
           console.error('Resend error:', err);
           synchro?.onError();
@@ -500,7 +501,23 @@
             err.message.replace('API error: ', 'Error ') || 'Unable to send code. Try again.',
             'error'
           );
+          resendBtn.disabled = false;
         }
+      }
+
+      function startResendCooldown() {
+        let remaining = 30;
+        resendBtn.textContent = `Resend in ${remaining}s`;
+        const interval = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(interval);
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend code';
+            return;
+          }
+          resendBtn.textContent = `Resend in ${remaining}s`;
+        }, 1000);
       }
 
       async function verifyCode() {
@@ -516,22 +533,19 @@
         try {
           const data = await Network.fetchAPI('/api/auth/verify-email', {
             method: 'POST',
-            body: JSON.stringify({ email, verificationCode: code }),
+            body: JSON.stringify({ email, code, purpose: 'signup' }),
           });
 
           synchro?.onSuccess();
           renderer?.burst('star', 5);
-          setStatus('Email verified! Redirecting...', 'success');
-          if (data.token) {
-            Auth.setToken(data.token);
-          }
-          if (data.username || storedUsername) {
-            localStorage.setItem('synchroEditUser', data.username || storedUsername);
-          }
+          setStatus(data.message || 'Email verified. Please sign in.', 'success');
+          Auth.removeToken();
           sessionStorage.removeItem('verificationEmail');
           sessionStorage.removeItem('verificationUsername');
           sessionStorage.removeItem('verificationMessage');
-          const redirectUrl = docId ? `../index.html?doc=${docId}` : '../index.html';
+          const redirectUrl = docId
+            ? `login.html?verified=1&doc=${encodeURIComponent(docId)}`
+            : 'login.html?verified=1';
           sessionStorage.removeItem('postLoginDocId');
           setTimeout(() => (window.location.href = redirectUrl), 1200);
         } catch (err) {

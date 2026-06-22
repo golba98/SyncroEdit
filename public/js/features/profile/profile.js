@@ -291,12 +291,16 @@ export class Profile {
 
     try {
       resendBtn.disabled = true;
-      await Network.fetchAPI('/api/auth/resend-code', {
+      await Network.fetchAPI('/api/auth/send-verification', {
         method: 'POST',
-        body: JSON.stringify({ email: this.user.email }),
+        body: JSON.stringify({ email: this.user.email, purpose: 'signup' }),
       });
 
+      sessionStorage.setItem('verificationEmail', this.user.email);
+      sessionStorage.setItem('verificationMessage', 'Check your email for a verification code.');
+      sessionStorage.setItem('codeJustSent', 'true');
       alert('Verification code sent to your email!');
+      window.location.href = `/pages/verify.html?email=${encodeURIComponent(this.user.email)}`;
 
       // Rate limit UI
       let timeLeft = 60;

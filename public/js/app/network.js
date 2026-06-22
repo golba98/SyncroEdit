@@ -66,6 +66,7 @@ export const Network = {
     const isAuthRequest =
       url.includes('/login') ||
       url.includes('/signup') ||
+      url.includes('/send-verification') ||
       url.includes('/verify-email') ||
       url.includes('/logout') ||
       url.includes('/refresh-token');
@@ -120,11 +121,15 @@ export const Network = {
 
     if (!response.ok) {
       let message = `API error: ${response.status}`;
+      let errData = null;
       try {
-        const errData = await response.json();
+        errData = await response.json();
         if (errData && errData.message) message = errData.message;
       } catch {}
-      throw new Error(message);
+      const error = new Error(message);
+      error.status = response.status;
+      error.data = errData;
+      throw error;
     }
     return response.json();
   },

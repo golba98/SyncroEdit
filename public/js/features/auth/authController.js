@@ -330,6 +330,11 @@ class AuthController {
       this.synchro.onSuccess();
       this._redirect();
     } catch (e) {
+      if (e.message === 'Email verification required') {
+        const email = e.data?.email || form.querySelector('#loginUsername')?.value?.trim();
+        this._goToVerification(email, 'Verify your email before signing in.');
+        return;
+      }
       const msg = e.message?.includes('401')
         ? 'Invalid username or password'
         : e.message?.replace('API error: ', '') || 'Login failed';
@@ -395,25 +400,12 @@ class AuthController {
         body: JSON.stringify({ username, email, password }),
       });
 
-      if (data.token) {
-        // Email verification disabled — log the user in directly
-        Auth.setToken(data.token);
-        this.synchro.onSuccess();
-        if (statusEl) {
-          statusEl.textContent = '✓ Account created! Redirecting...';
-          statusEl.className = 'status-message success';
-        }
-        setTimeout(() => this._redirect(), 1500);
-      } else {
-        // Email verification enabled — show the verification modal
-        this.synchro.onSuccess();
-        if (statusEl) {
-          statusEl.textContent =
-            '✓ ' + (data.message || 'Check your email for a verification code.');
-          statusEl.className = 'status-message success';
-        }
-        this._showVerificationModal(email);
+      this.synchro.onSuccess();
+      if (statusEl) {
+        statusEl.textContent = '✓ ' + (data.message || 'Check your email for a verification code.');
+        statusEl.className = 'status-message success';
       }
+      this._goToVerification(email, data.message || 'Check your email for a verification code.');
     } catch (e) {
       showError(e.message || 'Signup failed. Please try again.');
     } finally {
@@ -422,6 +414,18 @@ class AuthController {
         btn.textContent = 'Create Account';
       }
     }
+  }
+
+  _goToVerification(email, message) {
+    if (!email) return;
+    const docId = new URLSearchParams(window.location.search).get('doc');
+    sessionStorage.setItem('verificationEmail', email);
+    sessionStorage.setItem('verificationMessage', message || 'Use the code we just sent.');
+    sessionStorage.setItem('codeJustSent', 'true');
+    if (docId) {
+      sessionStorage.setItem('postLoginDocId', docId);
+    }
+    window.location.href = `/pages/verify.html?email=${encodeURIComponent(email)}`;
   }
 
   _showVerificationModal(email) {
@@ -447,17 +451,16 @@ class AuthController {
         verifyBtn.disabled = true;
         verifyBtn.textContent = 'Verifying...';
         try {
-          const data = await Network.fetchAPI('/api/auth/verify-email', {
+          await Network.fetchAPI('/api/auth/verify-email', {
             method: 'POST',
-            body: JSON.stringify({ email, verificationCode: code }),
+            body: JSON.stringify({ email, code, purpose: 'signup' }),
           });
-          Auth.setToken(data.token);
           if (verificationMsg) {
-            verificationMsg.textContent = '✓ Email verified! Redirecting...';
+            verificationMsg.textContent = '✓ Email verified! Please sign in.';
             verificationMsg.style.color = '#4caf50';
           }
           this.synchro.onSuccess();
-          setTimeout(() => this._redirect(), 1200);
+          setTimeout(() => (window.location.href = '/pages/login.html?verified=1'), 1200);
         } catch (err) {
           if (verificationMsg) {
             verificationMsg.textContent = '✗ ' + (err.message || 'Invalid code.');
@@ -473,9 +476,9 @@ class AuthController {
       resendBtn.onclick = async () => {
         resendBtn.disabled = true;
         try {
-          await Network.fetchAPI('/api/auth/resend-code', {
+          await Network.fetchAPI('/api/auth/send-verification', {
             method: 'POST',
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email, purpose: 'signup' }),
           });
           if (verificationMsg) {
             verificationMsg.textContent = 'New code sent to your email.';
