@@ -291,7 +291,38 @@ app.post('/api/auth/signup', async (c) => {
       .run();
 
     signupStep = 'send_verification_code';
-    await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
+    let codeSent = false;
+    let configError = null;
+    try {
+      await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
+      codeSent = true;
+    } catch (err) {
+      if (
+        err instanceof AppError &&
+        (err.code === 'missing_email_code_pepper' || err.code === 'missing_email_delivery_config')
+      ) {
+        configError = 'EMAIL_NOT_CONFIGURED';
+      } else {
+        throw err;
+      }
+    }
+
+    if (configError) {
+      return c.json(
+        {
+          ok: true,
+          emailVerified: false,
+          isEmailVerified: false,
+          verificationRequired: true,
+          codeSent: false,
+          code: 'EMAIL_NOT_CONFIGURED',
+          message: 'Account created. Email verification is not configured.',
+          username: trimmedUsername,
+          email: normalizedEmail,
+        },
+        201
+      );
+    }
 
     return c.json(
       {
@@ -299,6 +330,7 @@ app.post('/api/auth/signup', async (c) => {
         emailVerified: false,
         isEmailVerified: false,
         verificationRequired: true,
+        codeSent,
         message: 'Check your email for a verification code.',
         username: trimmedUsername,
         email: normalizedEmail,
@@ -477,7 +509,22 @@ app.post('/api/auth/send-verification', async (c) => {
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
   } catch (err) {
-    if (err instanceof AppError) throw err;
+    if (err instanceof AppError) {
+      if (
+        err.code === 'missing_email_code_pepper' ||
+        err.code === 'missing_email_delivery_config'
+      ) {
+        return c.json(
+          {
+            error: 'Email verification is not configured for this environment.',
+            message: 'Email verification is not configured for this environment.',
+            code: 'EMAIL_NOT_CONFIGURED',
+          },
+          500
+        );
+      }
+      throw err;
+    }
     throw new AppError(500, 'Internal Server Error', 'send_verification_failed');
   }
 });
@@ -492,7 +539,22 @@ app.post('/api/auth/resend-code', async (c) => {
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
   } catch (err) {
-    if (err instanceof AppError) throw err;
+    if (err instanceof AppError) {
+      if (
+        err.code === 'missing_email_code_pepper' ||
+        err.code === 'missing_email_delivery_config'
+      ) {
+        return c.json(
+          {
+            error: 'Email verification is not configured for this environment.',
+            message: 'Email verification is not configured for this environment.',
+            code: 'EMAIL_NOT_CONFIGURED',
+          },
+          500
+        );
+      }
+      throw err;
+    }
     throw new AppError(500, 'Internal Server Error', 'resend_code_failed');
   }
 });

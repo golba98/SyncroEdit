@@ -498,6 +498,89 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     });
   });
 
+  it('signs up successfully even if email configuration is missing, returning EMAIL_NOT_CONFIGURED status', async () => {
+    const badEnv = {
+      ...env,
+      EMAIL_CODE_PEPPER: '', // invalid / missing
+    };
+    const signupResult = await signup(badEnv, 'noconfiguser', 'noconfig@example.com');
+    expect(signupResult.res.status).toBe(201);
+    expect(signupResult.data.ok).toBe(true);
+    expect(signupResult.data.verificationRequired).toBe(true);
+    expect(signupResult.data.codeSent).toBe(false);
+    expect(signupResult.data.code).toBe('EMAIL_NOT_CONFIGURED');
+    expect(signupResult.user.email_verified_at).toBeNull();
+  });
+
+  it('returns EMAIL_NOT_CONFIGURED from send-verification if email configuration is missing', async () => {
+    const badEnv = {
+      ...env,
+      EMAIL_CODE_PEPPER: '', // invalid / missing
+    };
+    const res = await app.request(
+      '/api/auth/send-verification',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'noconfig@example.com', purpose: 'signup' }),
+      },
+      badEnv
+    );
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.code).toBe('EMAIL_NOT_CONFIGURED');
+    expect(data.error).toBe('Email verification is not configured for this environment.');
+  });
+
+  it('ignores extra request keys during verify-email, but fails if code is missing/legacy', async () => {
+    const signupResult = await signup(env, 'extrakeysuser', 'extrakeys@example.com');
+    const emailBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const code = emailBody.html.match(/letter-spacing:6px[^>]*>(\d{6})/)[1];
+
+    // Verify with extra keys (should succeed)
+    const extraKeysRes = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'extrakeys@example.com',
+          code,
+          purpose: 'signup',
+          extra_param_to_ignore: 'value',
+        }),
+      },
+      env
+    );
+    expect(extraKeysRes.status).toBe(200);
+    expect(signupResult.user.email_verified_at).toBeTruthy();
+
+    // Reset user verification state for checking legacy failure
+    signupResult.user.email_verified_at = null;
+    env.DB.email_verification_codes = [];
+    await signup(env, 'extrakeysuser', 'extrakeys@example.com');
+    const newEmailBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const newCode = newEmailBody.html.match(/letter-spacing:6px[^>]*>(\d{6})/)[1];
+
+    // Try verifying with legacy verificationCode key instead of code
+    const legacyRes = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'extrakeys@example.com',
+          verificationCode: newCode,
+          purpose: 'signup',
+        }),
+      },
+      env
+    );
+    expect(legacyRes.status).toBe(400);
+    const legacyData = await legacyRes.json();
+    expect(legacyData.code).toBe('invalid_code');
+  });
+
   it('limits verification attempts and active sends', async () => {
     await signup(env, 'limiteduser', 'limited@example.com');
     let latest = env.DB.email_verification_codes[0];
