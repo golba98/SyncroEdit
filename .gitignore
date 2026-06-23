@@ -27,6 +27,7 @@ jwtRS256.key.pub
 # Logs
 logs/
 *.log
+debug-output/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -42,6 +43,10 @@ test-results/
 dist/
 build/
 .next/
+tmp/
+*.tmp
+*.bak
+*~
 
 # IDEs and Editors
 .vscode/
