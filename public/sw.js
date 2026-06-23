@@ -1,4 +1,4 @@
-const CACHE_NAME = 'syncroedit-v7';
+const CACHE_NAME = 'syncroedit-v8';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -166,9 +166,9 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          console.warn('[SW] Fetch failed:', event.request.url);
-          return new Response('Network Error', { status: 404, statusText: 'Network Error' });
+        .catch((err) => {
+          console.warn('[SW] Fetch failed:', event.request.url, err);
+          throw err;
         });
     })
   );

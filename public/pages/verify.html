@@ -8,9 +8,11 @@
     <link rel="stylesheet" href="../css/synchro.css" />
     <style>
       :root {
-        --accent-color: #8b5cf6;
-        --accent-glow: rgba(139, 92, 246, 0.6);
-        --bg-gradient: linear-gradient(135deg, #1a0033 0%, #0d001a 50%, #000000 100%);
+        --accent-color: #3b82f6;
+        --accent-glow: rgba(59, 130, 246, 0.2);
+        --bg-gradient: linear-gradient(135deg, #101418 0%, #0f1317 50%, #0c0e11 100%);
+        --radius-lg: 12px;
+        --radius-sm: 6px;
       }
 
       * {
@@ -24,7 +26,14 @@
       }
 
       body {
-        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
         background: var(--bg-gradient);
         display: flex;
         justify-content: center;
@@ -35,16 +44,14 @@
       }
 
       body.error-flash {
-        background: linear-gradient(135deg, #330000 0%, #1a0000 50%, #000000 100%);
+        background: linear-gradient(135deg, #2a1010 0%, #1a0808 50%, #000000 100%);
       }
 
       .login-container {
-        background: #0d0d0d;
-        border-radius: 60px;
-        box-shadow:
-          0 20px 60px rgba(0, 0, 0, 0.6),
-          0 0 80px var(--accent-glow);
-        border: 1px solid #2a2a2a;
+        background: #151a20;
+        border-radius: var(--radius-lg);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+        border: 1px solid #2a323d;
         display: flex;
         width: 100%;
         max-width: 900px;
@@ -62,7 +69,7 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
-        background: #000000;
+        background: #101418;
         z-index: 2;
         position: relative;
       }
@@ -72,7 +79,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: radial-gradient(circle at center, #1a1a1a 0%, #000000 70%);
+        background: radial-gradient(circle at center, #151a20 0%, #0f1317 70%);
         position: relative;
         overflow: hidden;
       }
@@ -92,13 +99,12 @@
         gap: 12px;
         font-size: 28px;
         font-weight: 700;
-        color: var(--accent-color);
+        color: #f3f4f6;
         margin-bottom: 12px;
-        text-shadow: 0 0 20px var(--accent-glow);
       }
 
       .muted {
-        color: #9ca3af;
+        color: #b0b7c3;
         font-size: 14px;
         line-height: 1.5;
         margin-bottom: 18px;
@@ -109,17 +115,17 @@
         align-items: center;
         gap: 8px;
         padding: 10px 14px;
-        background: rgba(139, 92, 246, 0.12);
-        border: 1px solid rgba(139, 92, 246, 0.35);
-        border-radius: 10px;
-        color: #e5e7eb;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: var(--radius-sm);
+        color: #f3f4f6;
         font-weight: 600;
         margin-bottom: 20px;
       }
 
       .field-label {
         font-size: 13px;
-        color: #a1a1aa;
+        color: #b0b7c3;
         margin-bottom: 6px;
         display: block;
       }
@@ -127,10 +133,10 @@
       .code-input {
         width: 100%;
         padding: 14px;
-        border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        background: #16161d;
-        color: #f5f5f5;
+        border-radius: var(--radius-sm);
+        border: 1px solid #2a323d;
+        background: #1a2028;
+        color: #f3f4f6;
         letter-spacing: 6px;
         text-align: center;
         font-size: 18px;
@@ -141,8 +147,8 @@
       }
 
       .code-input:focus {
-        border-color: rgba(139, 92, 246, 0.8);
-        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
       }
 
       .actions {
@@ -154,26 +160,33 @@
       .btn {
         flex: 1;
         padding: 14px;
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         border: none;
         font-weight: 700;
         cursor: pointer;
         transition:
           transform 0.1s ease,
           box-shadow 0.2s ease,
-          opacity 0.2s ease;
+          background-color 0.2s ease;
       }
 
       .btn-primary {
-        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        background: var(--accent-color);
         color: #fff;
-        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
+      }
+
+      .btn-primary:hover {
+        background: #2563eb;
       }
 
       .btn-secondary {
         background: transparent;
-        color: #c4b5fd;
-        border: 1px solid rgba(139, 92, 246, 0.5);
+        color: #f3f4f6;
+        border: 1px solid #2a323d;
+      }
+
+      .btn-secondary:hover {
+        background: #202732;
       }
 
       .btn:active {
@@ -185,27 +198,28 @@
         font-size: 13px;
         min-height: 18px;
         text-align: center;
+        white-space: pre-wrap;
       }
 
       .status.error {
-        color: #f87171;
+        color: #ef4444;
       }
 
       .status.success {
-        color: #34d399;
+        color: #22c55e;
       }
 
       .footer {
         margin-top: 22px;
         font-size: 13px;
-        color: #9ca3af;
+        color: #b0b7c3;
         display: flex;
         justify-content: space-between;
         align-items: center;
       }
 
       .link {
-        color: #c4b5fd;
+        color: #60a5fa;
         text-decoration: none;
         font-weight: 600;
       }
@@ -326,7 +340,7 @@
         />
 
         <div class="actions">
-          <button id="verifyBtn" class="btn btn-primary">Confirm</button>
+          <button id="verifyBtn" class="btn btn-primary">Verify code</button>
           <button id="resendBtn" class="btn btn-secondary">Resend code</button>
         </div>
 
@@ -393,7 +407,6 @@
       const params = new URLSearchParams(window.location.search);
       const storedEmail = sessionStorage.getItem('verificationEmail');
       const email = storedEmail || params.get('email');
-      const storedUsername = sessionStorage.getItem('verificationUsername');
       const verificationMessage =
         sessionStorage.getItem('verificationMessage') || 'Use the code we just sent to continue.';
       const docId = sessionStorage.getItem('postLoginDocId');
@@ -410,17 +423,50 @@
         window.location.href = 'login.html';
       } else {
         emailValueEl.textContent = email;
-        introTextEl.textContent = `We sent a 6-digit code to ${email}. Open your inbox and paste it below.`;
         lastMessage.textContent = verificationMessage;
 
-        // Check if we just sent a code from the login page
-        const codeJustSent = sessionStorage.getItem('codeJustSent');
-        if (codeJustSent === 'true') {
-          sessionStorage.removeItem('codeJustSent');
+        const codeSent = sessionStorage.getItem('codeSent') === 'true';
+        const signupSuccess = sessionStorage.getItem('signupSuccess') === 'true';
+        const verificationErrorCode = sessionStorage.getItem('verificationErrorCode');
+
+        // Consume session storage flags
+        sessionStorage.removeItem('codeSent');
+        sessionStorage.removeItem('signupSuccess');
+        sessionStorage.removeItem('verificationErrorCode');
+
+        if (codeSent) {
+          if (signupSuccess) {
+            introTextEl.textContent = `Account created.\nWe sent a 6-digit verification code to ${email}.`;
+          } else {
+            introTextEl.textContent = `We sent a 6-digit verification code to ${email}.`;
+          }
+          resendBtn.textContent = 'Resend code';
           setStatus('Code sent. Check your email.', 'success');
+          startResendCooldown();
         } else {
-          // Send a fresh code on arrival to this page
-          sendCode();
+          if (signupSuccess) {
+            introTextEl.textContent = `Account created.\nSend a verification code to ${email}.`;
+          } else {
+            introTextEl.textContent = `Send a verification code to ${email}.`;
+          }
+          resendBtn.textContent = 'Send code';
+
+          if (verificationErrorCode === 'EMAIL_NOT_CONFIGURED') {
+            const isProduction =
+              window.location.hostname === 'syncroedit.online' ||
+              window.location.hostname === 'www.syncroedit.online';
+            if (isProduction) {
+              setStatus(
+                'Email verification is temporarily unavailable. Please contact support.',
+                'error'
+              );
+            } else {
+              setStatus(
+                'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.',
+                'error'
+              );
+            }
+          }
         }
       }
 
@@ -447,7 +493,7 @@
         });
         // Show ready state when code is complete
         if (isComplete) {
-          synchro?.transition('hover-ready');
+          synchro?.applyState('hover-ready');
         }
       });
 
@@ -471,23 +517,71 @@
       async function sendCode() {
         setStatus('Sending code...', '');
         synchro?.onSubmit();
+        resendBtn.disabled = true;
+        const isResend = resendBtn.textContent === 'Resend code';
+        resendBtn.textContent = isResend ? 'Resending...' : 'Sending...';
+
         try {
-          await Network.fetchAPI('/api/auth/resend-code', {
+          await Network.fetchAPI('/api/auth/send-verification', {
             method: 'POST',
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email, purpose: 'signup' }),
           });
-          synchro?.transition('idle');
+          synchro?.applyState('idle');
           setStatus('Code sent. Check your email.', 'success');
+          introTextEl.textContent = `We sent a 6-digit verification code to ${email}.`;
+          resendBtn.textContent = 'Resend code';
           codeInput.value = '';
           codeInput.focus();
+          startResendCooldown();
         } catch (err) {
           console.error('Resend error:', err);
           synchro?.onError();
-          setStatus(
-            err.message.replace('API error: ', 'Error ') || 'Unable to send code. Try again.',
-            'error'
-          );
+          resendBtn.textContent = isResend ? 'Resend code' : 'Send code';
+
+          const code = err.data?.code;
+          if (
+            code === 'EMAIL_NOT_CONFIGURED' ||
+            code === 'missing_email_code_pepper' ||
+            code === 'missing_email_delivery_config'
+          ) {
+            const isProduction =
+              window.location.hostname === 'syncroedit.online' ||
+              window.location.hostname === 'www.syncroedit.online';
+            if (isProduction) {
+              setStatus(
+                'Email verification is temporarily unavailable. Please contact support.',
+                'error'
+              );
+            } else {
+              setStatus(
+                'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.',
+                'error'
+              );
+            }
+          } else {
+            setStatus(
+              err.message.replace('API error: ', 'Error ') || 'Unable to send code. Try again.',
+              'error'
+            );
+          }
+          resendBtn.disabled = false;
         }
+      }
+
+      function startResendCooldown() {
+        let remaining = 30;
+        resendBtn.textContent = `Resend in ${remaining}s`;
+        resendBtn.disabled = true;
+        const interval = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(interval);
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend code';
+            return;
+          }
+          resendBtn.textContent = `Resend in ${remaining}s`;
+        }, 1000);
       }
 
       async function verifyCode() {
@@ -500,34 +594,59 @@
 
         synchro?.onSubmit();
         setStatus('Verifying...', '');
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = 'Verifying...';
+
         try {
           const data = await Network.fetchAPI('/api/auth/verify-email', {
             method: 'POST',
-            body: JSON.stringify({ email, verificationCode: code }),
+            body: JSON.stringify({ email, code, purpose: 'signup' }),
           });
 
           synchro?.onSuccess();
           renderer?.burst('star', 5);
-          setStatus('Email verified! Redirecting...', 'success');
-          if (data.token) {
-            Auth.setToken(data.token);
-          }
-          if (data.username || storedUsername) {
-            localStorage.setItem('synchroEditUser', data.username || storedUsername);
-          }
+          setStatus(data.message || 'Email verified. Please sign in.', 'success');
+          Auth.removeToken();
           sessionStorage.removeItem('verificationEmail');
           sessionStorage.removeItem('verificationUsername');
           sessionStorage.removeItem('verificationMessage');
-          const redirectUrl = docId ? `../index.html?doc=${docId}` : '../index.html';
+          const redirectUrl = docId
+            ? `login.html?verified=1&doc=${encodeURIComponent(docId)}`
+            : 'login.html?verified=1';
           sessionStorage.removeItem('postLoginDocId');
           setTimeout(() => (window.location.href = redirectUrl), 1200);
         } catch (err) {
           console.error('Verification error:', err);
           synchro?.onError();
-          setStatus(
-            err.message.replace('API error: ', 'Error ') || 'Invalid code. Try again.',
-            'error'
-          );
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = 'Verify code';
+
+          const errCode = err.data?.code;
+          if (
+            errCode === 'EMAIL_NOT_CONFIGURED' ||
+            errCode === 'missing_email_code_pepper' ||
+            errCode === 'missing_email_delivery_config'
+          ) {
+            const isProduction =
+              window.location.hostname === 'syncroedit.online' ||
+              window.location.hostname === 'www.syncroedit.online';
+            if (isProduction) {
+              setStatus(
+                'Email verification is temporarily unavailable. Please contact support.',
+                'error'
+              );
+            } else {
+              setStatus(
+                'Email verification is not configured for this environment.\nSet RESEND_API_KEY, EMAIL_CODE_PEPPER, EMAIL_FROM, and APP_NAME for staging.',
+                'error'
+              );
+            }
+          } else {
+            setStatus(
+              err.message.replace('API error: ', 'Error ') || 'Invalid code. Try again.',
+              'error'
+            );
+          }
         }
       }
 

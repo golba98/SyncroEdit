@@ -7,6 +7,7 @@ export class MockD1 {
     this.document_permissions = [];
     this.recent_documents = [];
     this.document_history = [];
+    this.email_verification_codes = [];
   }
 
   prepare(sql) {
@@ -51,10 +52,10 @@ export class MockD1 {
       return firstOnly ? found : found ? [found] : [];
     }
 
-    // 2. INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)
+    // 2. INSERT INTO users
     if (
       sql.includes(
-        'INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)'
+        'INSERT INTO users (id, username, email, password, isEmailVerified, email_verified_at) VALUES (?, ?, ?, ?, 0, NULL)'
       )
     ) {
       const [id, username, email, password] = args;
@@ -63,7 +64,8 @@ export class MockD1 {
         username,
         email,
         password,
-        isEmailVerified: 1,
+        isEmailVerified: 0,
+        email_verified_at: null,
         profilePicture: '',
         accentColor: '#8b5cf6',
         bio: '',
@@ -74,8 +76,13 @@ export class MockD1 {
       return user;
     }
 
-    // 3. SELECT id, username, email, password FROM users WHERE username = ?
-    if (sql.includes('SELECT id, username, email, password FROM users WHERE username = ?')) {
+    // 3. SELECT login user
+    if (
+      sql.includes(
+        'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
+      ) ||
+      sql.includes('SELECT id, username, email, password FROM users WHERE username = ?')
+    ) {
       const [username] = args;
       const found = this.users.find((u) => u.username === username);
       return firstOnly ? found : found ? [found] : [];
@@ -88,8 +95,20 @@ export class MockD1 {
       return firstOnly ? found : found ? [found] : [];
     }
 
-    // 5. SELECT username, email FROM users WHERE id = ?
+    // 5. SELECT username, email, email_verified_at FROM users WHERE id = ?
+    if (sql.includes('SELECT username, email, email_verified_at FROM users WHERE id = ?')) {
+      const [id] = args;
+      const found = this.users.find((u) => u.id === id);
+      return firstOnly ? found : found ? [found] : [];
+    }
+
     if (sql.includes('SELECT username, email FROM users WHERE id = ?')) {
+      const [id] = args;
+      const found = this.users.find((u) => u.id === id);
+      return firstOnly ? found : found ? [found] : [];
+    }
+
+    if (sql.includes('SELECT id, username, email, email_verified_at FROM users WHERE id = ?')) {
       const [id] = args;
       const found = this.users.find((u) => u.id === id);
       return firstOnly ? found : found ? [found] : [];
@@ -150,15 +169,93 @@ export class MockD1 {
       return { success: true };
     }
 
-    // 11. SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, createdAt FROM users WHERE id = ?
+    // 11. SELECT profile
     if (
-      sql.includes(
-        'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, createdAt FROM users WHERE id = ?'
-      )
+      sql.includes('SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus')
     ) {
       const [id] = args;
       const found = this.users.find((u) => u.id === id);
       return firstOnly ? found : found ? [found] : [];
+    }
+
+    if (
+      sql.includes(
+        'SELECT COUNT(*) as count FROM email_verification_codes WHERE email = ? AND purpose = ?'
+      )
+    ) {
+      const [email, purpose, createdAfter] = args;
+      const count = this.email_verification_codes.filter(
+        (code) =>
+          code.email === email &&
+          code.purpose === purpose &&
+          code.consumed_at === null &&
+          code.created_at >= createdAfter
+      ).length;
+      return { count };
+    }
+
+    if (sql.includes('INSERT INTO email_verification_codes')) {
+      const [id, email, code_hash, purpose, expires_at, created_at] = args;
+      const row = {
+        id,
+        email,
+        code_hash,
+        purpose,
+        attempts: 0,
+        expires_at,
+        consumed_at: null,
+        created_at,
+      };
+      this.email_verification_codes.push(row);
+      return row;
+    }
+
+    if (sql.includes('DELETE FROM email_verification_codes WHERE id = ? AND consumed_at IS NULL')) {
+      const [id] = args;
+      this.email_verification_codes = this.email_verification_codes.filter(
+        (code) => code.id !== id || code.consumed_at !== null
+      );
+      return { success: true };
+    }
+
+    if (
+      sql.includes('FROM email_verification_codes') &&
+      sql.includes('ORDER BY created_at DESC') &&
+      sql.includes('LIMIT 1')
+    ) {
+      const [email, purpose] = args;
+      const rows = this.email_verification_codes
+        .filter(
+          (code) => code.email === email && code.purpose === purpose && code.consumed_at === null
+        )
+        .sort((a, b) => b.created_at - a.created_at);
+      return firstOnly ? rows[0] || null : rows;
+    }
+
+    if (sql.includes('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = ?')) {
+      const [id] = args;
+      const row = this.email_verification_codes.find((code) => code.id === id);
+      if (row) row.attempts += 1;
+      return { success: true };
+    }
+
+    if (sql.includes('UPDATE email_verification_codes SET consumed_at = ? WHERE id = ?')) {
+      const [consumedAt, id] = args;
+      const row = this.email_verification_codes.find((code) => code.id === id);
+      if (row) row.consumed_at = consumedAt;
+      return { success: true };
+    }
+
+    if (
+      sql.includes('UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE email = ?')
+    ) {
+      const [verifiedAt, email] = args;
+      const user = this.users.find((u) => u.email === email);
+      if (user) {
+        user.email_verified_at = verifiedAt;
+        user.isEmailVerified = 1;
+      }
+      return { success: true };
     }
 
     // 12. UPDATE users SET ... WHERE id = ?
@@ -172,6 +269,10 @@ export class MockD1 {
         if (sql.includes('bio = ?')) user.bio = args[0];
         if (sql.includes('showOnlineStatus = ?')) user.showOnlineStatus = args[0];
         if (sql.includes('password = ?')) user.password = args[0];
+        if (sql.includes('email_verified_at = ?')) {
+          user.email_verified_at = args[0];
+          user.isEmailVerified = 1;
+        }
       }
       return { success: true };
     }

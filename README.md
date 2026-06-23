@@ -47,9 +47,20 @@ Set the following secret using wrangler CLI:
 
 ```bash
 wrangler secret put JWT_SECRET
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put EMAIL_CODE_PEPPER
 ```
 
-_Note: `JWT_SECRET` is used for signing/verifying session access tokens and short-lived WebSocket connection tickets._
+Configure these email settings for verification-code delivery:
+
+```txt
+RESEND_API_KEY=wrangler secret
+EMAIL_CODE_PEPPER=wrangler secret
+EMAIL_FROM="SyncroEdit <verify@yourdomain.com>"
+APP_NAME="SyncroEdit"
+```
+
+_Note: `JWT_SECRET` is used for signing/verifying session access tokens and short-lived WebSocket connection tickets. `EMAIL_CODE_PEPPER` is used to hash one-time email verification codes before storing them in D1._
 
 ---
 

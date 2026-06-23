@@ -33,6 +33,8 @@ export class Editor {
     this.onContentReady = options.onContentReady || (() => {});
     this.onLifecycleChange = options.onLifecycleChange || (() => {});
     this.onSaveStatusChange = options.onSaveStatusChange || (() => {});
+    this.onStatsChange = options.onStatsChange || (() => {});
+    this.onSelectionStatsChange = options.onSelectionStatsChange || (() => {});
     this.isNewDocument = Boolean(options.isNewDocument);
 
     this.initQuill();
@@ -97,17 +99,59 @@ export class Editor {
       this.renderAllPages(event);
     });
 
+    // 50ms debounced stats update
+    this.updateStatsDebounced = debounce(() => this.updateStats(), 50);
+
     // Persistence: Save to IndexedDB on every update (debounced)
+    let hasLocalChanges = false;
+    const debouncedSave = debounce(() => {
+      if (this._destroyed) return;
+      const docId = this.currentDocId;
+      if (!docId) return;
+
+      const shouldUpdateUI = hasLocalChanges;
+      hasLocalChanges = false;
+
+      if (shouldUpdateUI) {
+        this._setSaveStatus('saving');
+      }
+
+      this.saveToCache(docId)
+        .then(() => {
+          if (shouldUpdateUI) {
+            this._setSaveStatus(navigator.onLine === false ? 'offline' : 'saved');
+          }
+        })
+        .catch(() => {
+          if (shouldUpdateUI) {
+            this._setSaveStatus('failed');
+          }
+        });
+    }, 1000);
+
     if (typeof this.doc.on === 'function') {
-      this.doc.on(
-        'update',
-        debounce(() => {
-          this._setSaveStatus('saving');
-          this.saveToCache(docId)
-            .then(() => this._setSaveStatus(navigator.onLine === false ? 'offline' : 'saved'))
-            .catch(() => this._setSaveStatus('failed'));
-        }, 1000)
-      );
+      this.doc.on('update', (update, origin) => {
+        if (this._destroyed) return;
+
+        const isRemote =
+          (origin === this.provider && this.provider !== null) ||
+          (origin && origin.constructor && origin.constructor.name === 'WebsocketProvider');
+
+        // Stats updates: immediate if remote or empty text, else debounced at 50ms
+        if (isRemote || this.isDocumentTextEmpty()) {
+          this.updateStats();
+        } else {
+          this.updateStatsDebounced();
+        }
+
+        if (this._readyForUser) {
+          if (!isRemote) {
+            hasLocalChanges = true;
+            this._setSaveStatus('unsaved');
+          }
+          debouncedSave();
+        }
+      });
     }
 
     // Persistence: Save immediately on close
@@ -653,6 +697,20 @@ export class Editor {
       this.observer.disconnect();
       this.observer = null;
     }
+
+    if (this._selectionChangeListener) {
+      document.removeEventListener('selectionchange', this._selectionChangeListener);
+    }
+    if (this._undoRedoKeyListener) {
+      document.removeEventListener('keydown', this._undoRedoKeyListener);
+    }
+    if (this._undoRedoInputListener) {
+      document.removeEventListener('input', this._undoRedoInputListener);
+    }
+    if (this._pasteListener) {
+      document.removeEventListener('paste', this._pasteListener);
+    }
+
     this.plugins.forEach((plugin) => {
       if (typeof plugin.destroy === 'function') plugin.destroy();
     });
@@ -1005,6 +1063,8 @@ export class Editor {
     if (this._readyResolve) this._readyResolve();
     this.onContentReady();
 
+    this.updateStats();
+
     requestAnimationFrame(() => {
       if (this._destroyed || !this.quill) return;
       try {
@@ -1046,6 +1106,28 @@ export class Editor {
         this.quill.focus();
       }
     });
+
+    this._selectionChangeListener = () => this.updateSelectionStats();
+    this._undoRedoKeyListener = (e) => {
+      const isUndo = (e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey;
+      const isRedo = (e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
+      if (isUndo || isRedo) {
+        setTimeout(() => this.updateStats(), 0);
+      }
+    };
+    this._undoRedoInputListener = (e) => {
+      if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
+        setTimeout(() => this.updateStats(), 0);
+      }
+    };
+    this._pasteListener = () => {
+      setTimeout(() => this.updateStats(), 0);
+    };
+
+    document.addEventListener('selectionchange', this._selectionChangeListener);
+    document.addEventListener('keydown', this._undoRedoKeyListener);
+    document.addEventListener('input', this._undoRedoInputListener);
+    document.addEventListener('paste', this._pasteListener);
   }
 
   // --- Virtualization & DOM Management ---
@@ -1126,6 +1208,14 @@ export class Editor {
         this.readabilityManager.updateGutter(currentIndex);
       }
       this.pageManager.handleContentChange(currentIndex, delta, source);
+
+      if (source === 'api') {
+        this.updateStats();
+      }
+    });
+
+    pageQuill.on('selection-change', () => {
+      this.updateSelectionStats();
     });
 
     const yText = pageMap.get('content');
@@ -1358,6 +1448,151 @@ export class Editor {
 
     if (this.pageManager) {
       this.pageManager.updateWaterline();
+    }
+  }
+
+  isDocumentTextEmpty() {
+    try {
+      const pages = this.yPages.toArray();
+      if (pages.length === 0) return true;
+      for (const page of pages) {
+        const yText = page.get('content');
+        if (yText && yText.toString().replace(/\n/g, '').trim().length > 0) {
+          return false;
+        }
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
+  updateStats() {
+    if (this._destroyed) return;
+
+    try {
+      const pages = this.yPages.toArray();
+      const pageTextsForChars = [];
+      const pageTextsForWords = [];
+
+      for (const page of pages) {
+        const yText = page.get('content');
+        let text = yText ? yText.toString() : '';
+        if (text.endsWith('\n')) {
+          text = text.slice(0, -1);
+        }
+        pageTextsForChars.push(text);
+        pageTextsForWords.push(text);
+      }
+
+      // Join characters with "" (preventing artificial characters)
+      const charText = pageTextsForChars.join('').normalize();
+      const charCount = Array.from(charText).length;
+
+      // Join words with " " (separating word boundaries across pages)
+      const wordText = pageTextsForWords.join(' ').normalize();
+      const wordRegex = /[\p{L}\p{N}]+(?:['’_-][\p{L}\p{N}]+)*/gu;
+      const wordsMatch = wordText.match(wordRegex);
+      const wordCount = wordsMatch ? wordsMatch.length : 0;
+
+      const stats = { wordCount, charCount };
+
+      if (this.onStatsChange) {
+        this.onStatsChange(stats);
+      }
+    } catch (err) {
+      console.error('Error in updateStats:', err);
+    }
+  }
+
+  getSelectedText() {
+    try {
+      // 1. Check if we have a multi-page selection in progress or completed
+      if (
+        this.selectionManager &&
+        this.selectionManager.startPoint &&
+        this.selectionManager.currentPoint
+      ) {
+        let start = this.selectionManager.startPoint;
+        let end = this.selectionManager.currentPoint;
+        if (
+          start.pageIndex !== end.pageIndex ||
+          (start.pageIndex === end.pageIndex && start.index !== end.index)
+        ) {
+          // Normalize
+          if (
+            start.pageIndex > end.pageIndex ||
+            (start.pageIndex === end.pageIndex && start.index > end.index)
+          ) {
+            [start, end] = [end, start];
+          }
+
+          if (start.pageIndex !== end.pageIndex) {
+            // Multi-page selection
+            let text = '';
+            const pagesArr = this.yPages.toArray();
+            for (let i = start.pageIndex; i <= end.pageIndex; i++) {
+              const pageMap = pagesArr[i];
+              if (!pageMap) continue;
+              const quill = this.pageQuillInstances.get(pageMap.get('id'));
+              if (!quill) continue;
+
+              let pStart = 0;
+              let pEnd = quill.getLength();
+
+              if (i === start.pageIndex) pStart = start.index;
+              if (i === end.pageIndex) pEnd = end.index;
+
+              const length = Math.max(0, pEnd - pStart);
+              text += quill.getText(pStart, length);
+            }
+            return text;
+          }
+        }
+      }
+
+      // 2. Fallback: single page selection check on focused/active Quill
+      if (this.quill) {
+        const range = this.quill.getSelection();
+        if (range && range.length > 0) {
+          return this.quill.getText(range.index, range.length);
+        }
+      }
+
+      // 3. Fallback: check all Quill instances to see if any has a selection
+      for (const quill of this.pageQuillInstances.values()) {
+        const range = quill.getSelection();
+        if (range && range.length > 0) {
+          return quill.getText(range.index, range.length);
+        }
+      }
+    } catch (err) {
+      console.error('Error getting selected text:', err);
+    }
+    return '';
+  }
+
+  updateSelectionStats() {
+    try {
+      const selectedText = this.getSelectedText() || '';
+      const cleanText = selectedText.replace(/\r/g, '').normalize();
+      const charCount = Array.from(cleanText).length;
+
+      const wordRegex = /[\p{L}\p{N}]+(?:['’_-][\p{L}\p{N}]+)*/gu;
+      const wordsMatch = cleanText.match(wordRegex);
+      const wordCount = wordsMatch ? wordsMatch.length : 0;
+
+      if (charCount > 0) {
+        if (this.onSelectionStatsChange) {
+          this.onSelectionStatsChange({ wordCount, charCount, hasSelection: true });
+        }
+      } else {
+        if (this.onSelectionStatsChange) {
+          this.onSelectionStatsChange({ wordCount: 0, charCount: 0, hasSelection: false });
+        }
+      }
+    } catch (err) {
+      console.error('Error updating selection stats:', err);
     }
   }
 

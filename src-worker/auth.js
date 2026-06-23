@@ -1,5 +1,5 @@
 import { sign, verify } from 'hono/jwt';
-import { requireDb, requireJwtSecret } from './security.js';
+import { AppError, requireDb, requireJwtSecret } from './security.js';
 
 const PBKDF2_ITERATIONS = 100000;
 
@@ -174,5 +174,41 @@ export async function authenticateUser(c, next) {
     await next();
   } catch {
     return c.json({ message: 'Invalid or expired token' }, 401);
+  }
+}
+
+export async function requireVerifiedUser(env, userId) {
+  if (!userId) {
+    throw new AppError(401, 'Authentication required', 'authentication_required');
+  }
+
+  const db = requireDb(env);
+  const user = await db
+    .prepare('SELECT id, username, email, email_verified_at FROM users WHERE id = ?')
+    .bind(userId)
+    .first();
+
+  if (!user) {
+    throw new AppError(401, 'Authentication required', 'authentication_required');
+  }
+
+  if (!user.email_verified_at) {
+    throw new AppError(403, 'Email verification required', 'email_verification_required');
+  }
+
+  return user;
+}
+
+export async function requireVerifiedAuth(c, next) {
+  const user = c.get('user');
+  try {
+    const verifiedUser = await requireVerifiedUser(c.env, user && user.id);
+    c.set('verifiedUser', verifiedUser);
+    await next();
+  } catch (err) {
+    if (err instanceof AppError) {
+      return c.json({ message: err.message, code: err.code }, err.status);
+    }
+    throw err;
   }
 }

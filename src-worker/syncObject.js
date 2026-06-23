@@ -3,6 +3,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { verify } from 'hono/jwt';
+import { requireVerifiedUser } from './auth.js';
 import {
   AppError,
   LIMITS,
@@ -256,6 +257,7 @@ export class DocumentSyncObject {
 
       const { userId, username, sessionId } = ticketInfo;
       const db = requireDb(this.env);
+      await requireVerifiedUser(this.env, userId);
       const access = await getDocumentAccess(db, docId, userId);
       assertDocumentReadable(access);
 
@@ -420,6 +422,19 @@ export class DocumentSyncObject {
     });
 
     ws.addEventListener('error', (event) => {
+      const errMsg =
+        event?.message ||
+        event?.error?.message ||
+        (event?.error ? String(event.error) : '') ||
+        String(event);
+      if (errMsg && errMsg.includes('Network connection lost')) {
+        event.preventDefault?.();
+        console.log(
+          '[DO] WebSocket connection lost (client disconnected)',
+          this.getSocketLogContext('error-suppressed', event, ws, docId, meta)
+        );
+        return;
+      }
       console.error(
         '[DO] WebSocket error',
         this.getSocketLogContext('error', event, ws, docId, meta)

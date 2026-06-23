@@ -1,7 +1,25 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { sign, verify } from 'hono/jwt';
-import { hashPassword, verifyPassword, generateTokens, authenticateUser } from './auth.js';
+import {
+  hashPassword,
+  verifyPassword,
+  generateTokens,
+  authenticateUser,
+  requireVerifiedAuth,
+  requireVerifiedUser,
+} from './auth.js';
+import {
+  CODE_TTL_SECONDS,
+  MAX_ACTIVE_CODES_PER_EMAIL,
+  SEND_WINDOW_SECONDS,
+  generateCode,
+  hashCode,
+  isValidEmail,
+  normalizeEmail,
+  requireEmailCodePepper,
+  sendVerificationEmail,
+} from './emailVerification.js';
 import { RateLimitObject } from './rateLimitObject.js';
 import {
   AppError,
@@ -32,6 +50,21 @@ export { DocumentSyncObject } from './syncObject.js';
 export { RateLimitObject };
 
 const app = new Hono();
+
+function getRequestIdentifier(c) {
+  return c.req.header('cf-ray') || crypto.randomUUID();
+}
+
+function logSignupFailure(c, step, err) {
+  console.error('Signup route failed:', {
+    route: '/api/auth/signup',
+    requestId: getRequestIdentifier(c),
+    step,
+    errorName: err && err.name ? err.name : 'Error',
+    message: err && err.message ? err.message : 'Unknown error',
+    stack: err && err.stack ? err.stack : undefined,
+  });
+}
 
 app.onError((err, c) => {
   if (err instanceof AppError) {
@@ -68,6 +101,13 @@ const AUTH_RATE_LIMITS = {
     windowSeconds: 300,
   },
   '/api/auth/ws-ticket': { route: 'ws-ticket', limit: 120, windowSeconds: 300 },
+  '/api/auth/send-verification': {
+    route: 'send-verification',
+    limit: 5,
+    windowSeconds: 300,
+  },
+  '/api/auth/resend-code': { route: 'resend-code', limit: 5, windowSeconds: 300 },
+  '/api/auth/verify-email': { route: 'verify-email', limit: 10, windowSeconds: 300 },
 };
 
 app.use('/api/auth/*', async (c, next) => {
@@ -116,6 +156,78 @@ async function logHistory(db, docId, userId, username, action, details = '') {
   }
 }
 
+function validateVerificationPurpose(purpose) {
+  const clean = typeof purpose === 'string' && purpose.trim() ? purpose.trim() : 'signup';
+  if (!/^[a-z][a-z0-9_-]{0,31}$/i.test(clean)) {
+    throw new AppError(400, 'Invalid verification purpose', 'invalid_purpose');
+  }
+  return clean.toLowerCase();
+}
+
+function validateVerificationEmail(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) {
+    throw new AppError(400, 'Invalid email address', 'invalid_email');
+  }
+  return normalizedEmail;
+}
+
+async function createAndSendVerificationCode(env, db, email, purpose = 'signup') {
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - SEND_WINDOW_SECONDS;
+  const active = await db
+    .prepare(
+      `
+        SELECT COUNT(*) as count
+        FROM email_verification_codes
+        WHERE email = ?
+          AND purpose = ?
+          AND consumed_at IS NULL
+          AND created_at >= ?
+      `
+    )
+    .bind(email, purpose, windowStart)
+    .first();
+
+  if ((active && Number(active.count)) >= MAX_ACTIVE_CODES_PER_EMAIL) {
+    throw new AppError(429, 'Too many verification codes requested', 'verification_rate_limited');
+  }
+
+  const code = env.NODE_ENV === 'test' ? '123456' : generateCode();
+  const pepper = requireEmailCodePepper(env);
+  const codeHash = await hashCode({ email, code, pepper });
+  const expiresAt = now + CODE_TTL_SECONDS;
+  const codeId = crypto.randomUUID();
+
+  await db
+    .prepare(
+      `
+        INSERT INTO email_verification_codes
+          (id, email, code_hash, purpose, attempts, expires_at, consumed_at, created_at)
+        VALUES (?, ?, ?, ?, 0, ?, NULL, ?)
+      `
+    )
+    .bind(codeId, email, codeHash, purpose, expiresAt, now)
+    .run();
+
+  try {
+    await sendVerificationEmail(env, email, code);
+  } catch (err) {
+    await db
+      .prepare('DELETE FROM email_verification_codes WHERE id = ? AND consumed_at IS NULL')
+      .bind(codeId)
+      .run();
+    throw err;
+  }
+}
+
+function verificationSentResponse(c) {
+  return c.json({
+    ok: true,
+    message: 'If the email can receive verification codes, a code was sent.',
+  });
+}
+
 // -------------------------------------------------------------
 // Health and Config Routes (Public)
 // -------------------------------------------------------------
@@ -140,62 +252,110 @@ app.get('/api/config', (c) => {
 // -------------------------------------------------------------
 
 app.post('/api/auth/signup', async (c) => {
+  let signupStep = 'initialize';
   try {
+    signupStep = 'load_database';
     const db = requireDb(c.env);
+
+    signupStep = 'read_request_body';
     const { username, email, password } = await readJson(c, LIMITS.authBody);
+
+    signupStep = 'validate_request_fields';
     const trimmedUsername = validateUsername(username);
     const normalizedEmail = validateEmail(email);
     validatePassword(password);
 
     // Check uniqueness
+    signupStep = 'check_existing_user';
     const existingUser = await db
       .prepare('SELECT id FROM users WHERE username = ? OR email = ?')
       .bind(trimmedUsername, normalizedEmail)
       .first();
 
     if (existingUser) {
-      return c.json({ message: 'Unable to create account with those credentials' }, 400);
+      return c.json(
+        {
+          error: 'Username or email already in use.',
+          message: 'Username or email already in use.',
+          code: 'ACCOUNT_EXISTS',
+        },
+        409
+      );
     }
 
+    signupStep = 'hash_password';
     const hashedPassword = await hashPassword(password);
+
+    signupStep = 'generate_user_id';
     const userId = crypto.randomUUID();
 
+    signupStep = 'insert_user';
     await db
       .prepare(
-        'INSERT INTO users (id, username, email, password, isEmailVerified) VALUES (?, ?, ?, ?, 1)'
+        'INSERT INTO users (id, username, email, password, isEmailVerified, email_verified_at) VALUES (?, ?, ?, ?, 0, NULL)'
       )
       .bind(userId, trimmedUsername, normalizedEmail, hashedPassword)
       .run();
 
-    const userObj = {
-      id: userId,
-      username: trimmedUsername,
-      email: normalizedEmail,
-    };
-    const { accessToken, refreshToken } = await generateTokens(
-      userObj,
-      c.env,
-      c.req.header('user-agent'),
-      c.req.header('cf-connecting-ip')
-    );
+    signupStep = 'send_verification_code';
+    let codeSent = false;
+    let errorCode = null;
+    let errorMessage = 'Check your email for a verification code.';
+    try {
+      await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
+      codeSent = true;
+    } catch (err) {
+      if (err instanceof AppError) {
+        if (
+          err.code === 'missing_email_code_pepper' ||
+          err.code === 'missing_email_delivery_config'
+        ) {
+          errorCode = 'EMAIL_NOT_CONFIGURED';
+        } else {
+          errorCode = err.code;
+        }
+        errorMessage = err.message;
+      } else {
+        errorCode = 'email_send_failed';
+        errorMessage = 'Unable to send verification email.';
+      }
+    }
 
-    setCookie(c, 'refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    });
+    if (!codeSent) {
+      return c.json(
+        {
+          ok: true,
+          emailVerified: false,
+          isEmailVerified: false,
+          verificationRequired: true,
+          codeSent: false,
+          code: errorCode,
+          message:
+            errorCode === 'EMAIL_NOT_CONFIGURED'
+              ? 'Account created. Email verification is not configured.'
+              : `Account created. ${errorMessage}`,
+          username: trimmedUsername,
+          email: normalizedEmail,
+        },
+        201
+      );
+    }
 
     return c.json(
       {
-        token: accessToken,
+        ok: true,
+        emailVerified: false,
+        isEmailVerified: false,
+        verificationRequired: true,
+        codeSent,
+        message: 'Check your email for a verification code.',
         username: trimmedUsername,
         email: normalizedEmail,
       },
       201
     );
   } catch (err) {
+    logSignupFailure(c, signupStep, err);
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'Internal Server Error', 'signup_failed');
   }
@@ -211,7 +371,9 @@ app.post('/api/auth/login', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT id, username, email, password FROM users WHERE username = ?')
+      .prepare(
+        'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
+      )
       .bind(trimmedUsername)
       .first();
 
@@ -224,6 +386,21 @@ app.post('/api/auth/login', async (c) => {
     const isMatch = await verifyPassword(password, user.password);
     if (!isMatch) {
       return c.json({ message: 'Invalid username or password' }, 401);
+    }
+
+    if (!user.email_verified_at) {
+      await createAndSendVerificationCode(c.env, db, user.email, 'signup');
+      return c.json(
+        {
+          message: 'Email verification required',
+          code: 'email_verification_required',
+          emailVerified: false,
+          isEmailVerified: false,
+          verificationRequired: true,
+          email: user.email,
+        },
+        403
+      );
     }
 
     const { accessToken, refreshToken } = await generateTokens(
@@ -245,6 +422,8 @@ app.post('/api/auth/login', async (c) => {
       token: accessToken,
       username: user.username,
       email: user.email,
+      emailVerified: Boolean(user.email_verified_at),
+      isEmailVerified: Boolean(user.email_verified_at),
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -304,7 +483,7 @@ app.post('/api/auth/refresh-token', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT username, email FROM users WHERE id = ?')
+      .prepare('SELECT username, email, email_verified_at FROM users WHERE id = ?')
       .bind(decoded.id)
       .first();
     if (!user) {
@@ -327,13 +506,154 @@ app.post('/api/auth/refresh-token', async (c) => {
       .bind(decoded.sessionId)
       .run();
 
-    return c.json({ token: accessToken });
+    return c.json({
+      token: accessToken,
+      emailVerified: Boolean(user.email_verified_at),
+      isEmailVerified: Boolean(user.email_verified_at),
+    });
   } catch {
     return c.json({ message: 'Invalid refresh token' }, 401);
   }
 });
 
-app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
+app.post('/api/auth/send-verification', async (c) => {
+  try {
+    const db = requireDb(c.env);
+    const { email, purpose } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateVerificationEmail(email);
+    const verificationPurpose = validateVerificationPurpose(purpose);
+
+    await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
+    return verificationSentResponse(c);
+  } catch (err) {
+    if (err instanceof AppError) {
+      if (
+        err.code === 'missing_email_code_pepper' ||
+        err.code === 'missing_email_delivery_config'
+      ) {
+        return c.json(
+          {
+            error: 'Email verification is not configured for this environment.',
+            message: 'Email verification is not configured for this environment.',
+            code: 'EMAIL_NOT_CONFIGURED',
+          },
+          500
+        );
+      }
+      throw err;
+    }
+    throw new AppError(500, 'Internal Server Error', 'send_verification_failed');
+  }
+});
+
+app.post('/api/auth/resend-code', async (c) => {
+  try {
+    const db = requireDb(c.env);
+    const { email, purpose } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateVerificationEmail(email);
+    const verificationPurpose = validateVerificationPurpose(purpose);
+
+    await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
+    return verificationSentResponse(c);
+  } catch (err) {
+    if (err instanceof AppError) {
+      if (
+        err.code === 'missing_email_code_pepper' ||
+        err.code === 'missing_email_delivery_config'
+      ) {
+        return c.json(
+          {
+            error: 'Email verification is not configured for this environment.',
+            message: 'Email verification is not configured for this environment.',
+            code: 'EMAIL_NOT_CONFIGURED',
+          },
+          500
+        );
+      }
+      throw err;
+    }
+    throw new AppError(500, 'Internal Server Error', 'resend_code_failed');
+  }
+});
+
+app.post('/api/auth/verify-email', async (c) => {
+  try {
+    const db = requireDb(c.env);
+    const { email, code, purpose } = await readJson(c, LIMITS.authBody);
+    const normalizedEmail = validateVerificationEmail(email);
+    const submittedCode = String(code || '').trim();
+    const verificationPurpose = validateVerificationPurpose(purpose);
+
+    if (!/^\d{6}$/.test(submittedCode)) {
+      throw new AppError(400, 'Verification code must be 6 digits', 'invalid_code');
+    }
+
+    const row = await db
+      .prepare(
+        `
+          SELECT id, email, code_hash, attempts, expires_at, consumed_at
+          FROM email_verification_codes
+          WHERE email = ?
+            AND purpose = ?
+            AND consumed_at IS NULL
+          ORDER BY created_at DESC
+          LIMIT 1
+        `
+      )
+      .bind(normalizedEmail, verificationPurpose)
+      .first();
+
+    if (!row) {
+      throw new AppError(400, 'Invalid or expired verification code', 'invalid_code');
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (Number(row.expires_at) < now) {
+      throw new AppError(400, 'Invalid or expired verification code', 'code_expired');
+    }
+
+    if (Number(row.attempts) >= 5) {
+      throw new AppError(400, 'Too many failed verification attempts', 'too_many_attempts');
+    }
+
+    const pepper = requireEmailCodePepper(c.env);
+    const submittedHash = await hashCode({
+      email: normalizedEmail,
+      code: submittedCode,
+      pepper,
+    });
+
+    if (submittedHash !== row.code_hash) {
+      await db
+        .prepare('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = ?')
+        .bind(row.id)
+        .run();
+      throw new AppError(400, 'Invalid or expired verification code', 'invalid_code');
+    }
+
+    await db
+      .prepare('UPDATE email_verification_codes SET consumed_at = ? WHERE id = ?')
+      .bind(now, row.id)
+      .run();
+
+    await db
+      .prepare('UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE email = ?')
+      .bind(now, normalizedEmail)
+      .run();
+
+    return c.json({
+      ok: true,
+      emailVerified: true,
+      isEmailVerified: true,
+      message: 'Email verified.',
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'Internal Server Error', 'verification_failed');
+  }
+});
+
+app.get('/api/auth/ws-ticket', authenticateUser, requireVerifiedAuth, async (c) => {
   const user = c.get('user');
   const jwtSecret = requireJwtSecret(c.env);
 
@@ -356,12 +676,12 @@ app.get('/api/auth/ws-ticket', authenticateUser, async (c) => {
 // User Profile & Session Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/user/profile', authenticateUser, async (c) => {
+app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const profile = await db
     .prepare(
-      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, createdAt FROM users WHERE id = ?'
+      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, email_verified_at, createdAt FROM users WHERE id = ?'
     )
     .bind(user.id)
     .first();
@@ -370,10 +690,12 @@ app.get('/api/user/profile', authenticateUser, async (c) => {
   return c.json({
     ...profile,
     showOnlineStatus: profile.showOnlineStatus === 1,
+    emailVerified: Boolean(profile.email_verified_at),
+    isEmailVerified: Boolean(profile.email_verified_at),
   });
 });
 
-app.put('/api/user/profile', authenticateUser, async (c) => {
+app.put('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { profilePicture, accentColor, bio, showOnlineStatus } = await readJson(
@@ -433,7 +755,7 @@ app.put('/api/user/profile', authenticateUser, async (c) => {
   });
 });
 
-app.put('/api/user/password', authenticateUser, async (c) => {
+app.put('/api/user/password', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { currentPassword, newPassword } = await readJson(c, LIMITS.authBody);
@@ -458,7 +780,7 @@ app.put('/api/user/password', authenticateUser, async (c) => {
   return c.json({ message: 'Password updated successfully' });
 });
 
-app.get('/api/user/sessions', authenticateUser, async (c) => {
+app.get('/api/user/sessions', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const sessions = await db
@@ -476,7 +798,7 @@ app.get('/api/user/sessions', authenticateUser, async (c) => {
   return c.json(mapped);
 });
 
-app.delete('/api/user/sessions/:sessionId', authenticateUser, async (c) => {
+app.delete('/api/user/sessions/:sessionId', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const sessionId = validateUuid(c.req.param('sessionId'), 'session id');
@@ -487,7 +809,7 @@ app.delete('/api/user/sessions/:sessionId', authenticateUser, async (c) => {
   return c.json({ message: 'Session revoked' });
 });
 
-app.delete('/api/user/sessions', authenticateUser, async (c) => {
+app.delete('/api/user/sessions', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   await db
@@ -501,7 +823,7 @@ app.delete('/api/user/sessions', authenticateUser, async (c) => {
 // Document CRUD Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/documents', authenticateUser, async (c) => {
+app.get('/api/documents', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
@@ -562,7 +884,7 @@ app.get('/api/documents', authenticateUser, async (c) => {
   });
 });
 
-app.post('/api/documents', authenticateUser, async (c) => {
+app.post('/api/documents', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const body = await readJson(c, LIMITS.documentBody);
@@ -605,7 +927,7 @@ app.post('/api/documents', authenticateUser, async (c) => {
   );
 });
 
-app.patch('/api/documents/:id', authenticateUser, async (c) => {
+app.patch('/api/documents/:id', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -664,7 +986,7 @@ app.patch('/api/documents/:id', authenticateUser, async (c) => {
   });
 });
 
-app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
+app.post('/api/documents/:id/recent', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -698,7 +1020,7 @@ app.post('/api/documents/:id/recent', authenticateUser, async (c) => {
   return c.json({ message: 'Added to recent' });
 });
 
-app.get('/api/documents/:id/settings', authenticateUser, async (c) => {
+app.get('/api/documents/:id/settings', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -713,7 +1035,7 @@ app.get('/api/documents/:id/settings', authenticateUser, async (c) => {
   });
 });
 
-app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
+app.patch('/api/documents/:id/settings', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -731,7 +1053,7 @@ app.patch('/api/documents/:id/settings', authenticateUser, async (c) => {
   });
 });
 
-app.delete('/api/documents/:id', authenticateUser, async (c) => {
+app.delete('/api/documents/:id', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -776,7 +1098,7 @@ app.delete('/api/documents/:id', authenticateUser, async (c) => {
   return c.json({ message: 'Document deleted', action: 'deleted' });
 });
 
-app.post('/api/documents/:id/transfer', authenticateUser, async (c) => {
+app.post('/api/documents/:id/transfer', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -828,7 +1150,7 @@ app.post('/api/documents/:id/transfer', authenticateUser, async (c) => {
   });
 });
 
-app.get('/api/documents/:id/history', authenticateUser, async (c) => {
+app.get('/api/documents/:id/history', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -845,7 +1167,7 @@ app.get('/api/documents/:id/history', authenticateUser, async (c) => {
   return c.json(history.results || []);
 });
 
-app.get('/api/documents/:id/info', authenticateUser, async (c) => {
+app.get('/api/documents/:id/info', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const docId = validateUuid(c.req.param('id'), 'document id');
@@ -902,6 +1224,7 @@ app.get('/ws/:documentId', async (c) => {
   // Task 4: Check document read permission before forwarding to DO.
   const db = requireDb(c.env);
   try {
+    await requireVerifiedUser(c.env, ticketPayload.sub);
     const access = await getDocumentAccess(db, documentId, ticketPayload.sub);
     assertDocumentReadable(access);
     console.log('[WS] Permission granted', {

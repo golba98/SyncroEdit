@@ -1,20 +1,12 @@
 const { test, expect } = require('@playwright/test');
+const { createVerifiedSessionViaApi, registerVerifyAndLogin } = require('./helpers/auth');
 
 test.describe('Auth and Basic Document Flow', () => {
   test('should register, login, create doc, edit, save, and logout', async ({ page }) => {
-    // 1. Registration
-    await page.goto('/pages/login.html');
-    await page.click('#showSignup');
-
+    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+    page.on('pageerror', (err) => console.error('PAGE ERROR:', err.stack || err.message));
     const testUser = `u_${test.info().project.name.slice(0, 3)}_${Math.random().toString(36).slice(2, 10)}`;
-    await page.fill('#signupUsername', testUser);
-    await page.fill('#signupEmail', `${testUser}@example.com`);
-    await page.fill('#signupPassword', 'Password123!');
-    await page.fill('#signupPasswordConfirm', 'Password123!');
-    await page.click('#signupBtn');
-
-    // Wait for redirect to the app entrypoint (since email verification is disabled)
-    await expect(page).toHaveURL(/\/(?:index\.html)?$/);
+    await registerVerifyAndLogin(page, testUser);
 
     // 2. Create Document
     // Library should be open by default if no doc is in URL
@@ -63,15 +55,7 @@ test.describe('Auth and Basic Document Flow', () => {
     await page.goto('/pages/login.html');
     const testUser = `s_${test.info().project.name.slice(0, 3)}_${Math.random().toString(36).slice(2, 10)}`;
 
-    const signupResponse = await page.request.post('/api/auth/signup', {
-      data: {
-        username: testUser,
-        email: `${testUser}@example.com`,
-        password: 'Password123!',
-      },
-    });
-
-    expect(signupResponse.ok()).toBeTruthy();
+    await createVerifiedSessionViaApi(page, testUser);
 
     await page.goto('/index.html');
 
