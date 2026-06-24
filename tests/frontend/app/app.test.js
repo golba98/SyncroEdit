@@ -83,15 +83,13 @@ describe('App Core Initialization', () => {
     `;
 
     // Default Profile load success
-    Profile.prototype.loadProfile = jest
-      .fn()
-      .mockResolvedValue({
-        _id: 'user1',
-        username: 'TestUser',
-        emailVerified: true,
-        isEmailVerified: true,
-        accentColor: '#8b5cf6',
-      });
+    Profile.prototype.loadProfile = jest.fn().mockResolvedValue({
+      _id: 'user1',
+      username: 'TestUser',
+      emailVerified: true,
+      isEmailVerified: true,
+      accentColor: '#8b5cf6',
+    });
     Profile.prototype.isVerified = jest.fn().mockReturnValue(true);
     Profile.prototype.openProfileModal = jest.fn();
 

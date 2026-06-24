@@ -524,7 +524,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     });
 
     const profileRes = await app.request(
-      '/api/documents',
+      '/api/user/profile',
       {
         headers: {
           Authorization: `Bearer ${loginData.token}`,
