@@ -13,6 +13,19 @@ export class LibraryManager {
   }
 
   async showLibrary() {
+    if (this.app.verificationRestricted) {
+      if (this.app.uiManager) {
+        this.app.uiManager.applyViewState('dashboard');
+        this.app.uiManager.updateMobileUIState();
+      }
+      const listContainer = document.getElementById('documentList');
+      if (listContainer) {
+        listContainer.innerHTML =
+          '<tr><td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">Verify your email in Settings to access documents and collaboration.</td></tr>';
+      }
+      return;
+    }
+
     // Prevent rapid transitions
     if (this.isTransitioning) return;
     this.isTransitioning = true;
@@ -202,6 +215,11 @@ export class LibraryManager {
   }
 
   async createNewDocument() {
+    if (this.app.verificationRestricted) {
+      alert('Verify your email to access documents.');
+      return;
+    }
+
     // Prevent rapid clicks
     if (this.openLock) return;
     console.log('[OPEN] click', { action: 'create' });
@@ -254,6 +272,11 @@ export class LibraryManager {
   }
 
   async openDocument(docId) {
+    if (this.app.verificationRestricted) {
+      alert('Verify your email to access documents.');
+      return;
+    }
+
     // Prevent rapid transitions
     if (this.openLock) return;
     console.log('[OPEN] click', { action: 'open', docId });

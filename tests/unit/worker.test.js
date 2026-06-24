@@ -491,8 +491,42 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       },
       env
     );
-    expect(profileRes.status).toBe(403);
-    await expect(profileRes.json()).resolves.toEqual({
+    expect(profileRes.status).toBe(200);
+    await expect(profileRes.json()).resolves.toEqual(
+      expect.objectContaining({
+        username: 'legacyuser',
+        email: 'legacy@example.com',
+        emailVerified: false,
+        isEmailVerified: false,
+      })
+    );
+
+    const documentsRes = await app.request(
+      '/api/documents',
+      {
+        headers: {
+          Authorization: `Bearer ${forgedToken}`,
+        },
+      },
+      env
+    );
+    expect(documentsRes.status).toBe(403);
+    await expect(documentsRes.json()).resolves.toEqual({
+      code: 'email_verification_required',
+      message: 'Email verification required',
+    });
+
+    const wsTicketRes = await app.request(
+      '/api/auth/ws-ticket',
+      {
+        headers: {
+          Authorization: `Bearer ${forgedToken}`,
+        },
+      },
+      env
+    );
+    expect(wsTicketRes.status).toBe(403);
+    await expect(wsTicketRes.json()).resolves.toEqual({
       code: 'email_verification_required',
       message: 'Email verification required',
     });
@@ -699,6 +733,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   });
 
   it('does not leave an active verification code when email delivery fails', async () => {
+    const logSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     global.fetch.mockResolvedValueOnce({
       ok: false,
       status: 503,
@@ -717,6 +752,19 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
 
     expect(res.status).toBe(502);
     expect(env.DB.email_verification_codes).toHaveLength(0);
+    expect(logSpy).toHaveBeenCalledWith(
+      'Verification email send failed:',
+      expect.objectContaining({
+        route: '/api/auth/send-verification',
+        email: 'delivery-fail@example.com',
+        purpose: 'signup',
+        errorCode: 'email_send_failed',
+        provider: 'resend',
+        providerStatus: 503,
+        providerResponse: 'service unavailable',
+      })
+    );
+    logSpy.mockRestore();
   });
 
   it('prevents private document IDOR reads and enforces editor/viewer writes', async () => {
