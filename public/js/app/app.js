@@ -138,12 +138,26 @@ export class App {
     this.uiManager.setupRibbonTabs();
     this.setupVisibilityListener();
 
+    const isVerified = this.user && (this.user.isEmailVerified === true || Number(this.user.isEmailVerified) === 1);
+
     if (this.documentId) {
       console.log('[BOOT] route resolved document');
-      await this.loadDocument();
+      if (!isVerified) {
+        console.warn('[BOOT] user is unverified, forcing library view');
+        this.documentId = null;
+        const newUrl = window.location.pathname;
+        window.history.replaceState({ view: 'library' }, '', newUrl);
+        await this.libraryManager.showLibrary();
+        this.uiManager.openProfileModal();
+      } else {
+        await this.loadDocument();
+      }
     } else {
       console.log('[BOOT] route resolved dashboard');
       await this.libraryManager.showLibrary();
+      if (!isVerified) {
+        this.uiManager.openProfileModal();
+      }
       console.log('[BOOT] dashboard ready');
     }
   }
@@ -374,6 +388,17 @@ export class App {
     console.log('[OPEN] opening document');
     const docId = this.documentId;
     if (!docId) return;
+
+    const isVerified = this.user && (this.user.isEmailVerified === true || Number(this.user.isEmailVerified) === 1);
+    if (!isVerified) {
+      console.warn('[OPEN] Prevented document load for unverified user');
+      this.documentId = null;
+      const newUrl = window.location.pathname;
+      window.history.replaceState({ view: 'library' }, '', newUrl);
+      await this.libraryManager.showLibrary();
+      this.uiManager.openProfileModal();
+      return;
+    }
 
     const mode = options.mode || 'loading-content';
     const requestToken = ++this.loadDocumentToken;

@@ -33,6 +33,12 @@ export class Profile {
       resendBtn.addEventListener('click', () => this.resendVerification());
     }
 
+    // Verify verification listener
+    const verifyBtn = document.getElementById('profileVerifyCodeBtn');
+    if (verifyBtn) {
+      verifyBtn.addEventListener('click', () => this.verifyEmailCode());
+    }
+
     // Revoke all others listener
     const revokeOthersBtn = document.getElementById('revokeAllOthersBtn');
     if (revokeOthersBtn) {
@@ -274,20 +280,30 @@ export class Profile {
     const resendContainer = document.getElementById('resendVerificationContainer');
     if (!badge) return;
 
-    if (this.user.emailVerified) {
+    const isVerified = this.user && (this.user.isEmailVerified === true || Number(this.user.isEmailVerified) === 1);
+
+    if (isVerified) {
       badge.innerHTML =
         '<span class="status-pill status-pill-verified"><i class="fas fa-check-circle"></i> Verified</span>';
       if (resendContainer) resendContainer.style.display = 'none';
     } else {
       badge.innerHTML =
         '<span class="status-pill status-pill-unverified"><i class="fas fa-exclamation-circle"></i> Unverified</span>';
-      if (resendContainer) resendContainer.style.display = 'block';
+      if (resendContainer) {
+        resendContainer.style.display = 'block';
+        const codeContainer = document.getElementById('profileVerifyCodeContainer');
+        if (codeContainer) {
+          codeContainer.style.display = 'flex';
+        }
+      }
     }
   }
 
   async resendVerification() {
     const resendBtn = document.getElementById('resendVerificationBtn');
     const timerSpan = document.getElementById('resendTimer');
+    const codeContainer = document.getElementById('profileVerifyCodeContainer');
+    const msgEl = document.getElementById('profileVerificationMessage');
 
     try {
       resendBtn.disabled = true;
@@ -296,17 +312,20 @@ export class Profile {
         body: JSON.stringify({ email: this.user.email, purpose: 'signup' }),
       });
 
-      sessionStorage.setItem('verificationEmail', this.user.email);
-      sessionStorage.setItem('verificationMessage', 'Check your email for a verification code.');
-      sessionStorage.setItem('codeJustSent', 'true');
-      alert('Verification code sent to your email!');
-      window.location.href = `/pages/verify.html?email=${encodeURIComponent(this.user.email)}`;
+      if (msgEl) {
+        msgEl.textContent = 'Verification code sent to your email!';
+        msgEl.style.color = '#10b981';
+        msgEl.style.display = 'block';
+      }
+
+      if (codeContainer) {
+        codeContainer.style.display = 'flex';
+      }
 
       // Rate limit UI
       let timeLeft = 60;
       timerSpan.style.display = 'inline';
-      resendBtn.style.opacity = '0.5';
-      resendBtn.style.cursor = 'not-allowed';
+      resendBtn.style.display = 'none';
 
       const interval = setInterval(() => {
         timeLeft--;
@@ -314,15 +333,93 @@ export class Profile {
         if (timeLeft <= 0) {
           clearInterval(interval);
           resendBtn.disabled = false;
-          resendBtn.style.opacity = '1';
-          resendBtn.style.cursor = 'pointer';
+          resendBtn.style.display = 'inline';
           timerSpan.style.display = 'none';
         }
       }, 1000);
     } catch (err) {
       console.error('Resend error:', err);
-      alert('Failed to resend code. Please try again later.');
+      if (msgEl) {
+        msgEl.textContent = 'Failed to send code. Please try again later.';
+        msgEl.style.color = '#ef4444';
+        msgEl.style.display = 'block';
+      }
       resendBtn.disabled = false;
+    }
+  }
+
+  async verifyEmailCode() {
+    const codeInput = document.getElementById('profileVerificationCodeInput');
+    const verifyBtn = document.getElementById('profileVerifyCodeBtn');
+    const msgEl = document.getElementById('profileVerificationMessage');
+
+    if (!codeInput || !verifyBtn) return;
+
+    const code = codeInput.value.trim();
+    if (!code) {
+      if (msgEl) {
+        msgEl.textContent = 'Please enter the verification code.';
+        msgEl.style.color = '#ef4444';
+        msgEl.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!/^\d{6}$/.test(code)) {
+      if (msgEl) {
+        msgEl.textContent = 'Code must be exactly 6 digits.';
+        msgEl.style.color = '#ef4444';
+        msgEl.style.display = 'block';
+      }
+      return;
+    }
+
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = 'Verifying...';
+    if (msgEl) msgEl.style.display = 'none';
+
+    try {
+      await Network.fetchAPI('/api/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: this.user.email,
+          code,
+          purpose: 'signup',
+        }),
+      });
+
+      // Update state
+      this.user.isEmailVerified = true;
+      this.user.emailVerified = true;
+      if (window.app) {
+        window.app.user = this.user;
+      }
+
+      // Update UI badge and hide the panel
+      this.updateVerificationBadge();
+
+      // Show success message
+      if (msgEl) {
+        msgEl.textContent = '✓ Email verified successfully!';
+        msgEl.style.color = '#10b981';
+        msgEl.style.display = 'block';
+      }
+
+      // Clear inputs
+      codeInput.value = '';
+
+      // Fetch the library normally
+      if (window.app && window.app.libraryManager) {
+        await window.app.libraryManager.showLibrary();
+      }
+    } catch (err) {
+      if (msgEl) {
+        msgEl.textContent = '✗ ' + (err.message || 'Verification failed.');
+        msgEl.style.color = '#ef4444';
+        msgEl.style.display = 'block';
+      }
+      verifyBtn.disabled = false;
+      verifyBtn.textContent = 'Verify Email';
     }
   }
 

@@ -84,7 +84,7 @@ describe('App Core Initialization', () => {
     // Default Profile load success
     Profile.prototype.loadProfile = jest
       .fn()
-      .mockResolvedValue({ _id: 'user1', username: 'TestUser' });
+      .mockResolvedValue({ _id: 'user1', username: 'TestUser', isEmailVerified: true });
 
     // Default Network mocks
     Network.getDocuments.mockResolvedValue({ documents: [] });

@@ -483,7 +483,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     });
 
     const profileRes = await app.request(
-      '/api/user/profile',
+      '/api/documents',
       {
         headers: {
           Authorization: `Bearer ${forgedToken}`,

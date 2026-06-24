@@ -676,7 +676,7 @@ app.get('/api/auth/ws-ticket', authenticateUser, requireVerifiedAuth, async (c) 
 // User Profile & Session Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
+app.get('/api/user/profile', authenticateUser, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const profile = await db
@@ -695,7 +695,7 @@ app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) =>
   });
 });
 
-app.put('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
+app.put('/api/user/profile', authenticateUser, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { profilePicture, accentColor, bio, showOnlineStatus } = await readJson(

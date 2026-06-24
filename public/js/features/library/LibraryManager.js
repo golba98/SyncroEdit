@@ -65,6 +65,16 @@ export class LibraryManager {
       fab.onclick = () => this.createNewDocument();
     }
 
+    const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
+    if (!isVerified) {
+      const listContainer = document.getElementById('documentList');
+      if (listContainer) {
+        listContainer.innerHTML =
+          '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-soft);">Verify your email to access your documents.</td></tr>';
+      }
+      return;
+    }
+
     const renderList = (docs) => {
       this.documents = Array.isArray(docs) ? docs : [];
       const filteredDocs = this.filterDocuments(this.documents);
@@ -121,6 +131,15 @@ export class LibraryManager {
         renderList(docs);
       }
     } catch (err) {
+      if (err.code === 'EMAIL_VERIFICATION_REQUIRED' || err.status === 403) {
+        const listContainer = document.getElementById('documentList');
+        if (listContainer) {
+          listContainer.innerHTML =
+            '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-soft);">Verify your email to access your documents.</td></tr>';
+        }
+        return;
+      }
+
       console.error('Error fetching documents from network:', err);
 
       // Handle Auth Error (Token expired/invalid)
@@ -202,6 +221,12 @@ export class LibraryManager {
   }
 
   async createNewDocument() {
+    const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
+    if (!isVerified) {
+      this.app.uiManager?.openProfileModal();
+      return;
+    }
+
     // Prevent rapid clicks
     if (this.openLock) return;
     console.log('[OPEN] click', { action: 'create' });
@@ -254,6 +279,12 @@ export class LibraryManager {
   }
 
   async openDocument(docId) {
+    const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
+    if (!isVerified) {
+      this.app.uiManager?.openProfileModal();
+      return;
+    }
+
     // Prevent rapid transitions
     if (this.openLock) return;
     console.log('[OPEN] click', { action: 'open', docId });

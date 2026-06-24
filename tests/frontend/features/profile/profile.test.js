@@ -115,12 +115,12 @@ describe('Profile UI', () => {
       expect(initialsEl.style.display).toBe('none');
     });
 
-    it('should render the verification badge from emailVerified instead of the legacy flag', () => {
+    it('should render the verification badge from isEmailVerified', () => {
       profile.user = {
         username: 'John Doe',
         email: 'john@example.com',
-        emailVerified: false,
-        isEmailVerified: true,
+        emailVerified: true,
+        isEmailVerified: false,
       };
 
       profile.updateUI();
