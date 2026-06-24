@@ -5,7 +5,6 @@ export class Profile {
   constructor() {
     this.user = null;
     this.hasSentVerificationCode = false;
-    this.resendCooldownInterval = null;
     this.setupEventListeners();
   }
 
@@ -29,25 +28,26 @@ export class Profile {
       });
     });
 
-    // Resend verification listener
-    const resendBtn = document.getElementById('resendVerificationBtn');
-    if (resendBtn) {
-      resendBtn.addEventListener('click', () => this.resendVerification());
+    const sendVerificationBtn = document.getElementById('sendVerificationBtn');
+    if (sendVerificationBtn) {
+      sendVerificationBtn.addEventListener('click', () => this.sendVerificationCode());
     }
 
-    const verifyBtn = document.getElementById('verifyEmailBtn');
-    if (verifyBtn) {
-      verifyBtn.addEventListener('click', () => this.verifyEmail());
+    const verifyEmailBtn = document.getElementById('verifyEmailBtn');
+    if (verifyEmailBtn) {
+      verifyEmailBtn.addEventListener('click', () => this.verifyEmail());
     }
 
     const verificationCodeInput = document.getElementById('verificationCodeInput');
     if (verificationCodeInput) {
-      verificationCodeInput.addEventListener('input', () => {
-        verificationCodeInput.value = verificationCodeInput.value.replace(/\D/g, '').slice(0, 6);
+      verificationCodeInput.addEventListener('input', (event) => {
+        event.target.value = String(event.target.value || '')
+          .replace(/\D/g, '')
+          .slice(0, 6);
       });
-      verificationCodeInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
+      verificationCodeInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
           this.verifyEmail();
         }
       });
@@ -197,14 +197,17 @@ export class Profile {
   }
 
   normalizeVerificationState(profile) {
-    const isVerified =
-      profile?.isEmailVerified === true || Number(profile?.isEmailVerified) === 1;
+    const isVerified = this.isVerified(profile);
 
     return {
       ...profile,
       emailVerified: isVerified,
       isEmailVerified: isVerified,
     };
+  }
+
+  isVerified(profile = this.user) {
+    return profile?.isEmailVerified === true || Number(profile?.isEmailVerified) === 1;
   }
 
   getInitials(name) {
@@ -252,7 +255,7 @@ export class Profile {
     if (profileBioInput) profileBioInput.value = this.user.bio || '';
 
     this.updateVerificationBadge();
-    this.updateVerificationPrompt();
+    this.updateVerificationPanel();
     this.updatePrivacyUI();
 
     const pfpElements = [
@@ -308,8 +311,7 @@ export class Profile {
     const badge = document.getElementById('emailVerificationBadge');
     if (!badge) return;
 
-    const isVerified =
-      this.user?.isEmailVerified === true || Number(this.user?.isEmailVerified) === 1;
+    const isVerified = this.isVerified();
 
     if (isVerified) {
       badge.innerHTML =
@@ -320,155 +322,148 @@ export class Profile {
     }
   }
 
-  updateVerificationPrompt() {
-    const prompt = document.getElementById('verificationPrompt');
-    const resendBtn = document.getElementById('resendVerificationBtn');
+  updateVerificationPanel() {
+    const panel = document.getElementById('emailVerificationPanel');
+    const sendButton = document.getElementById('sendVerificationBtn');
     const codeInput = document.getElementById('verificationCodeInput');
+    const verifyButton = document.getElementById('verifyEmailBtn');
+    const statusMessage = document.getElementById('verificationStatusMessage');
+    if (!panel) return;
 
-    if (!prompt || !resendBtn || !codeInput) return;
+    const isVerified = this.isVerified();
+    panel.style.display = isVerified ? 'none' : 'flex';
 
-    const isVerified = Boolean(this.user && this.user.emailVerified);
-    prompt.style.display = isVerified ? 'none' : 'flex';
-    resendBtn.textContent = this.hasSentVerificationCode
+    if (sendButton) {
+      sendButton.textContent = this.hasSentVerificationCode
+        ? 'Resend verification code'
+        : 'Send verification code';
+    }
+
+    if (isVerified) {
+      this.hasSentVerificationCode = false;
+      if (codeInput) codeInput.value = '';
+      if (verifyButton) verifyButton.disabled = false;
+      if (statusMessage) {
+        statusMessage.textContent = '';
+        statusMessage.className = 'profile-verification-status';
+      }
+    }
+  }
+
+  setVerificationStatus(message, state = '') {
+    const statusMessage = document.getElementById('verificationStatusMessage');
+    if (!statusMessage) return;
+    statusMessage.textContent = message || '';
+    statusMessage.className = 'profile-verification-status';
+    if (state) {
+      statusMessage.classList.add(`is-${state}`);
+    }
+  }
+
+  setVerificationButtonLoading(buttonId, isLoading, loadingText, idleText) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    button.disabled = isLoading;
+    button.textContent = isLoading ? loadingText : idleText;
+  }
+
+  getErrorMessage(err, fallbackMessage) {
+    return err?.data?.message || err?.message || fallbackMessage;
+  }
+
+  async sendVerificationCode() {
+    const idleText = this.hasSentVerificationCode
       ? 'Resend verification code'
       : 'Send verification code';
 
-    if (isVerified) {
-      this.setVerificationStatus('');
-      codeInput.value = '';
-      this.stopResendCooldown();
-    }
-  }
-
-  setVerificationStatus(message, type = '') {
-    const statusEl = document.getElementById('verificationStatusMessage');
-    if (!statusEl) return;
-
-    statusEl.textContent = message || '';
-    statusEl.className = type ? `profile-inline-status ${type}` : 'profile-inline-status';
-  }
-
-  startResendCooldown(seconds = 30) {
-    const resendBtn = document.getElementById('resendVerificationBtn');
-    const timerSpan = document.getElementById('resendTimer');
-    if (!resendBtn || !timerSpan) return;
-
-    this.stopResendCooldown();
-    let remaining = seconds;
-    resendBtn.disabled = true;
-    timerSpan.style.display = 'inline';
-    timerSpan.textContent = `Resend available in ${remaining}s`;
-
-    this.resendCooldownInterval = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        this.stopResendCooldown();
-        return;
-      }
-      timerSpan.textContent = `Resend available in ${remaining}s`;
-    }, 1000);
-  }
-
-  stopResendCooldown() {
-    const resendBtn = document.getElementById('resendVerificationBtn');
-    const timerSpan = document.getElementById('resendTimer');
-
-    if (this.resendCooldownInterval) {
-      clearInterval(this.resendCooldownInterval);
-      this.resendCooldownInterval = null;
-    }
-
-    if (resendBtn) {
-      resendBtn.disabled = false;
-    }
-
-    if (timerSpan) {
-      timerSpan.style.display = 'none';
-      timerSpan.textContent = '';
-    }
-  }
-
-  async resendVerification() {
-    const resendBtn = document.getElementById('resendVerificationBtn');
-    if (!resendBtn || !this.user) return;
-
     try {
-      this.setVerificationStatus('Sending verification code...');
-      resendBtn.disabled = true;
+      this.setVerificationButtonLoading('sendVerificationBtn', true, 'Sending...', idleText);
+      this.setVerificationStatus('Sending verification code...', 'loading');
       await Network.fetchAPI('/api/auth/send-verification', {
         method: 'POST',
         body: JSON.stringify({ email: this.user.email, purpose: 'signup' }),
       });
       this.hasSentVerificationCode = true;
-      this.updateVerificationPrompt();
+      this.updateVerificationPanel();
       this.setVerificationStatus('Verification code sent. Check your email.', 'success');
-      this.startResendCooldown();
     } catch (err) {
-      console.error('Resend error:', err);
-      this.stopResendCooldown();
+      console.error('Verification code send failed:', err);
       this.setVerificationStatus(
-        err.message || 'Failed to send verification code. Please try again.',
+        this.getErrorMessage(err, 'Failed to send verification code.'),
         'error'
+      );
+    } finally {
+      this.setVerificationButtonLoading(
+        'sendVerificationBtn',
+        false,
+        'Sending...',
+        this.hasSentVerificationCode ? 'Resend verification code' : 'Send verification code'
       );
     }
   }
 
   async verifyEmail() {
-    const verifyBtn = document.getElementById('verifyEmailBtn');
     const codeInput = document.getElementById('verificationCodeInput');
+    const code = String(codeInput?.value || '').trim();
 
-    if (!verifyBtn || !codeInput || !this.user) return;
-
-    const code = codeInput.value.trim();
     if (!/^\d{6}$/.test(code)) {
-      this.setVerificationStatus('Verification code must be 6 digits.', 'error');
-      codeInput.focus();
+      this.setVerificationStatus('Enter the 6-digit verification code.', 'error');
       return;
     }
 
     try {
-      verifyBtn.disabled = true;
-      verifyBtn.textContent = 'Verifying...';
-      this.setVerificationStatus('Verifying email...');
-
-      const data = await Network.fetchAPI('/api/auth/verify-email', {
+      this.setVerificationButtonLoading('verifyEmailBtn', true, 'Verifying...', 'Verify email');
+      this.setVerificationStatus('Verifying email...', 'loading');
+      const response = await Network.fetchAPI('/api/auth/verify-email', {
         method: 'POST',
         body: JSON.stringify({ email: this.user.email, code, purpose: 'signup' }),
       });
 
-      this.user.emailVerified = true;
-      this.user.isEmailVerified = true;
-      this.user.email_verified_at = this.user.email_verified_at || Math.floor(Date.now() / 1000);
+      this.user = this.normalizeVerificationState({
+        ...this.user,
+        ...response,
+        emailVerified: true,
+        isEmailVerified: true,
+      });
       this.hasSentVerificationCode = false;
+      if (codeInput) codeInput.value = '';
       this.updateUI();
-      this.setVerificationStatus(data.message || 'Email verified.', 'success');
-      codeInput.value = '';
-
+      this.setVerificationStatus('Email verified.', 'success');
       if (window.app) {
-        window.app.user = {
-          ...(window.app.user || {}),
-          emailVerified: true,
-          isEmailVerified: true,
-          email_verified_at: this.user.email_verified_at,
-        };
-        if (typeof window.app.handleEmailVerified === 'function') {
-          window.app.handleEmailVerified();
-        }
+        window.app.user = this.user;
+        window.app.handleEmailVerified?.(this.user);
       }
-
-      if (window.editor && typeof window.editor.updateUser === 'function') {
+      if (window.editor?.updateUser) {
         window.editor.updateUser(this.user);
       }
     } catch (err) {
-      console.error('Verify email error:', err);
-      this.setVerificationStatus(
-        err.message || 'Invalid or expired verification code.',
-        'error'
-      );
+      console.error('Email verification failed:', err);
+      const message =
+        err?.status === 400
+          ? 'Invalid or expired verification code.'
+          : this.getErrorMessage(err, 'Failed to verify email.');
+      this.setVerificationStatus(message, 'error');
     } finally {
-      verifyBtn.disabled = false;
-      verifyBtn.textContent = 'Verify email';
+      this.setVerificationButtonLoading('verifyEmailBtn', false, 'Verifying...', 'Verify email');
     }
+  }
+
+  openProfileModal({ tab = 'general' } = {}) {
+    const modal = document.getElementById('profileModal');
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+
+    const tabs = document.querySelectorAll('.profile-tab');
+    const tabContents = document.querySelectorAll('.profile-tab-content');
+    tabs.forEach((node) => {
+      const isActive = node.dataset.tab === tab;
+      node.classList.toggle('active', isActive);
+      node.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    tabContents.forEach((node) => {
+      node.style.display = node.id === `${tab}-content` ? 'block' : 'none';
+    });
   }
 
   updatePasswordStrength(password) {

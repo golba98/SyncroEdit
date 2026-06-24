@@ -231,6 +231,14 @@ async function createAndSendVerificationCode(env, db, email, purpose = 'signup')
   try {
     await sendVerificationEmail(env, email, code);
   } catch (err) {
+    console.error('Verification email send failed:', {
+      email,
+      purpose,
+      errorName: err?.name || 'Error',
+      message: err?.message || 'Unknown verification email failure',
+      code: err?.code || null,
+      status: err?.status || null,
+    });
     await db
       .prepare('DELETE FROM email_verification_codes WHERE id = ? AND consumed_at IS NULL')
       .bind(codeId)
@@ -395,7 +403,7 @@ app.post('/api/auth/login', async (c) => {
 
     const user = await db
       .prepare(
-        'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
+        'SELECT id, username, email, password, isEmailVerified FROM users WHERE username = ?'
       )
       .bind(trimmedUsername)
       .first();
@@ -411,21 +419,12 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ message: 'Invalid username or password' }, 401);
     }
 
-    if (!user.email_verified_at) {
+    const isEmailVerified = Number(user.isEmailVerified) === 1;
+
+    if (!isEmailVerified) {
       c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
         logVerificationSendFailure(c, targetEmail, targetPurpose, err);
       await createAndSendVerificationCode(c.env, db, user.email, 'signup');
-      return c.json(
-        {
-          message: 'Email verification required',
-          code: 'email_verification_required',
-          emailVerified: false,
-          isEmailVerified: false,
-          verificationRequired: true,
-          email: user.email,
-        },
-        403
-      );
     }
 
     const { accessToken, refreshToken } = await generateTokens(
@@ -447,8 +446,10 @@ app.post('/api/auth/login', async (c) => {
       token: accessToken,
       username: user.username,
       email: user.email,
-      emailVerified: Boolean(user.email_verified_at),
-      isEmailVerified: Boolean(user.email_verified_at),
+      emailVerified: isEmailVerified,
+      isEmailVerified,
+      verificationRequired: !isEmailVerified,
+      message: !isEmailVerified ? 'Email verification required' : undefined,
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -508,12 +509,14 @@ app.post('/api/auth/refresh-token', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT username, email, email_verified_at FROM users WHERE id = ?')
+      .prepare('SELECT username, email, isEmailVerified FROM users WHERE id = ?')
       .bind(decoded.id)
       .first();
     if (!user) {
       return c.json({ message: 'User not found' }, 401);
     }
+
+    const isEmailVerified = Number(user.isEmailVerified) === 1;
 
     // Generate new access token
     const accessToken = await sign(
@@ -533,8 +536,9 @@ app.post('/api/auth/refresh-token', async (c) => {
 
     return c.json({
       token: accessToken,
-      emailVerified: Boolean(user.email_verified_at),
-      isEmailVerified: Boolean(user.email_verified_at),
+      emailVerified: isEmailVerified,
+      isEmailVerified,
+      verificationRequired: !isEmailVerified,
     });
   } catch {
     return c.json({ message: 'Invalid refresh token' }, 401);
@@ -553,6 +557,13 @@ app.post('/api/auth/send-verification', async (c) => {
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
   } catch (err) {
+    console.error('Send verification endpoint failed:', {
+      route: '/api/auth/send-verification',
+      errorName: err?.name || 'Error',
+      message: err?.message || 'Unknown send-verification failure',
+      code: err?.code || null,
+      status: err?.status || null,
+    });
     if (err instanceof AppError) {
       if (
         err.code === 'missing_email_code_pepper' ||
@@ -585,6 +596,13 @@ app.post('/api/auth/resend-code', async (c) => {
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
   } catch (err) {
+    console.error('Resend verification endpoint failed:', {
+      route: '/api/auth/resend-code',
+      errorName: err?.name || 'Error',
+      message: err?.message || 'Unknown resend-code failure',
+      code: err?.code || null,
+      status: err?.status || null,
+    });
     if (err instanceof AppError) {
       if (
         err.code === 'missing_email_code_pepper' ||

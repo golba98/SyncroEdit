@@ -184,7 +184,7 @@ export async function requireVerifiedUser(env, userId) {
 
   const db = requireDb(env);
   const user = await db
-    .prepare('SELECT id, username, email, email_verified_at FROM users WHERE id = ?')
+    .prepare('SELECT id, username, email, isEmailVerified FROM users WHERE id = ?')
     .bind(userId)
     .first();
 
@@ -192,7 +192,7 @@ export async function requireVerifiedUser(env, userId) {
     throw new AppError(401, 'Authentication required', 'authentication_required');
   }
 
-  if (!user.email_verified_at) {
+  if (Number(user.isEmailVerified) !== 1) {
     throw new AppError(403, 'Email verification required', 'email_verification_required');
   }
 

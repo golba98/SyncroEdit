@@ -79,6 +79,9 @@ export class MockD1 {
     // 3. SELECT login user
     if (
       sql.includes(
+        'SELECT id, username, email, password, isEmailVerified FROM users WHERE username = ?'
+      ) ||
+      sql.includes(
         'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
       ) ||
       sql.includes('SELECT id, username, email, password FROM users WHERE username = ?')
@@ -96,7 +99,10 @@ export class MockD1 {
     }
 
     // 5. SELECT username, email, email_verified_at FROM users WHERE id = ?
-    if (sql.includes('SELECT username, email, email_verified_at FROM users WHERE id = ?')) {
+    if (
+      sql.includes('SELECT username, email, isEmailVerified FROM users WHERE id = ?') ||
+      sql.includes('SELECT username, email, email_verified_at FROM users WHERE id = ?')
+    ) {
       const [id] = args;
       const found = this.users.find((u) => u.id === id);
       return firstOnly ? found : found ? [found] : [];
@@ -108,7 +114,10 @@ export class MockD1 {
       return firstOnly ? found : found ? [found] : [];
     }
 
-    if (sql.includes('SELECT id, username, email, email_verified_at FROM users WHERE id = ?')) {
+    if (
+      sql.includes('SELECT id, username, email, isEmailVerified FROM users WHERE id = ?') ||
+      sql.includes('SELECT id, username, email, email_verified_at FROM users WHERE id = ?')
+    ) {
       const [id] = args;
       const found = this.users.find((u) => u.id === id);
       return firstOnly ? found : found ? [found] : [];
