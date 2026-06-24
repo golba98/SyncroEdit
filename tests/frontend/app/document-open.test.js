@@ -53,6 +53,7 @@ describe('Document Opening Flow', () => {
 
     // Initialize Mock App and Managers
     app = {
+      user: { isEmailVerified: true },
       documentId: null,
       openingDocumentId: null,
       documentLoadState: 'idle',

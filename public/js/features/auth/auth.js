@@ -25,8 +25,19 @@ export const Auth = {
 
     try {
       const data = await Network.fetchAPI('/api/user/profile');
+      if (data) {
+        const val = data.isEmailVerified !== undefined ? data.isEmailVerified : data.emailVerified;
+        data.isEmailVerified = val === true || Number(val) === 1;
+        data.emailVerified = data.isEmailVerified;
+      }
       return data;
     } catch (err) {
+      if (err.code === 'EMAIL_VERIFICATION_REQUIRED' || err.status === 403) {
+        // Do not clear the token; the user is authenticated but needs email verification.
+        // We return a mock/partial user structure or bubble the error depending on context,
+        // but since GET /api/user/profile is accessible, this is just a safety guard.
+        return { isEmailVerified: false, emailVerified: false };
+      }
       console.error('Token verification error:', err);
       this.removeToken();
       return false;

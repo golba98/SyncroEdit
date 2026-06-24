@@ -1,4 +1,4 @@
-export class RateLimitObject {
+export class SynchroRateLimitObject {
   constructor(state) {
     this.state = state;
   }

@@ -20,7 +20,7 @@ import {
   requireEmailCodePepper,
   sendVerificationEmail,
 } from './emailVerification.js';
-import { RateLimitObject } from './rateLimitObject.js';
+import { SynchroRateLimitObject } from './rateLimitObject.js';
 import {
   AppError,
   LIMITS,
@@ -46,8 +46,8 @@ import {
 } from './security.js';
 
 // Export Durable Object class so Cloudflare can bind it
-export { DocumentSyncObject } from './syncObject.js';
-export { RateLimitObject };
+export { SynchroDocumentObject } from './syncObject.js';
+export { SynchroRateLimitObject };
 
 const app = new Hono();
 
@@ -743,7 +743,7 @@ app.get('/api/user/profile', authenticateUser, async (c) => {
   });
 });
 
-app.put('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
+app.put('/api/user/profile', authenticateUser, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { profilePicture, accentColor, bio, showOnlineStatus } = await readJson(

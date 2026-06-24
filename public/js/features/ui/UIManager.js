@@ -903,6 +903,17 @@ export class UIManager {
     indicator.hidden = false;
   }
 
+  openProfileModal() {
+    const modal = document.getElementById('profileModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      const generalTab = document.getElementById('tab-general');
+      if (generalTab) {
+        generalTab.click();
+      }
+    }
+  }
+
   cleanupTimers() {
     if (this.connectionStatusTimer) clearTimeout(this.connectionStatusTimer);
     if (this.saveStatusTimer) clearTimeout(this.saveStatusTimer);

@@ -53,6 +53,12 @@ export class Profile {
       });
     }
 
+    // Verify verification listener
+    const verifyBtn = document.getElementById('profileVerifyCodeBtn');
+    if (verifyBtn) {
+      verifyBtn.addEventListener('click', () => this.verifyEmailCode());
+    }
+
     // Revoke all others listener
     const revokeOthersBtn = document.getElementById('revokeAllOthersBtn');
     if (revokeOthersBtn) {
@@ -306,7 +312,6 @@ export class Profile {
       });
     }
   }
-
   updateVerificationBadge() {
     const badge = document.getElementById('emailVerificationBadge');
     if (!badge) return;
@@ -383,6 +388,7 @@ export class Profile {
         method: 'POST',
         body: JSON.stringify({ email: this.user.email, purpose: 'signup' }),
       });
+
       this.hasSentVerificationCode = true;
       this.updateVerificationPanel();
       this.setVerificationStatus('Verification code sent. Check your email.', 'success');
@@ -465,7 +471,6 @@ export class Profile {
       node.style.display = node.id === `${tab}-content` ? 'block' : 'none';
     });
   }
-
   updatePasswordStrength(password) {
     const bar = document.getElementById('passwordStrengthBar');
     const reqs = {
