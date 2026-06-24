@@ -307,6 +307,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(unauthenticated.status).toBe(401);
 
     signupResult.user.email_verified_at = Math.floor(Date.now() / 1000);
+    signupResult.user.isEmailVerified = 1;
     const verifiedLogin = await app.request(
       '/api/auth/login',
       {
@@ -331,6 +332,39 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     await expect(profile.json()).resolves.toEqual(
       expect.objectContaining({
         username: 'alice',
+        emailVerified: true,
+        isEmailVerified: true,
+      })
+    );
+  });
+
+  it('serializes profile verification strictly from isEmailVerified', async () => {
+    const verified = await signupVerified(env, 'profileuser', 'profile@example.com');
+    verified.user.isEmailVerified = 0;
+
+    const unverifiedProfile = await app.request(
+      '/api/user/profile',
+      { headers: { Authorization: `Bearer ${verified.data.token}` } },
+      env
+    );
+    expect(unverifiedProfile.status).toBe(200);
+    await expect(unverifiedProfile.json()).resolves.toEqual(
+      expect.objectContaining({
+        emailVerified: false,
+        isEmailVerified: false,
+      })
+    );
+
+    verified.user.isEmailVerified = 1;
+
+    const verifiedProfile = await app.request(
+      '/api/user/profile',
+      { headers: { Authorization: `Bearer ${verified.data.token}` } },
+      env
+    );
+    expect(verifiedProfile.status).toBe(200);
+    await expect(verifiedProfile.json()).resolves.toEqual(
+      expect.objectContaining({
         emailVerified: true,
         isEmailVerified: true,
       })
