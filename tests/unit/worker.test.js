@@ -1,6 +1,6 @@
 const { sign } = require('hono/jwt');
 const app = require('../../src-worker/index.js').default;
-const { DocumentSyncObject } = require('../../src-worker/index.js');
+const { SynchroDocumentObject } = require('../../src-worker/index.js');
 const { MockD1 } = require('../mockD1.js');
 
 const PASSWORD = 'Password123!';
@@ -811,7 +811,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       env.JWT_SECRET
     );
 
-    const object = new DocumentSyncObject({}, env);
+    const object = new SynchroDocumentObject({}, env);
     const res = await object.fetch(
       new Request(`https://example.com/ws/${doc.data.id}?ticket=${ticket}`)
     );
@@ -821,7 +821,7 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
   it('rejects malformed realtime messages cleanly', async () => {
     const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'Realtime Doc');
-    const object = new DocumentSyncObject({}, env);
+    const object = new SynchroDocumentObject({}, env);
     const socket = new FakeSocket();
 
     await object.handleConnection(socket, doc.data.id, alice.user.id, 'alice', false);
