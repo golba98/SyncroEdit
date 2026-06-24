@@ -42,14 +42,11 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       <div id="profileModal" style="display: none;">
         <button id="tab-general"></button>
         <span id="emailVerificationBadge"></span>
-        <div id="resendVerificationContainer" style="display: none;">
-          <button id="resendVerificationBtn"></button>
-          <span id="resendTimer"></span>
-          <div id="profileVerifyCodeContainer" style="display: none;">
-            <input id="profileVerificationCodeInput" />
-            <button id="profileVerifyCodeBtn"></button>
-          </div>
-          <div id="profileVerificationMessage"></div>
+        <div id="emailVerificationPanel" style="display: none;">
+          <button id="sendVerificationBtn"></button>
+          <input id="verificationCodeInput" />
+          <button id="verifyEmailBtn"></button>
+          <div id="verificationStatusMessage"></div>
         </div>
       </div>
     `;
@@ -89,7 +86,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
 
     // Verify verification-required message is shown in documentList
     const listContainer = document.getElementById('documentList');
-    expect(listContainer.innerHTML).toContain('Verify your email to access your documents.');
+    expect(listContainer.innerHTML).toContain('Verify your email in Settings to access documents and collaboration.');
 
     // Verify profile modal is surfaced on boot
     const profileModal = document.getElementById('profileModal');
@@ -118,7 +115,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
 
     // Verify verification-required empty state is rendered
     const listContainer = document.getElementById('documentList');
-    expect(listContainer.innerHTML).toContain('Verify your email to access your documents.');
+    expect(listContainer.innerHTML).toContain('Verify your email in Settings to access documents and collaboration.');
   });
 
   it('verified user still loads documents normally', async () => {
@@ -163,14 +160,14 @@ describe('Unverified User Dashboard & Verification Handling', () => {
     expect(Network.getDocuments).not.toHaveBeenCalled();
 
     // Mock verification form input
-    const codeInput = document.getElementById('profileVerificationCodeInput');
+    const codeInput = document.getElementById('verificationCodeInput');
     codeInput.value = '123456';
 
     // Clear transitioning flag to allow showLibrary() to fetch documents
     app.libraryManager.isTransitioning = false;
 
     // Simulate verification submit by calling the async method directly
-    await app.profile.verifyEmailCode();
+    await app.profile.verifyEmail();
 
     // Verify Network.fetchAPI was called to verify code
     expect(Network.fetchAPI).toHaveBeenCalledWith('/api/auth/verify-email', expect.objectContaining({

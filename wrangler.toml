@@ -30,6 +30,10 @@ new_sqlite_classes = ["SynchroDocumentObject"]
 tag = "v2"
 new_sqlite_classes = ["SynchroRateLimitObject"]
 
+[vars]
+EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
+APP_NAME = "SyncroEdit"
+
 [env.staging]
 name = "synchroedit-dev"
 workers_dev = true
@@ -49,5 +53,5 @@ name = "RATE_LIMIT_OBJECT"
 class_name = "SynchroRateLimitObject"
 
 [env.staging.vars]
-EMAIL_FROM = "SyncroEdit <onboarding@resend.dev>"
+EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
 APP_NAME = "SyncroEdit"

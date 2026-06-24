@@ -35,6 +35,7 @@ export class App {
     this.hasLoggedWebSocketConnected = false;
     this.pendingInitialSyncLog = false;
     this.hasLoggedInitialSync = false;
+    this.verificationRestricted = false;
 
     // Offline Indicator
     window.addEventListener('offline', () => this.showOfflineIndicator(true));
@@ -138,26 +139,20 @@ export class App {
     this.uiManager.setupRibbonTabs();
     this.setupVisibilityListener();
 
-    const isVerified = this.user && (this.user.isEmailVerified === true || Number(this.user.isEmailVerified) === 1);
+    this.verificationRestricted = !this.profile.isVerified?.(this.user);
+
+    if (this.verificationRestricted) {
+      console.log('[BOOT] route resolved unverified');
+      await this.showVerificationRestrictedState();
+      return;
+    }
 
     if (this.documentId) {
       console.log('[BOOT] route resolved document');
-      if (!isVerified) {
-        console.warn('[BOOT] user is unverified, forcing library view');
-        this.documentId = null;
-        const newUrl = window.location.pathname;
-        window.history.replaceState({ view: 'library' }, '', newUrl);
-        await this.libraryManager.showLibrary();
-        this.uiManager.openProfileModal();
-      } else {
-        await this.loadDocument();
-      }
+      await this.loadDocument();
     } else {
       console.log('[BOOT] route resolved dashboard');
       await this.libraryManager.showLibrary();
-      if (!isVerified) {
-        this.uiManager.openProfileModal();
-      }
       console.log('[BOOT] dashboard ready');
     }
   }
@@ -171,6 +166,13 @@ export class App {
         const user = await this.profile.loadProfile({ silent: true });
         if (!user) {
           Auth.logout();
+          return;
+        }
+
+        this.user = user;
+        this.verificationRestricted = !this.profile.isVerified?.(user);
+        if (this.verificationRestricted) {
+          await this.showVerificationRestrictedState();
           return;
         }
 
@@ -386,6 +388,11 @@ export class App {
 
   async loadDocument(options = {}) {
     console.log('[OPEN] opening document');
+    if (this.verificationRestricted) {
+      await this.showVerificationRestrictedState();
+      return;
+    }
+
     const docId = this.documentId;
     if (!docId) return;
 
@@ -528,6 +535,22 @@ export class App {
       }
       this.uiManager.preventBlackEditorLoadingState();
     }
+  }
+
+  promptEmailVerification() {
+    this.profile.openProfileModal({ tab: 'general' });
+  }
+
+  async showVerificationRestrictedState() {
+    this.uiManager.applyViewState('dashboard');
+    await this.libraryManager.showLibrary();
+    this.promptEmailVerification();
+  }
+
+  async handleEmailVerified(user) {
+    this.user = user || this.user;
+    this.verificationRestricted = false;
+    await this.libraryManager.showLibrary();
   }
 
   hasLoadedEditorContent() {

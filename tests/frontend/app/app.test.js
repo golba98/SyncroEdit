@@ -71,6 +71,7 @@ describe('App Core Initialization', () => {
       </div>
       
       <div id="profileModal">
+        <button id="tab-general"></button>
         <img id="profilePfp" />
         <div id="profileInitials"></div>
         <div id="profilePfpPlaceholder"></div>
@@ -84,7 +85,15 @@ describe('App Core Initialization', () => {
     // Default Profile load success
     Profile.prototype.loadProfile = jest
       .fn()
-      .mockResolvedValue({ _id: 'user1', username: 'TestUser', isEmailVerified: true });
+      .mockResolvedValue({
+        _id: 'user1',
+        username: 'TestUser',
+        emailVerified: true,
+        isEmailVerified: true,
+        accentColor: '#8b5cf6',
+      });
+    Profile.prototype.isVerified = jest.fn().mockReturnValue(true);
+    Profile.prototype.openProfileModal = jest.fn();
 
     // Default Network mocks
     Network.getDocuments.mockResolvedValue({ documents: [] });
@@ -170,6 +179,23 @@ describe('App Core Initialization', () => {
     await new Promise(process.nextTick);
 
     expect(Utils.navigateTo).toHaveBeenCalledWith('pages/login.html?doc=doc-42');
+  });
+
+  it('keeps unverified users in the app shell and opens the profile modal', async () => {
+    Profile.prototype.loadProfile = jest.fn().mockResolvedValue({
+      _id: 'user1',
+      username: 'TestUser',
+      isEmailVerified: 0,
+    });
+    Profile.prototype.isVerified = jest.fn().mockReturnValue(false);
+    Profile.prototype.openProfileModal = jest.fn();
+
+    new App();
+    await new Promise(process.nextTick);
+
+    expect(Network.getDocuments).not.toHaveBeenCalled();
+    expect(Profile.prototype.openProfileModal).toHaveBeenCalledWith({ tab: 'general' });
+    expect(document.getElementById('docLibrary').style.display).toBe('block');
   });
 
   it('hides initial connecting badge without showing the connection overlay', async () => {
@@ -915,5 +941,28 @@ describe('App Core Initialization', () => {
 
     app.uiManager.setDocumentOpenState('ready');
     expect(document.body.dataset.documentOpenState).toBe('ready');
+  });
+
+  it('holds authenticated unverified users in the profile flow without fetching documents', async () => {
+    Profile.prototype.loadProfile = jest.fn().mockResolvedValue({
+      _id: 'user1',
+      username: 'TestUser',
+      emailVerified: false,
+      accentColor: '#8b5cf6',
+    });
+    Profile.prototype.isVerified = jest.fn().mockReturnValue(false);
+    Profile.prototype.openProfileModal = jest.fn(() => {
+      document.getElementById('profileModal').style.display = 'flex';
+    });
+
+    new App();
+    await new Promise(process.nextTick);
+
+    expect(Network.getDocuments).not.toHaveBeenCalled();
+    expect(document.body.dataset.viewState).toBe('dashboard');
+    expect(document.getElementById('profileModal').style.display).toBe('flex');
+    expect(document.getElementById('documentList').textContent).toContain(
+      'Verify your email in Settings'
+    );
   });
 });

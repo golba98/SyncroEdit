@@ -4,6 +4,7 @@ import { Network } from '/js/app/network.js';
 export class Profile {
   constructor() {
     this.user = null;
+    this.hasSentVerificationCode = false;
     this.setupEventListeners();
   }
 
@@ -27,10 +28,29 @@ export class Profile {
       });
     });
 
-    // Resend verification listener
-    const resendBtn = document.getElementById('resendVerificationBtn');
-    if (resendBtn) {
-      resendBtn.addEventListener('click', () => this.resendVerification());
+    const sendVerificationBtn = document.getElementById('sendVerificationBtn');
+    if (sendVerificationBtn) {
+      sendVerificationBtn.addEventListener('click', () => this.sendVerificationCode());
+    }
+
+    const verifyEmailBtn = document.getElementById('verifyEmailBtn');
+    if (verifyEmailBtn) {
+      verifyEmailBtn.addEventListener('click', () => this.verifyEmail());
+    }
+
+    const verificationCodeInput = document.getElementById('verificationCodeInput');
+    if (verificationCodeInput) {
+      verificationCodeInput.addEventListener('input', (event) => {
+        event.target.value = String(event.target.value || '')
+          .replace(/\D/g, '')
+          .slice(0, 6);
+      });
+      verificationCodeInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          this.verifyEmail();
+        }
+      });
     }
 
     // Verify verification listener
@@ -168,7 +188,8 @@ export class Profile {
       this.showSkeleton();
     }
 
-    this.user = await Auth.verifyToken();
+    const profile = await Auth.verifyToken();
+    this.user = profile ? this.normalizeVerificationState(profile) : profile;
 
     if (!silent) {
       this.hideSkeleton();
@@ -179,6 +200,20 @@ export class Profile {
     }
 
     return this.user;
+  }
+
+  normalizeVerificationState(profile) {
+    const isVerified = this.isVerified(profile);
+
+    return {
+      ...profile,
+      emailVerified: isVerified,
+      isEmailVerified: isVerified,
+    };
+  }
+
+  isVerified(profile = this.user) {
+    return profile?.isEmailVerified === true || Number(profile?.isEmailVerified) === 1;
   }
 
   getInitials(name) {
@@ -214,6 +249,8 @@ export class Profile {
   }
 
   updateUI() {
+    this.user = this.normalizeVerificationState(this.user || {});
+
     const profileEmailInput = document.getElementById('profileEmailInput');
     if (profileEmailInput) profileEmailInput.value = this.user.email;
 
@@ -224,6 +261,7 @@ export class Profile {
     if (profileBioInput) profileBioInput.value = this.user.bio || '';
 
     this.updateVerificationBadge();
+    this.updateVerificationPanel();
     this.updatePrivacyUI();
 
     const pfpElements = [
@@ -274,155 +312,165 @@ export class Profile {
       });
     }
   }
-
   updateVerificationBadge() {
     const badge = document.getElementById('emailVerificationBadge');
-    const resendContainer = document.getElementById('resendVerificationContainer');
     if (!badge) return;
 
-    const isVerified = this.user && (this.user.isEmailVerified === true || Number(this.user.isEmailVerified) === 1);
+    const isVerified = this.isVerified();
 
     if (isVerified) {
       badge.innerHTML =
         '<span class="status-pill status-pill-verified"><i class="fas fa-check-circle"></i> Verified</span>';
-      if (resendContainer) resendContainer.style.display = 'none';
     } else {
       badge.innerHTML =
         '<span class="status-pill status-pill-unverified"><i class="fas fa-exclamation-circle"></i> Unverified</span>';
-      if (resendContainer) {
-        resendContainer.style.display = 'block';
-        const codeContainer = document.getElementById('profileVerifyCodeContainer');
-        if (codeContainer) {
-          codeContainer.style.display = 'flex';
-        }
+    }
+  }
+
+  updateVerificationPanel() {
+    const panel = document.getElementById('emailVerificationPanel');
+    const sendButton = document.getElementById('sendVerificationBtn');
+    const codeInput = document.getElementById('verificationCodeInput');
+    const verifyButton = document.getElementById('verifyEmailBtn');
+    const statusMessage = document.getElementById('verificationStatusMessage');
+    if (!panel) return;
+
+    const isVerified = this.isVerified();
+    panel.style.display = isVerified ? 'none' : 'flex';
+
+    if (sendButton) {
+      sendButton.textContent = this.hasSentVerificationCode
+        ? 'Resend verification code'
+        : 'Send verification code';
+    }
+
+    if (isVerified) {
+      this.hasSentVerificationCode = false;
+      if (codeInput) codeInput.value = '';
+      if (verifyButton) verifyButton.disabled = false;
+      if (statusMessage) {
+        statusMessage.textContent = '';
+        statusMessage.className = 'profile-verification-status';
       }
     }
   }
 
-  async resendVerification() {
-    const resendBtn = document.getElementById('resendVerificationBtn');
-    const timerSpan = document.getElementById('resendTimer');
-    const codeContainer = document.getElementById('profileVerifyCodeContainer');
-    const msgEl = document.getElementById('profileVerificationMessage');
+  setVerificationStatus(message, state = '') {
+    const statusMessage = document.getElementById('verificationStatusMessage');
+    if (!statusMessage) return;
+    statusMessage.textContent = message || '';
+    statusMessage.className = 'profile-verification-status';
+    if (state) {
+      statusMessage.classList.add(`is-${state}`);
+    }
+  }
+
+  setVerificationButtonLoading(buttonId, isLoading, loadingText, idleText) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    button.disabled = isLoading;
+    button.textContent = isLoading ? loadingText : idleText;
+  }
+
+  getErrorMessage(err, fallbackMessage) {
+    return err?.data?.message || err?.message || fallbackMessage;
+  }
+
+  async sendVerificationCode() {
+    const idleText = this.hasSentVerificationCode
+      ? 'Resend verification code'
+      : 'Send verification code';
 
     try {
-      resendBtn.disabled = true;
+      this.setVerificationButtonLoading('sendVerificationBtn', true, 'Sending...', idleText);
+      this.setVerificationStatus('Sending verification code...', 'loading');
       await Network.fetchAPI('/api/auth/send-verification', {
         method: 'POST',
         body: JSON.stringify({ email: this.user.email, purpose: 'signup' }),
       });
 
-      if (msgEl) {
-        msgEl.textContent = 'Verification code sent to your email!';
-        msgEl.style.color = '#10b981';
-        msgEl.style.display = 'block';
-      }
-
-      if (codeContainer) {
-        codeContainer.style.display = 'flex';
-      }
-
-      // Rate limit UI
-      let timeLeft = 60;
-      timerSpan.style.display = 'inline';
-      resendBtn.style.display = 'none';
-
-      const interval = setInterval(() => {
-        timeLeft--;
-        timerSpan.textContent = `Retry in ${timeLeft}s`;
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          resendBtn.disabled = false;
-          resendBtn.style.display = 'inline';
-          timerSpan.style.display = 'none';
-        }
-      }, 1000);
+      this.hasSentVerificationCode = true;
+      this.updateVerificationPanel();
+      this.setVerificationStatus('Verification code sent. Check your email.', 'success');
     } catch (err) {
-      console.error('Resend error:', err);
-      if (msgEl) {
-        msgEl.textContent = 'Failed to send code. Please try again later.';
-        msgEl.style.color = '#ef4444';
-        msgEl.style.display = 'block';
-      }
-      resendBtn.disabled = false;
+      console.error('Verification code send failed:', err);
+      this.setVerificationStatus(
+        this.getErrorMessage(err, 'Failed to send verification code.'),
+        'error'
+      );
+    } finally {
+      this.setVerificationButtonLoading(
+        'sendVerificationBtn',
+        false,
+        'Sending...',
+        this.hasSentVerificationCode ? 'Resend verification code' : 'Send verification code'
+      );
     }
   }
 
-  async verifyEmailCode() {
-    const codeInput = document.getElementById('profileVerificationCodeInput');
-    const verifyBtn = document.getElementById('profileVerifyCodeBtn');
-    const msgEl = document.getElementById('profileVerificationMessage');
-
-    if (!codeInput || !verifyBtn) return;
-
-    const code = codeInput.value.trim();
-    if (!code) {
-      if (msgEl) {
-        msgEl.textContent = 'Please enter the verification code.';
-        msgEl.style.color = '#ef4444';
-        msgEl.style.display = 'block';
-      }
-      return;
-    }
+  async verifyEmail() {
+    const codeInput = document.getElementById('verificationCodeInput');
+    const code = String(codeInput?.value || '').trim();
 
     if (!/^\d{6}$/.test(code)) {
-      if (msgEl) {
-        msgEl.textContent = 'Code must be exactly 6 digits.';
-        msgEl.style.color = '#ef4444';
-        msgEl.style.display = 'block';
-      }
+      this.setVerificationStatus('Enter the 6-digit verification code.', 'error');
       return;
     }
 
-    verifyBtn.disabled = true;
-    verifyBtn.textContent = 'Verifying...';
-    if (msgEl) msgEl.style.display = 'none';
-
     try {
-      await Network.fetchAPI('/api/auth/verify-email', {
+      this.setVerificationButtonLoading('verifyEmailBtn', true, 'Verifying...', 'Verify email');
+      this.setVerificationStatus('Verifying email...', 'loading');
+      const response = await Network.fetchAPI('/api/auth/verify-email', {
         method: 'POST',
-        body: JSON.stringify({
-          email: this.user.email,
-          code,
-          purpose: 'signup',
-        }),
+        body: JSON.stringify({ email: this.user.email, code, purpose: 'signup' }),
       });
 
-      // Update state
-      this.user.isEmailVerified = true;
-      this.user.emailVerified = true;
+      this.user = this.normalizeVerificationState({
+        ...this.user,
+        ...response,
+        emailVerified: true,
+        isEmailVerified: true,
+      });
+      this.hasSentVerificationCode = false;
+      if (codeInput) codeInput.value = '';
+      this.updateUI();
+      this.setVerificationStatus('Email verified.', 'success');
       if (window.app) {
         window.app.user = this.user;
+        window.app.handleEmailVerified?.(this.user);
       }
-
-      // Update UI badge and hide the panel
-      this.updateVerificationBadge();
-
-      // Show success message
-      if (msgEl) {
-        msgEl.textContent = '✓ Email verified successfully!';
-        msgEl.style.color = '#10b981';
-        msgEl.style.display = 'block';
-      }
-
-      // Clear inputs
-      codeInput.value = '';
-
-      // Fetch the library normally
-      if (window.app && window.app.libraryManager) {
-        await window.app.libraryManager.showLibrary();
+      if (window.editor?.updateUser) {
+        window.editor.updateUser(this.user);
       }
     } catch (err) {
-      if (msgEl) {
-        msgEl.textContent = '✗ ' + (err.message || 'Verification failed.');
-        msgEl.style.color = '#ef4444';
-        msgEl.style.display = 'block';
-      }
-      verifyBtn.disabled = false;
-      verifyBtn.textContent = 'Verify Email';
+      console.error('Email verification failed:', err);
+      const message =
+        err?.status === 400
+          ? 'Invalid or expired verification code.'
+          : this.getErrorMessage(err, 'Failed to verify email.');
+      this.setVerificationStatus(message, 'error');
+    } finally {
+      this.setVerificationButtonLoading('verifyEmailBtn', false, 'Verifying...', 'Verify email');
     }
   }
 
+  openProfileModal({ tab = 'general' } = {}) {
+    const modal = document.getElementById('profileModal');
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+
+    const tabs = document.querySelectorAll('.profile-tab');
+    const tabContents = document.querySelectorAll('.profile-tab-content');
+    tabs.forEach((node) => {
+      const isActive = node.dataset.tab === tab;
+      node.classList.toggle('active', isActive);
+      node.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    tabContents.forEach((node) => {
+      node.style.display = node.id === `${tab}-content` ? 'block' : 'none';
+    });
+  }
   updatePasswordStrength(password) {
     const bar = document.getElementById('passwordStrengthBar');
     const reqs = {

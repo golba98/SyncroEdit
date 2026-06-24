@@ -13,6 +13,19 @@ export class LibraryManager {
   }
 
   async showLibrary() {
+    if (this.app.verificationRestricted) {
+      if (this.app.uiManager) {
+        this.app.uiManager.applyViewState('dashboard');
+        this.app.uiManager.updateMobileUIState();
+      }
+      const listContainer = document.getElementById('documentList');
+      if (listContainer) {
+        listContainer.innerHTML =
+          '<tr><td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">Verify your email in Settings to access documents and collaboration.</td></tr>';
+      }
+      return;
+    }
+
     // Prevent rapid transitions
     if (this.isTransitioning) return;
     this.isTransitioning = true;
@@ -63,6 +76,7 @@ export class LibraryManager {
     const fab = document.getElementById('fabCreateDoc');
     if (fab) {
       fab.onclick = () => this.createNewDocument();
+      fab.style.display = this.app.verificationRestricted ? 'none' : '';
     }
 
     const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
@@ -70,7 +84,7 @@ export class LibraryManager {
       const listContainer = document.getElementById('documentList');
       if (listContainer) {
         listContainer.innerHTML =
-          '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-soft);">Verify your email to access your documents.</td></tr>';
+          '<tr><td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">Verify your email in Settings to access documents and collaboration.</td></tr>';
       }
       return;
     }
@@ -95,6 +109,21 @@ export class LibraryManager {
     };
 
     this.bindSearch(renderList);
+
+    if (this.app.verificationRestricted) {
+      const listContainer = document.getElementById('documentList');
+      if (listContainer) {
+        listContainer.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">
+              Verify your email in Settings/Profile to access documents and collaboration features.
+            </td>
+          </tr>
+        `;
+      }
+      this.documents = [];
+      return;
+    }
 
     // 1. Instant Cache Render
     const cachedData = localStorage.getItem('syncroedit_library_cache');
@@ -135,7 +164,7 @@ export class LibraryManager {
         const listContainer = document.getElementById('documentList');
         if (listContainer) {
           listContainer.innerHTML =
-            '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-soft);">Verify your email to access your documents.</td></tr>';
+            '<tr><td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">Verify your email in Settings to access documents and collaboration.</td></tr>';
         }
         return;
       }
@@ -221,9 +250,8 @@ export class LibraryManager {
   }
 
   async createNewDocument() {
-    const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
-    if (!isVerified) {
-      this.app.uiManager?.openProfileModal();
+    if (this.app.verificationRestricted) {
+      this.app.promptEmailVerification?.();
       return;
     }
 
@@ -279,9 +307,8 @@ export class LibraryManager {
   }
 
   async openDocument(docId) {
-    const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
-    if (!isVerified) {
-      this.app.uiManager?.openProfileModal();
+    if (this.app.verificationRestricted) {
+      this.app.promptEmailVerification?.();
       return;
     }
 

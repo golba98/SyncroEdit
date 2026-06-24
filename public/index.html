@@ -960,39 +960,38 @@
                         <!-- Will be populated by JS -->
                       </div>
                     </div>
-                    <div id="resendVerificationContainer" style="display: none; margin-top: 12px; padding: 12px; border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px; background: rgba(139, 92, 246, 0.03);">
-                      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <span style="font-size: 13px; color: var(--text-soft); font-weight: 500;">Email Verification:</span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <button id="resendVerificationBtn" class="profile-btn-secondary" style="padding: 6px 12px; font-size: 12px; line-height: 1; text-transform: none; letter-spacing: normal;">
-                            Send verification code
-                          </button>
-                          <span
-                            id="resendTimer"
-                            style="
-                              font-size: 12px;
-                              color: var(--text-soft);
-                              display: none;
-                            "
-                          ></span>
-                        </div>
+                    <div id="emailVerificationPanel" class="profile-verification-panel">
+                      <div class="profile-verification-copy">
+                        <h3 class="profile-verification-title">Verify your email</h3>
+                        <p class="profile-verification-message">
+                          Your account email is not verified yet. Verify your email to unlock full
+                          access to SyncroEdit.
+                        </p>
                       </div>
-                      
-                      <!-- 6-digit verification code input and button -->
-                      <div id="profileVerifyCodeContainer" style="display: none; align-items: center; gap: 8px; margin-top: 10px; border-top: 1px solid rgba(139, 92, 246, 0.1); padding-top: 10px;">
-                        <input
-                          type="text"
-                          id="profileVerificationCodeInput"
-                          placeholder="6-digit code"
-                          maxlength="6"
-                          class="profile-input"
-                          style="max-width: 120px; text-align: center; font-size: 14px; height: 32px; padding: 4px;"
-                        />
-                        <button id="profileVerifyCodeBtn" class="profile-btn-primary" style="padding: 6px 16px; font-size: 12px; line-height: 1; text-transform: none; letter-spacing: normal; height: 32px; display: inline-flex; align-items: center; justify-content: center;">
-                          Verify Email
+                      <div class="profile-verification-actions">
+                        <button id="sendVerificationBtn" class="profile-text-action" type="button">
+                          Send verification code
                         </button>
                       </div>
-                      <div id="profileVerificationMessage" style="font-size: 12px; margin-top: 6px; display: none;"></div>
+                      <div class="profile-verification-form">
+                        <input
+                          type="text"
+                          id="verificationCodeInput"
+                          class="profile-input"
+                          inputmode="numeric"
+                          maxlength="6"
+                          autocomplete="one-time-code"
+                          placeholder="Enter 6-digit code"
+                        />
+                        <button id="verifyEmailBtn" class="profile-btn-primary" type="button">
+                          Verify email
+                        </button>
+                      </div>
+                      <div
+                        id="verificationStatusMessage"
+                        class="profile-verification-status"
+                        aria-live="polite"
+                      ></div>
                     </div>
                   </div>
 
