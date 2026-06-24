@@ -73,7 +73,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       _id: 'user-unverified',
       username: 'UnverifiedUser',
       email: 'unverified@example.com',
-      isEmailVerified: false
+      isEmailVerified: false,
     });
 
     Network.getDocuments = jest.fn();
@@ -86,7 +86,9 @@ describe('Unverified User Dashboard & Verification Handling', () => {
 
     // Verify verification-required message is shown in documentList
     const listContainer = document.getElementById('documentList');
-    expect(listContainer.innerHTML).toContain('Verify your email in Settings to access documents and collaboration.');
+    expect(listContainer.innerHTML).toContain(
+      'Verify your email in Settings to access documents and collaboration.'
+    );
 
     // Verify profile modal is surfaced on boot
     const profileModal = document.getElementById('profileModal');
@@ -99,7 +101,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       _id: 'user-1',
       username: 'User1',
       email: 'user@example.com',
-      isEmailVerified: true
+      isEmailVerified: true,
     });
 
     const error = new Error('Email verification required');
@@ -115,7 +117,9 @@ describe('Unverified User Dashboard & Verification Handling', () => {
 
     // Verify verification-required empty state is rendered
     const listContainer = document.getElementById('documentList');
-    expect(listContainer.innerHTML).toContain('Verify your email in Settings to access documents and collaboration.');
+    expect(listContainer.innerHTML).toContain(
+      'Verify your email in Settings to access documents and collaboration.'
+    );
   });
 
   it('verified user still loads documents normally', async () => {
@@ -123,10 +127,12 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       _id: 'user-verified',
       username: 'VerifiedUser',
       email: 'verified@example.com',
-      isEmailVerified: true
+      isEmailVerified: true,
     });
 
-    Network.getDocuments = jest.fn().mockResolvedValue({ documents: [{ _id: 'doc1', title: 'Doc 1' }] });
+    Network.getDocuments = jest
+      .fn()
+      .mockResolvedValue({ documents: [{ _id: 'doc1', title: 'Doc 1' }] });
 
     const app = new App();
     await new Promise(process.nextTick);
@@ -141,17 +147,19 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       _id: 'user-unverified',
       username: 'UnverifiedUser',
       email: 'unverified@example.com',
-      isEmailVerified: false
+      isEmailVerified: false,
     };
 
-    loadProfileSpy = jest.spyOn(Profile.prototype, 'loadProfile').mockImplementation(function() {
+    loadProfileSpy = jest.spyOn(Profile.prototype, 'loadProfile').mockImplementation(function () {
       this.user = mockUser;
       this.updateUI();
       return Promise.resolve(mockUser);
     });
 
     Network.fetchAPI = jest.fn().mockResolvedValue({ ok: true, message: 'Email verified.' });
-    Network.getDocuments = jest.fn().mockResolvedValue({ documents: [{ _id: 'doc1', title: 'Doc 1' }] });
+    Network.getDocuments = jest
+      .fn()
+      .mockResolvedValue({ documents: [{ _id: 'doc1', title: 'Doc 1' }] });
 
     const app = new App();
     await new Promise(process.nextTick);
@@ -170,10 +178,17 @@ describe('Unverified User Dashboard & Verification Handling', () => {
     await app.profile.verifyEmail();
 
     // Verify Network.fetchAPI was called to verify code
-    expect(Network.fetchAPI).toHaveBeenCalledWith('/api/auth/verify-email', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ email: 'unverified@example.com', code: '123456', purpose: 'signup' })
-    }));
+    expect(Network.fetchAPI).toHaveBeenCalledWith(
+      '/api/auth/verify-email',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'unverified@example.com',
+          code: '123456',
+          purpose: 'signup',
+        }),
+      })
+    );
 
     // Verify user verified state updated on frontend
     expect(app.user.isEmailVerified).toBe(true);

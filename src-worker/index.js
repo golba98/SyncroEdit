@@ -76,8 +76,7 @@ function logVerificationSendFailure(c, email, purpose, err) {
     errorName: err && err.name ? err.name : 'Error',
     message: err && err.message ? err.message : 'Unknown error',
     provider: err && err.provider ? err.provider : undefined,
-    providerStatus:
-      err && typeof err.providerStatus === 'number' ? err.providerStatus : undefined,
+    providerStatus: err && typeof err.providerStatus === 'number' ? err.providerStatus : undefined,
     providerResponse:
       err && typeof err.providerResponse === 'string' ? err.providerResponse : undefined,
     stack: err && err.stack ? err.stack : undefined,

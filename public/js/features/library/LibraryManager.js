@@ -79,7 +79,9 @@ export class LibraryManager {
       fab.style.display = this.app.verificationRestricted ? 'none' : '';
     }
 
-    const isVerified = this.app.user && (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
+    const isVerified =
+      this.app.user &&
+      (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
     if (!isVerified) {
       const listContainer = document.getElementById('documentList');
       if (listContainer) {

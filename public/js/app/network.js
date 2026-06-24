@@ -129,7 +129,11 @@ export const Network = {
       const error = new Error(message);
       error.status = response.status;
       error.data = errData;
-      if (response.status === 403 && (message === 'Email verification required' || (errData && errData.code === 'email_verification_required'))) {
+      if (
+        response.status === 403 &&
+        (message === 'Email verification required' ||
+          (errData && errData.code === 'email_verification_required'))
+      ) {
         error.code = 'EMAIL_VERIFICATION_REQUIRED';
       }
       throw error;
