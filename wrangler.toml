@@ -33,6 +33,7 @@ new_sqlite_classes = ["SynchroRateLimitObject"]
 [vars]
 EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
 APP_NAME = "SyncroEdit"
+APP_URL = "https://syncroedit.online"
 
 [env.staging]
 name = "synchroedit-dev"
@@ -46,12 +47,13 @@ migrations_dir = "migrations"
 
 [[env.staging.durable_objects.bindings]]
 name = "DOCUMENT_SYNC_OBJECT"
-class_name = "SynchroDocumentObject"
+class_name = "DocumentSyncObject"
 
 [[env.staging.durable_objects.bindings]]
 name = "RATE_LIMIT_OBJECT"
-class_name = "SynchroRateLimitObject"
+class_name = "RateLimitObject"
 
 [env.staging.vars]
 EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
 APP_NAME = "SyncroEdit"
+APP_URL = "https://synchroedit-dev.jordanvorster404.workers.dev"

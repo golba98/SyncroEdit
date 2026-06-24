@@ -20,7 +20,6 @@ import {
   requireEmailCodePepper,
   sendVerificationEmail,
 } from './emailVerification.js';
-import { SynchroRateLimitObject } from './rateLimitObject.js';
 import {
   AppError,
   LIMITS,
@@ -45,9 +44,18 @@ import {
   validateUuid,
 } from './security.js';
 
-// Export Durable Object class so Cloudflare can bind it
-export { SynchroDocumentObject } from './syncObject.js';
-export { SynchroRateLimitObject };
+// Export Durable Object classes so Cloudflare can bind them.
+// The Synchro* aliases match the production class names already registered
+// in Cloudflare's namespace (wrangler.toml bindings use these names).
+export {
+  DocumentSyncObject,
+  DocumentSyncObject as SynchroDocumentObject,
+} from './syncObject.js';
+
+export {
+  RateLimitObject,
+  RateLimitObject as SynchroRateLimitObject,
+} from './rateLimitObject.js';
 
 const app = new Hono();
 
@@ -62,23 +70,6 @@ function logSignupFailure(c, step, err) {
     step,
     errorName: err && err.name ? err.name : 'Error',
     message: err && err.message ? err.message : 'Unknown error',
-    stack: err && err.stack ? err.stack : undefined,
-  });
-}
-
-function logVerificationSendFailure(c, email, purpose, err) {
-  console.error('Verification email send failed:', {
-    route: c.req.path,
-    requestId: getRequestIdentifier(c),
-    email,
-    purpose,
-    errorCode: err && err.code ? err.code : 'email_send_failed',
-    errorName: err && err.name ? err.name : 'Error',
-    message: err && err.message ? err.message : 'Unknown error',
-    provider: err && err.provider ? err.provider : undefined,
-    providerStatus: err && typeof err.providerStatus === 'number' ? err.providerStatus : undefined,
-    providerResponse:
-      err && typeof err.providerResponse === 'string' ? err.providerResponse : undefined,
     stack: err && err.stack ? err.stack : undefined,
   });
 }
@@ -230,21 +221,10 @@ async function createAndSendVerificationCode(env, db, email, purpose = 'signup')
   try {
     await sendVerificationEmail(env, email, code);
   } catch (err) {
-    console.error('Verification email send failed:', {
-      email,
-      purpose,
-      errorName: err?.name || 'Error',
-      message: err?.message || 'Unknown verification email failure',
-      code: err?.code || null,
-      status: err?.status || null,
-    });
     await db
       .prepare('DELETE FROM email_verification_codes WHERE id = ? AND consumed_at IS NULL')
       .bind(codeId)
       .run();
-    if (env && typeof env.__logVerificationSendFailure === 'function') {
-      env.__logVerificationSendFailure(email, purpose, err);
-    }
     throw err;
   }
 }
@@ -330,8 +310,6 @@ app.post('/api/auth/signup', async (c) => {
     let errorCode = null;
     let errorMessage = 'Check your email for a verification code.';
     try {
-      c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
-        logVerificationSendFailure(c, targetEmail, targetPurpose, err);
       await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
       codeSent = true;
     } catch (err) {
@@ -402,7 +380,7 @@ app.post('/api/auth/login', async (c) => {
 
     const user = await db
       .prepare(
-        'SELECT id, username, email, password, isEmailVerified FROM users WHERE username = ?'
+        'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
       )
       .bind(trimmedUsername)
       .first();
@@ -418,12 +396,19 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ message: 'Invalid username or password' }, 401);
     }
 
-    const isEmailVerified = Number(user.isEmailVerified) === 1;
-
-    if (!isEmailVerified) {
-      c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
-        logVerificationSendFailure(c, targetEmail, targetPurpose, err);
+    if (!user.email_verified_at) {
       await createAndSendVerificationCode(c.env, db, user.email, 'signup');
+      return c.json(
+        {
+          message: 'Email verification required',
+          code: 'email_verification_required',
+          emailVerified: false,
+          isEmailVerified: false,
+          verificationRequired: true,
+          email: user.email,
+        },
+        403
+      );
     }
 
     const { accessToken, refreshToken } = await generateTokens(
@@ -445,10 +430,8 @@ app.post('/api/auth/login', async (c) => {
       token: accessToken,
       username: user.username,
       email: user.email,
-      emailVerified: isEmailVerified,
-      isEmailVerified,
-      verificationRequired: !isEmailVerified,
-      message: !isEmailVerified ? 'Email verification required' : undefined,
+      emailVerified: Boolean(user.email_verified_at),
+      isEmailVerified: Boolean(user.email_verified_at),
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -508,14 +491,12 @@ app.post('/api/auth/refresh-token', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT username, email, isEmailVerified FROM users WHERE id = ?')
+      .prepare('SELECT username, email, email_verified_at FROM users WHERE id = ?')
       .bind(decoded.id)
       .first();
     if (!user) {
       return c.json({ message: 'User not found' }, 401);
     }
-
-    const isEmailVerified = Number(user.isEmailVerified) === 1;
 
     // Generate new access token
     const accessToken = await sign(
@@ -535,9 +516,8 @@ app.post('/api/auth/refresh-token', async (c) => {
 
     return c.json({
       token: accessToken,
-      emailVerified: isEmailVerified,
-      isEmailVerified,
-      verificationRequired: !isEmailVerified,
+      emailVerified: Boolean(user.email_verified_at),
+      isEmailVerified: Boolean(user.email_verified_at),
     });
   } catch {
     return c.json({ message: 'Invalid refresh token' }, 401);
@@ -550,19 +530,10 @@ app.post('/api/auth/send-verification', async (c) => {
     const { email, purpose } = await readJson(c, LIMITS.authBody);
     const normalizedEmail = validateVerificationEmail(email);
     const verificationPurpose = validateVerificationPurpose(purpose);
-    c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
-      logVerificationSendFailure(c, targetEmail, targetPurpose, err);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
   } catch (err) {
-    console.error('Send verification endpoint failed:', {
-      route: '/api/auth/send-verification',
-      errorName: err?.name || 'Error',
-      message: err?.message || 'Unknown send-verification failure',
-      code: err?.code || null,
-      status: err?.status || null,
-    });
     if (err instanceof AppError) {
       if (
         err.code === 'missing_email_code_pepper' ||
@@ -589,19 +560,10 @@ app.post('/api/auth/resend-code', async (c) => {
     const { email, purpose } = await readJson(c, LIMITS.authBody);
     const normalizedEmail = validateVerificationEmail(email);
     const verificationPurpose = validateVerificationPurpose(purpose);
-    c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
-      logVerificationSendFailure(c, targetEmail, targetPurpose, err);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
   } catch (err) {
-    console.error('Resend verification endpoint failed:', {
-      route: '/api/auth/resend-code',
-      errorName: err?.name || 'Error',
-      message: err?.message || 'Unknown resend-code failure',
-      code: err?.code || null,
-      status: err?.status || null,
-    });
     if (err instanceof AppError) {
       if (
         err.code === 'missing_email_code_pepper' ||
@@ -722,27 +684,26 @@ app.get('/api/auth/ws-ticket', authenticateUser, requireVerifiedAuth, async (c) 
 // User Profile & Session Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/user/profile', authenticateUser, async (c) => {
+app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const profile = await db
     .prepare(
-      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, isEmailVerified, email_verified_at, createdAt FROM users WHERE id = ?'
+      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, email_verified_at, createdAt FROM users WHERE id = ?'
     )
     .bind(user.id)
     .first();
 
   if (!profile) return c.json({ message: 'User not found' }, 404);
-  const isEmailVerified = Number(profile.isEmailVerified) === 1;
   return c.json({
     ...profile,
     showOnlineStatus: profile.showOnlineStatus === 1,
-    emailVerified: isEmailVerified,
-    isEmailVerified,
+    emailVerified: Boolean(profile.email_verified_at),
+    isEmailVerified: Boolean(profile.email_verified_at),
   });
 });
 
-app.put('/api/user/profile', authenticateUser, async (c) => {
+app.put('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const { profilePicture, accentColor, bio, showOnlineStatus } = await readJson(
