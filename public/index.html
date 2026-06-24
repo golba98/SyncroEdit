@@ -960,19 +960,42 @@
                         <!-- Will be populated by JS -->
                       </div>
                     </div>
-                    <div id="resendVerificationContainer" style="display: none; margin-top: 8px">
-                      <button id="resendVerificationBtn" class="profile-text-action">
-                        Resend verification code
-                      </button>
-                      <span
-                        id="resendTimer"
-                        style="
-                          font-size: 12px;
-                          color: var(--text-soft);
-                          margin-left: 8px;
-                          display: none;
-                        "
-                      ></span>
+                    <div id="verificationPrompt" class="profile-verification-panel" style="display: none">
+                      <div class="profile-verification-copy">
+                        <div class="profile-verification-title">
+                          Verify your email to unlock the full account.
+                        </div>
+                        <p class="profile-verification-text">
+                          This account email is not verified yet. Some features may be restricted
+                          until verification is completed.
+                        </p>
+                      </div>
+                      <div class="profile-verification-actions">
+                        <button id="resendVerificationBtn" class="profile-text-action" type="button">
+                          Send verification code
+                        </button>
+                        <span id="resendTimer" class="profile-inline-status" style="display: none"></span>
+                      </div>
+                      <div class="profile-verification-code-row">
+                        <input
+                          type="text"
+                          id="verificationCodeInput"
+                          class="profile-input"
+                          inputmode="numeric"
+                          autocomplete="one-time-code"
+                          maxlength="6"
+                          placeholder="Enter 6-digit code"
+                        />
+                        <button id="verifyEmailBtn" class="profile-btn-primary" type="button">
+                          Verify email
+                        </button>
+                      </div>
+                      <div
+                        id="verificationStatusMessage"
+                        class="profile-inline-status"
+                        role="status"
+                        aria-live="polite"
+                      ></div>
                     </div>
                   </div>
 

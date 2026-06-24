@@ -91,7 +91,13 @@ export async function sendVerificationEmail(env, email, code) {
   });
 
   if (!response.ok) {
-    throw new AppError(502, 'Unable to send verification email', 'email_send_failed');
+    const responseBody =
+      typeof response.text === 'function' ? await response.text().catch(() => '') : '';
+    const error = new AppError(502, 'Unable to send verification email', 'email_send_failed');
+    error.provider = 'resend';
+    error.providerStatus = response.status;
+    error.providerResponse = responseBody;
+    throw error;
   }
 }
 

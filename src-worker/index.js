@@ -66,6 +66,24 @@ function logSignupFailure(c, step, err) {
   });
 }
 
+function logVerificationSendFailure(c, email, purpose, err) {
+  console.error('Verification email send failed:', {
+    route: c.req.path,
+    requestId: getRequestIdentifier(c),
+    email,
+    purpose,
+    errorCode: err && err.code ? err.code : 'email_send_failed',
+    errorName: err && err.name ? err.name : 'Error',
+    message: err && err.message ? err.message : 'Unknown error',
+    provider: err && err.provider ? err.provider : undefined,
+    providerStatus:
+      err && typeof err.providerStatus === 'number' ? err.providerStatus : undefined,
+    providerResponse:
+      err && typeof err.providerResponse === 'string' ? err.providerResponse : undefined,
+    stack: err && err.stack ? err.stack : undefined,
+  });
+}
+
 app.onError((err, c) => {
   if (err instanceof AppError) {
     return jsonError(c, err.status, err.message, err.code);
@@ -217,6 +235,9 @@ async function createAndSendVerificationCode(env, db, email, purpose = 'signup')
       .prepare('DELETE FROM email_verification_codes WHERE id = ? AND consumed_at IS NULL')
       .bind(codeId)
       .run();
+    if (env && typeof env.__logVerificationSendFailure === 'function') {
+      env.__logVerificationSendFailure(email, purpose, err);
+    }
     throw err;
   }
 }
@@ -302,6 +323,8 @@ app.post('/api/auth/signup', async (c) => {
     let errorCode = null;
     let errorMessage = 'Check your email for a verification code.';
     try {
+      c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
+        logVerificationSendFailure(c, targetEmail, targetPurpose, err);
       await createAndSendVerificationCode(c.env, db, normalizedEmail, 'signup');
       codeSent = true;
     } catch (err) {
@@ -389,6 +412,8 @@ app.post('/api/auth/login', async (c) => {
     }
 
     if (!user.email_verified_at) {
+      c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
+        logVerificationSendFailure(c, targetEmail, targetPurpose, err);
       await createAndSendVerificationCode(c.env, db, user.email, 'signup');
       return c.json(
         {
@@ -522,6 +547,8 @@ app.post('/api/auth/send-verification', async (c) => {
     const { email, purpose } = await readJson(c, LIMITS.authBody);
     const normalizedEmail = validateVerificationEmail(email);
     const verificationPurpose = validateVerificationPurpose(purpose);
+    c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
+      logVerificationSendFailure(c, targetEmail, targetPurpose, err);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
@@ -552,6 +579,8 @@ app.post('/api/auth/resend-code', async (c) => {
     const { email, purpose } = await readJson(c, LIMITS.authBody);
     const normalizedEmail = validateVerificationEmail(email);
     const verificationPurpose = validateVerificationPurpose(purpose);
+    c.env.__logVerificationSendFailure = (targetEmail, targetPurpose, err) =>
+      logVerificationSendFailure(c, targetEmail, targetPurpose, err);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
@@ -676,7 +705,7 @@ app.get('/api/auth/ws-ticket', authenticateUser, requireVerifiedAuth, async (c) 
 // User Profile & Session Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
+app.get('/api/user/profile', authenticateUser, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const profile = await db
