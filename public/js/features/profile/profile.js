@@ -182,7 +182,8 @@ export class Profile {
       this.showSkeleton();
     }
 
-    this.user = await Auth.verifyToken();
+    const profile = await Auth.verifyToken();
+    this.user = profile ? this.normalizeVerificationState(profile) : profile;
 
     if (!silent) {
       this.hideSkeleton();
@@ -193,6 +194,17 @@ export class Profile {
     }
 
     return this.user;
+  }
+
+  normalizeVerificationState(profile) {
+    const isVerified =
+      profile?.isEmailVerified === true || Number(profile?.isEmailVerified) === 1;
+
+    return {
+      ...profile,
+      emailVerified: isVerified,
+      isEmailVerified: isVerified,
+    };
   }
 
   getInitials(name) {
@@ -228,6 +240,8 @@ export class Profile {
   }
 
   updateUI() {
+    this.user = this.normalizeVerificationState(this.user || {});
+
     const profileEmailInput = document.getElementById('profileEmailInput');
     if (profileEmailInput) profileEmailInput.value = this.user.email;
 
@@ -294,7 +308,10 @@ export class Profile {
     const badge = document.getElementById('emailVerificationBadge');
     if (!badge) return;
 
-    if (this.user.emailVerified) {
+    const isVerified =
+      this.user?.isEmailVerified === true || Number(this.user?.isEmailVerified) === 1;
+
+    if (isVerified) {
       badge.innerHTML =
         '<span class="status-pill status-pill-verified"><i class="fas fa-check-circle"></i> Verified</span>';
     } else {

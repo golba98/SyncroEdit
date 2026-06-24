@@ -710,17 +710,18 @@ app.get('/api/user/profile', authenticateUser, async (c) => {
   const user = c.get('user');
   const profile = await db
     .prepare(
-      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, email_verified_at, createdAt FROM users WHERE id = ?'
+      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, isEmailVerified, email_verified_at, createdAt FROM users WHERE id = ?'
     )
     .bind(user.id)
     .first();
 
   if (!profile) return c.json({ message: 'User not found' }, 404);
+  const isEmailVerified = Number(profile.isEmailVerified) === 1;
   return c.json({
     ...profile,
     showOnlineStatus: profile.showOnlineStatus === 1,
-    emailVerified: Boolean(profile.email_verified_at),
-    isEmailVerified: Boolean(profile.email_verified_at),
+    emailVerified: isEmailVerified,
+    isEmailVerified,
   });
 });
 

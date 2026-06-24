@@ -127,12 +127,12 @@ describe('Profile UI', () => {
       expect(initialsEl.style.display).toBe('none');
     });
 
-    it('should render the verification badge from emailVerified instead of the legacy flag', () => {
+    it('treats numeric 0 as unverified', () => {
       profile.user = {
         username: 'John Doe',
         email: 'john@example.com',
-        emailVerified: false,
-        isEmailVerified: true,
+        emailVerified: true,
+        isEmailVerified: 0,
       };
 
       profile.updateUI();
@@ -234,6 +234,77 @@ describe('Profile UI', () => {
       );
       expect(document.getElementById('verificationStatusMessage').className).toContain('error');
       expect(document.getElementById('verificationPrompt').style.display).toBe('flex');
+    });
+
+    it('treats string 0 as unverified', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        emailVerified: true,
+        isEmailVerified: '0',
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
+      expect(document.getElementById('resendVerificationContainer').style.display).toBe('block');
+    });
+
+    it('treats missing isEmailVerified as unverified', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
+      expect(document.getElementById('resendVerificationContainer').style.display).toBe('block');
+    });
+
+    it('shows verified only for strict true', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        isEmailVerified: true,
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
+      expect(document.getElementById('resendVerificationContainer').style.display).toBe('none');
+    });
+
+    it('shows verified for numeric 1', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        isEmailVerified: 1,
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
+      expect(document.getElementById('resendVerificationContainer').style.display).toBe('none');
+    });
+  });
+
+  describe('loadProfile', () => {
+    it('normalizes fetched verification state before storing it', async () => {
+      const mockUser = {
+        username: 'testuser',
+        email: 'test@example.com',
+        isEmailVerified: '0',
+        emailVerified: true,
+      };
+      Auth.verifyToken.mockResolvedValue(mockUser);
+
+      const loaded = await profile.loadProfile({ silent: true });
+
+      expect(loaded.isEmailVerified).toBe(false);
+      expect(loaded.emailVerified).toBe(false);
+      expect(profile.user.isEmailVerified).toBe(false);
+      expect(profile.user.emailVerified).toBe(false);
     });
   });
 });
