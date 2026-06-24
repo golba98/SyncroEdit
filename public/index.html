@@ -960,30 +960,27 @@
                         <!-- Will be populated by JS -->
                       </div>
                     </div>
-                    <div id="verificationPrompt" class="profile-verification-panel" style="display: none">
+                    <div id="emailVerificationPanel" class="profile-verification-panel">
                       <div class="profile-verification-copy">
-                        <div class="profile-verification-title">
-                          Verify your email to unlock the full account.
-                        </div>
-                        <p class="profile-verification-text">
-                          This account email is not verified yet. Some features may be restricted
-                          until verification is completed.
+                        <h3 class="profile-verification-title">Verify your email</h3>
+                        <p class="profile-verification-message">
+                          Your account email is not verified yet. Verify your email to unlock full
+                          access to SyncroEdit.
                         </p>
                       </div>
                       <div class="profile-verification-actions">
-                        <button id="resendVerificationBtn" class="profile-text-action" type="button">
+                        <button id="sendVerificationBtn" class="profile-text-action" type="button">
                           Send verification code
                         </button>
-                        <span id="resendTimer" class="profile-inline-status" style="display: none"></span>
                       </div>
-                      <div class="profile-verification-code-row">
+                      <div class="profile-verification-form">
                         <input
                           type="text"
                           id="verificationCodeInput"
                           class="profile-input"
                           inputmode="numeric"
-                          autocomplete="one-time-code"
                           maxlength="6"
+                          autocomplete="one-time-code"
                           placeholder="Enter 6-digit code"
                         />
                         <button id="verifyEmailBtn" class="profile-btn-primary" type="button">
@@ -992,8 +989,7 @@
                       </div>
                       <div
                         id="verificationStatusMessage"
-                        class="profile-inline-status"
-                        role="status"
+                        class="profile-verification-status"
                         aria-live="polite"
                       ></div>
                     </div>

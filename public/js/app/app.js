@@ -139,9 +139,11 @@ export class App {
     this.uiManager.setupRibbonTabs();
     this.setupVisibilityListener();
 
-    if (!this.user.emailVerified) {
-      this.verificationRestricted = true;
-      this.showVerificationRequiredState();
+    this.verificationRestricted = !this.profile.isVerified?.(this.user);
+
+    if (this.verificationRestricted) {
+      console.log('[BOOT] route resolved unverified');
+      await this.showVerificationRestrictedState();
       return;
     }
 
@@ -168,9 +170,9 @@ export class App {
         }
 
         this.user = user;
-        if (!user.emailVerified) {
-          this.verificationRestricted = true;
-          this.showVerificationRequiredState();
+        this.verificationRestricted = !this.profile.isVerified?.(user);
+        if (this.verificationRestricted) {
+          await this.showVerificationRestrictedState();
           return;
         }
 
@@ -187,45 +189,6 @@ export class App {
         }
       }
     });
-  }
-
-  showVerificationRequiredState() {
-    this.uiManager.applyViewState('dashboard');
-    this.uiManager.updateMobileUIState();
-
-    const listContainer = document.getElementById('documentList');
-    if (listContainer) {
-      listContainer.innerHTML =
-        '<tr><td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">Verify your email in Settings to access documents and collaboration.</td></tr>';
-    }
-
-    const modal = document.getElementById('profileModal');
-    if (modal) {
-      modal.style.display = 'flex';
-    }
-
-    const generalTab = document.getElementById('tab-general');
-    generalTab?.click();
-  }
-
-  handleEmailVerified() {
-    if (!this.user || !this.user.emailVerified) {
-      return;
-    }
-
-    const wasRestricted = this.verificationRestricted;
-    this.verificationRestricted = false;
-
-    if (!wasRestricted) {
-      return;
-    }
-
-    if (this.documentId) {
-      this.loadDocument();
-      return;
-    }
-
-    this.libraryManager.showLibrary();
   }
 
   handleWSStatusChange(status) {
@@ -425,6 +388,11 @@ export class App {
 
   async loadDocument(options = {}) {
     console.log('[OPEN] opening document');
+    if (this.verificationRestricted) {
+      await this.showVerificationRestrictedState();
+      return;
+    }
+
     const docId = this.documentId;
     if (!docId) return;
 
@@ -556,6 +524,22 @@ export class App {
       }
       this.uiManager.preventBlackEditorLoadingState();
     }
+  }
+
+  promptEmailVerification() {
+    this.profile.openProfileModal({ tab: 'general' });
+  }
+
+  async showVerificationRestrictedState() {
+    this.uiManager.applyViewState('dashboard');
+    await this.libraryManager.showLibrary();
+    this.promptEmailVerification();
+  }
+
+  async handleEmailVerified(user) {
+    this.user = user || this.user;
+    this.verificationRestricted = false;
+    await this.libraryManager.showLibrary();
   }
 
   hasLoadedEditorContent() {

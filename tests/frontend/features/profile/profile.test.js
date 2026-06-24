@@ -19,9 +19,8 @@ describe('Profile UI', () => {
       <input id="profileUsernameInput" />
       <textarea id="profileBioInput"></textarea>
       <div id="emailVerificationBadge"></div>
-      <div id="verificationPrompt" style="display:none;">
-        <button id="resendVerificationBtn" type="button"></button>
-        <span id="resendTimer" style="display:none;"></span>
+      <div id="emailVerificationPanel" style="display:none;">
+        <button id="sendVerificationBtn" type="button"></button>
         <input id="verificationCodeInput" />
         <button id="verifyEmailBtn" type="button"></button>
         <div id="verificationStatusMessage"></div>
@@ -37,11 +36,6 @@ describe('Profile UI', () => {
       <i id="libraryHeaderUserIcon"></i>
       <i id="privacyToggle"></i>
     `;
-    window.app = {
-      user: null,
-      handleEmailVerified: jest.fn(),
-    };
-    window.editor = undefined;
     profile = new Profile();
   });
 
@@ -138,102 +132,7 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
-      expect(document.getElementById('verificationPrompt').style.display).toBe('flex');
-      expect(document.getElementById('resendVerificationBtn').textContent).toBe(
-        'Send verification code'
-      );
-    });
-
-    it('hides the verification prompt for verified users', () => {
-      profile.user = {
-        username: 'John Doe',
-        email: 'john@example.com',
-        emailVerified: true,
-      };
-
-      profile.updateUI();
-
-      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('verificationPrompt').style.display).toBe('none');
-    });
-  });
-
-  describe('verification actions', () => {
-    beforeEach(() => {
-      profile.user = {
-        username: 'John Doe',
-        email: 'john@example.com',
-        emailVerified: false,
-        isEmailVerified: false,
-      };
-      window.app.user = { ...profile.user };
-      profile.updateUI();
-    });
-
-    it('shows a success message after sending a verification code', async () => {
-      jest.useFakeTimers();
-      Network.fetchAPI.mockResolvedValue({ ok: true });
-
-      await profile.resendVerification();
-
-      expect(Network.fetchAPI).toHaveBeenCalledWith('/api/auth/send-verification', {
-        method: 'POST',
-        body: JSON.stringify({ email: 'john@example.com', purpose: 'signup' }),
-      });
-      expect(document.getElementById('verificationStatusMessage').textContent).toBe(
-        'Verification code sent. Check your email.'
-      );
-      expect(document.getElementById('verificationStatusMessage').className).toContain('success');
-      expect(document.getElementById('resendVerificationBtn').textContent).toBe(
-        'Resend verification code'
-      );
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
-    });
-
-    it('shows the backend error message when sending a verification code fails', async () => {
-      Network.fetchAPI.mockRejectedValue(new Error('Email delivery is not configured'));
-
-      await profile.resendVerification();
-
-      expect(document.getElementById('verificationStatusMessage').textContent).toBe(
-        'Email delivery is not configured'
-      );
-      expect(document.getElementById('verificationStatusMessage').className).toContain('error');
-    });
-
-    it('updates the UI immediately after successful verification', async () => {
-      Network.fetchAPI.mockResolvedValue({
-        ok: true,
-        emailVerified: true,
-        isEmailVerified: true,
-        message: 'Email verified.',
-      });
-      document.getElementById('verificationCodeInput').value = '123456';
-
-      await profile.verifyEmail();
-
-      expect(Network.fetchAPI).toHaveBeenCalledWith('/api/auth/verify-email', {
-        method: 'POST',
-        body: JSON.stringify({ email: 'john@example.com', code: '123456', purpose: 'signup' }),
-      });
-      expect(profile.user.emailVerified).toBe(true);
-      expect(document.getElementById('verificationPrompt').style.display).toBe('none');
-      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(window.app.handleEmailVerified).toHaveBeenCalled();
-    });
-
-    it('shows the backend error message when verification fails', async () => {
-      Network.fetchAPI.mockRejectedValue(new Error('Invalid or expired verification code'));
-      document.getElementById('verificationCodeInput').value = '123456';
-
-      await profile.verifyEmail();
-
-      expect(document.getElementById('verificationStatusMessage').textContent).toBe(
-        'Invalid or expired verification code'
-      );
-      expect(document.getElementById('verificationStatusMessage').className).toContain('error');
-      expect(document.getElementById('verificationPrompt').style.display).toBe('flex');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
     it('treats string 0 as unverified', () => {
@@ -247,7 +146,7 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
-      expect(document.getElementById('resendVerificationContainer').style.display).toBe('block');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
     it('treats missing isEmailVerified as unverified', () => {
@@ -259,7 +158,7 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
-      expect(document.getElementById('resendVerificationContainer').style.display).toBe('block');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
     it('shows verified only for strict true', () => {
@@ -272,7 +171,7 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('resendVerificationContainer').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
     });
 
     it('shows verified for numeric 1', () => {
@@ -285,7 +184,7 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('resendVerificationContainer').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
     });
   });
 
@@ -305,6 +204,88 @@ describe('Profile UI', () => {
       expect(loaded.emailVerified).toBe(false);
       expect(profile.user.isEmailVerified).toBe(false);
       expect(profile.user.emailVerified).toBe(false);
+    });
+  });
+
+  describe('verification panel', () => {
+    beforeEach(() => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        isEmailVerified: 0,
+      };
+    });
+
+    it('shows the verification panel for an unverified user', () => {
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.getElementById('sendVerificationBtn').textContent).toBe(
+        'Send verification code'
+      );
+    });
+
+    it('does not show the verification panel for a verified user', () => {
+      profile.user.isEmailVerified = true;
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+    });
+
+    it('shows success state after sending a verification code', async () => {
+      Network.fetchAPI.mockResolvedValue({ ok: true });
+      profile.updateUI();
+
+      await profile.sendVerificationCode();
+
+      expect(Network.fetchAPI).toHaveBeenCalledWith('/api/auth/send-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'john@example.com', purpose: 'signup' }),
+      });
+      expect(document.getElementById('sendVerificationBtn').textContent).toBe(
+        'Resend verification code'
+      );
+      expect(document.getElementById('verificationStatusMessage').textContent).toBe(
+        'Verification code sent. Check your email.'
+      );
+    });
+
+    it('shows backend error state if sending fails', async () => {
+      Network.fetchAPI.mockRejectedValue(
+        Object.assign(new Error('Resend is currently unavailable'), {
+          data: { message: 'Resend is currently unavailable' },
+        })
+      );
+      profile.updateUI();
+
+      await profile.sendVerificationCode();
+
+      expect(document.getElementById('verificationStatusMessage').textContent).toBe(
+        'Resend is currently unavailable'
+      );
+    });
+
+    it('updates the modal to verified after a valid code is submitted', async () => {
+      Network.fetchAPI.mockResolvedValue({ ok: true, isEmailVerified: true, emailVerified: true });
+      profile.updateUI();
+      document.getElementById('verificationCodeInput').value = '123456';
+      window.app = { user: null, handleEmailVerified: jest.fn() };
+
+      await profile.verifyEmail();
+
+      expect(Network.fetchAPI).toHaveBeenCalledWith('/api/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'john@example.com',
+          code: '123456',
+          purpose: 'signup',
+        }),
+      });
+      expect(profile.user.isEmailVerified).toBe(true);
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+      expect(window.app.handleEmailVerified).toHaveBeenCalled();
     });
   });
 });

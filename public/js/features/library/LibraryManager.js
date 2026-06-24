@@ -76,6 +76,7 @@ export class LibraryManager {
     const fab = document.getElementById('fabCreateDoc');
     if (fab) {
       fab.onclick = () => this.createNewDocument();
+      fab.style.display = this.app.verificationRestricted ? 'none' : '';
     }
 
     const renderList = (docs) => {
@@ -98,6 +99,21 @@ export class LibraryManager {
     };
 
     this.bindSearch(renderList);
+
+    if (this.app.verificationRestricted) {
+      const listContainer = document.getElementById('documentList');
+      if (listContainer) {
+        listContainer.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-soft);">
+              Verify your email in Settings/Profile to access documents and collaboration features.
+            </td>
+          </tr>
+        `;
+      }
+      this.documents = [];
+      return;
+    }
 
     // 1. Instant Cache Render
     const cachedData = localStorage.getItem('syncroedit_library_cache');
@@ -216,7 +232,7 @@ export class LibraryManager {
 
   async createNewDocument() {
     if (this.app.verificationRestricted) {
-      alert('Verify your email to access documents.');
+      this.app.promptEmailVerification?.();
       return;
     }
 
@@ -273,7 +289,7 @@ export class LibraryManager {
 
   async openDocument(docId) {
     if (this.app.verificationRestricted) {
-      alert('Verify your email to access documents.');
+      this.app.promptEmailVerification?.();
       return;
     }
 
