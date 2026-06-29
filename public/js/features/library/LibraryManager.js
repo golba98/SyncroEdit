@@ -261,7 +261,6 @@ export class LibraryManager {
 
     // Prevent rapid clicks
     if (this.openLock) return;
-    console.log('[OPEN] click', { action: 'create' });
     this.openLock = true;
     this.isTransitioning = true;
     this.app.beginDocumentOpen?.({ mode: 'creating', isNewDocument: true });
@@ -318,7 +317,6 @@ export class LibraryManager {
 
     // Prevent rapid transitions
     if (this.openLock) return;
-    console.log('[OPEN] click', { action: 'open', docId });
     this.openLock = true;
     this.isTransitioning = true;
     this.app.beginDocumentOpen?.({ mode: 'opening', docId, isNewDocument: false });

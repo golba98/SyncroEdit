@@ -751,7 +751,6 @@ export class Profile {
           method: 'PUT',
           body: JSON.stringify({ accentColor: color }),
         });
-        console.log(`[Profile] Accent color synced to backend: ${color}`);
       } catch (err) {
         console.error('Error syncing accent color:', err);
       }

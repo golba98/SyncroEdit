@@ -180,11 +180,6 @@ export class ReadabilityManager extends Plugin {
   setFocusMode(active) {
     this.isFocusMode = active;
     document.body.classList.toggle('focus-mode', active);
-
-    // Notify app to hide/show other UI if necessary
-    if (active) {
-      console.log('Zen Mode Activated');
-    }
   }
 
   // Called when a new page is created

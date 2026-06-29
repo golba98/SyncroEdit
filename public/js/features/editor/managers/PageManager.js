@@ -161,9 +161,6 @@ export class PageManager extends Plugin {
         const ops = quill.getContents(index, line.length()).ops;
         ops.forEach((op, opIdx) => {
           if (op.insert && op.insert.image) {
-            console.log(
-              `[PageManager] Constraining oversized image: ${height.toFixed(1)}px -> ${this.MAX_CONTENT_HEIGHT}px`
-            );
             quill.formatText(
               index + opIdx,
               1,

@@ -72,7 +72,6 @@ export const Network = {
       url.includes('/refresh-token');
 
     if (response.status === 401 && !isAuthRequest) {
-      // console.log('Token expired, attempting refresh...'); // Reduced noise
       try {
         if (!_refreshPromise) {
           _refreshPromise = (async () => {
@@ -266,7 +265,6 @@ export const Network = {
 
         socket.onopen = () => {
           if (isIntentionallyClosed || generation !== connectionGeneration || socket !== ws) return;
-          console.log('Connected to server');
           reconnectAttempts = 0;
           if (onStatusChange) onStatusChange('connected');
           // No need to send join-document message as it is handled by URL params in upgrade

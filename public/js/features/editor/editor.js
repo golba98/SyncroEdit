@@ -404,10 +404,6 @@ export class Editor {
     const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000);
     this._reconnectAttempts += 1;
     this.onStatusChange('reconnecting');
-    if (this._readyForUser) {
-      console.log('[CONNECTION] reconnect after ready - non blocking');
-      console.log('[CONNECTION] suppressed full loader after ready', { reason });
-    }
 
     console.warn('[Editor] Scheduling WebSocket reconnect', {
       docId,
@@ -560,9 +556,6 @@ export class Editor {
         this._reconnectAttempts = 0;
         if (!this._readyForUser) {
           this._emitLifecycle('syncing');
-        } else {
-          console.log('[CONNECTION] reconnect after ready - non blocking');
-          console.log('[CONNECTION] suppressed full loader after ready', { status });
         }
       }
     });

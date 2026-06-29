@@ -57,9 +57,6 @@ describe('Editor Virtualization / Scalability', () => {
   let mockYPages;
 
   beforeEach(() => {
-    // Debugging: Check prototype
-    console.log('Editor prototype keys:', Object.getOwnPropertyNames(Editor.prototype));
-
     // Mock initQuill to avoid module issues
     Editor.prototype.initQuill = jest.fn();
 
@@ -145,16 +142,7 @@ describe('Editor Virtualization / Scalability', () => {
     }));
     mockYPages.toArray.mockReturnValue(manyPages);
 
-    const start = performance.now();
     editor.renderAllPages();
-    const end = performance.now();
-
-    // This is a loose benchmark, but iterating 1000 items and doing DOM checks
-    // shouldn't take > 100ms in a test environment if virtualized/optimized.
-    // If it tries to render 1000 Quills, it will be slow.
-    // Since we mocked createPageEditor, we measure the overhead of the loop and logic.
-
-    console.log(`Render loop for 1000 pages took: ${end - start}ms`);
 
     expect(editor.createPageContainer).toHaveBeenCalledTimes(1000);
   });
