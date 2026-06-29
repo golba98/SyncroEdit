@@ -72,6 +72,28 @@ async function signupVerified(env, username, email) {
   return { ...result, login, data };
 }
 
+async function createAuthToken(env, user) {
+  const sessionId = crypto.randomUUID();
+  env.DB.sessions.push({
+    id: sessionId,
+    userId: user.id,
+    refreshToken: 'test-refresh-token',
+    userAgent: 'jest',
+    ipAddress: '127.0.0.1',
+    lastActive: new Date().toISOString(),
+  });
+
+  return sign(
+    {
+      id: user.id,
+      username: user.username,
+      sessionId,
+      exp: Math.floor(Date.now() / 1000) + 15 * 60,
+    },
+    env.JWT_SECRET
+  );
+}
+
 async function createDocument(env, token, title = 'Document', content = 'Hello') {
   const res = await app.request(
     '/api/documents',
@@ -587,11 +609,11 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       },
       env
     );
-    expect(profileRes.status).toBe(403);
-    await expect(profileRes.json()).resolves.toEqual({
-      code: 'email_verification_required',
-      message: 'Email verification required',
-    });
+    expect(profileRes.status).toBe(200);
+    const profileData = await profileRes.json();
+    expect(profileData.email).toBe('legacy@example.com');
+    expect(profileData.emailVerified).toBe(false);
+    expect(profileData.isEmailVerified).toBe(false);
     expect(signupResult.user.isEmailVerified).toBe(0);
   });
 
@@ -828,6 +850,120 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
       })
     );
     logSpy.mockRestore();
+  });
+
+  it('uses the logged-in user email for authenticated send-code instead of a forged body email', async () => {
+    const { user } = await signup(env, 'authsender', 'authsender@example.com');
+    env.DB.email_verification_codes = [];
+    const token = await createAuthToken(env, user);
+
+    const res = await app.request(
+      '/api/auth/send-verification',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: 'forged@example.com', purpose: 'signup' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(env.DB.email_verification_codes).toHaveLength(1);
+    expect(env.DB.email_verification_codes[0].email).toBe('authsender@example.com');
+  });
+
+  it('does not let authenticated verify-code verify another user email or code', async () => {
+    env.NODE_ENV = 'test';
+    const alice = await signup(env, 'authalice', 'authalice@example.com');
+    await signup(env, 'authbob', 'authbob@example.com');
+    env.DB.email_verification_codes = [];
+    await app.request(
+      '/api/auth/send-verification',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'authbob@example.com', purpose: 'signup' }),
+      },
+      env
+    );
+    const token = await createAuthToken(env, alice.user);
+
+    const res = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: 'authbob@example.com', code: '123456', purpose: 'signup' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+    expect(alice.user.email_verified_at).toBeNull();
+    expect(
+      env.DB.users.find((user) => user.email === 'authbob@example.com').email_verified_at
+    ).toBeNull();
+    expect(env.DB.email_verification_codes[0].consumed_at).toBeNull();
+  });
+
+  it('marks authenticated email verified, consumes the code, and persists through profile', async () => {
+    env.NODE_ENV = 'test';
+    const { user } = await signup(env, 'authverify', 'authverify@example.com');
+    env.DB.email_verification_codes = [];
+    const token = await createAuthToken(env, user);
+
+    const send = await app.request(
+      '/api/auth/send-verification',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: 'forged@example.com', purpose: 'signup' }),
+      },
+      env
+    );
+    expect(send.status).toBe(200);
+    const codeRow = env.DB.email_verification_codes[0];
+
+    const verify = await app.request(
+      '/api/auth/verify-email',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: 'forged@example.com', code: '123456', purpose: 'signup' }),
+      },
+      env
+    );
+
+    expect(verify.status).toBe(200);
+    expect(user.email_verified_at).toBeTruthy();
+    expect(codeRow.consumed_at).toBeTruthy();
+
+    const profile = await app.request(
+      '/api/user/profile',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      env
+    );
+    const profileData = await profile.json();
+    expect(profile.status).toBe(200);
+    expect(profileData.email).toBe('authverify@example.com');
+    expect(profileData.emailVerified).toBe(true);
+    expect(profileData.isEmailVerified).toBe(true);
   });
 
   it('prevents private document IDOR reads and enforces editor/viewer writes', async () => {
