@@ -435,8 +435,6 @@ export class Profile {
       this.user = this.normalizeVerificationState({
         ...this.user,
         ...response,
-        emailVerified: true,
-        isEmailVerified: true,
       });
       this.hasSentVerificationCode = false;
       if (codeInput) codeInput.value = '';

@@ -5,12 +5,7 @@ let _accessToken = null;
 export function normalizeVerificationUser(user) {
   if (!user || typeof user !== 'object') return user;
 
-  const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
-  const emailVerified = hasCanonicalField
-    ? user.email_verified_at !== null && user.email_verified_at !== undefined
-    : user.isEmailVerified !== undefined
-      ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
-      : Boolean(user.emailVerified);
+  const emailVerified = user.email_verified_at !== null && user.email_verified_at !== undefined;
 
   return {
     ...user,
