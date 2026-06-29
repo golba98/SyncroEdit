@@ -47,11 +47,11 @@ migrations_dir = "migrations"
 
 [[env.staging.durable_objects.bindings]]
 name = "DOCUMENT_SYNC_OBJECT"
-class_name = "DocumentSyncObject"
+class_name = "SynchroDocumentObject"
 
 [[env.staging.durable_objects.bindings]]
 name = "RATE_LIMIT_OBJECT"
-class_name = "RateLimitObject"
+class_name = "SynchroRateLimitObject"
 
 [env.staging.vars]
 EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"

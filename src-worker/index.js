@@ -52,7 +52,10 @@ export {
   SynchroDocumentObject as DocumentSyncObject,
 } from './syncObject.js';
 
-export { RateLimitObject, RateLimitObject as SynchroRateLimitObject } from './rateLimitObject.js';
+export {
+  SynchroRateLimitObject,
+  SynchroRateLimitObject as RateLimitObject,
+} from './rateLimitObject.js';
 
 const app = new Hono();
 
@@ -86,7 +89,7 @@ function logVerificationEmailFailure(c, route, email, purpose, err) {
 
 function getEmailVerificationState(user) {
   const verifiedAt = user?.email_verified_at ?? null;
-  const verified = verifiedAt !== null && verifiedAt !== undefined;
+  const verified = Boolean(verifiedAt);
   return {
     email_verified_at: verifiedAt,
     emailVerified: verified,
@@ -97,8 +100,7 @@ function getEmailVerificationState(user) {
 async function syncLegacyEmailVerificationMirror(db, user) {
   if (!user || !user.id || user.isEmailVerified === undefined) return;
 
-  const canonicalMirror =
-    user.email_verified_at !== null && user.email_verified_at !== undefined ? 1 : 0;
+  const canonicalMirror = user.email_verified_at ? 1 : 0;
   if (Number(user.isEmailVerified) === canonicalMirror) return;
 
   await db

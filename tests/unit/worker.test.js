@@ -595,6 +595,34 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(signupResult.user.isEmailVerified).toBe(0);
   });
 
+  it('treats falsy canonical email_verified_at values as unverified', async () => {
+    const signupResult = await signup(env, 'falsyuser', 'falsy@example.com');
+    signupResult.user.isEmailVerified = 1;
+    signupResult.user.email_verified_at = 0;
+
+    const loginRes = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'falsyuser', password: PASSWORD }),
+      },
+      env
+    );
+
+    expect(loginRes.status).toBe(403);
+    await expect(loginRes.json()).resolves.toEqual({
+      code: 'email_verification_required',
+      email: 'falsy@example.com',
+      email_verified_at: 0,
+      emailVerified: false,
+      isEmailVerified: false,
+      message: 'Email verification required',
+      verificationRequired: true,
+    });
+    expect(signupResult.user.isEmailVerified).toBe(0);
+  });
+
   it('signs up successfully even if email configuration is missing, returning EMAIL_NOT_CONFIGURED status', async () => {
     const badEnv = {
       ...env,

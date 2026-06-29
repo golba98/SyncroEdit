@@ -7,7 +7,7 @@ export function normalizeVerificationUser(user) {
 
   const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
   const emailVerified = hasCanonicalField
-    ? user.email_verified_at !== null && user.email_verified_at !== undefined
+    ? Boolean(user.email_verified_at)
     : user.isEmailVerified !== undefined
       ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
       : Boolean(user.emailVerified);
