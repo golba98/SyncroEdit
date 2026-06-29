@@ -52,7 +52,10 @@ export {
   SynchroDocumentObject as DocumentSyncObject,
 } from './syncObject.js';
 
-export { RateLimitObject, RateLimitObject as SynchroRateLimitObject } from './rateLimitObject.js';
+export {
+  SynchroRateLimitObject,
+  SynchroRateLimitObject as RateLimitObject,
+} from './rateLimitObject.js';
 
 const app = new Hono();
 
