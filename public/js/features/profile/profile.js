@@ -1,4 +1,4 @@
-import { Auth } from '/js/features/auth/auth.js';
+import { Auth, normalizeVerificationUser } from '/js/features/auth/auth.js';
 import { Network } from '/js/app/network.js';
 
 export class Profile {
@@ -203,17 +203,11 @@ export class Profile {
   }
 
   normalizeVerificationState(profile) {
-    const isVerified = this.isVerified(profile);
-
-    return {
-      ...profile,
-      emailVerified: isVerified,
-      isEmailVerified: isVerified,
-    };
+    return normalizeVerificationUser(profile);
   }
 
   isVerified(profile = this.user) {
-    return profile?.isEmailVerified === true || Number(profile?.isEmailVerified) === 1;
+    return this.normalizeVerificationState(profile)?.emailVerified === true;
   }
 
   getInitials(name) {
@@ -249,7 +243,9 @@ export class Profile {
   }
 
   updateUI() {
-    this.user = this.normalizeVerificationState(this.user || {});
+    if (!this.user) return;
+    this.user = this.normalizeVerificationState(this.user);
+    if (!this.user) return;
 
     const profileEmailInput = document.getElementById('profileEmailInput');
     if (profileEmailInput) profileEmailInput.value = this.user.email;

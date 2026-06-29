@@ -2,6 +2,23 @@ import { Network } from '/js/app/network.js';
 
 let _accessToken = null;
 
+export function normalizeVerificationUser(user) {
+  if (!user || typeof user !== 'object') return user;
+
+  const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
+  const emailVerified = hasCanonicalField
+    ? user.email_verified_at !== null && user.email_verified_at !== undefined
+    : user.isEmailVerified !== undefined
+      ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
+      : Boolean(user.emailVerified);
+
+  return {
+    ...user,
+    emailVerified,
+    isEmailVerified: emailVerified,
+  };
+}
+
 export const Auth = {
   getToken() {
     return _accessToken;
@@ -25,12 +42,7 @@ export const Auth = {
 
     try {
       const data = await Network.fetchAPI('/api/user/profile');
-      if (data) {
-        const val = data.isEmailVerified !== undefined ? data.isEmailVerified : data.emailVerified;
-        data.isEmailVerified = val === true || Number(val) === 1;
-        data.emailVerified = data.isEmailVerified;
-      }
-      return data;
+      return normalizeVerificationUser(data);
     } catch (err) {
       if (err.code === 'EMAIL_VERIFICATION_REQUIRED' || err.status === 403) {
         // Do not clear the token; the user is authenticated but needs email verification.

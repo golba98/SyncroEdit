@@ -81,7 +81,9 @@ export class LibraryManager {
 
     const isVerified =
       this.app.user &&
-      (this.app.user.isEmailVerified === true || Number(this.app.user.isEmailVerified) === 1);
+      (this.app.user.emailVerified === true ||
+        this.app.user.isEmailVerified === true ||
+        Number(this.app.user.isEmailVerified) === 1);
     if (!isVerified) {
       const listContainer = document.getElementById('documentList');
       if (listContainer) {
