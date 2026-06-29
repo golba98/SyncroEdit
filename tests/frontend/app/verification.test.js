@@ -14,12 +14,7 @@ jest.mock('/js/features/auth/auth.js', () => ({
   },
   normalizeVerificationUser: (user) => {
     if (!user || typeof user !== 'object') return user;
-    const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
-    const emailVerified = hasCanonicalField
-      ? user.email_verified_at !== null && user.email_verified_at !== undefined
-      : user.isEmailVerified !== undefined
-        ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
-        : Boolean(user.emailVerified);
+    const emailVerified = user.email_verified_at !== null && user.email_verified_at !== undefined;
     return { ...user, emailVerified, isEmailVerified: emailVerified };
   },
 }));
@@ -112,6 +107,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       _id: 'user-1',
       username: 'User1',
       email: 'user@example.com',
+      email_verified_at: 1782162112,
       isEmailVerified: true,
     });
 
@@ -138,6 +134,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       _id: 'user-verified',
       username: 'VerifiedUser',
       email: 'verified@example.com',
+      email_verified_at: 1782162112,
       isEmailVerified: true,
     });
 
@@ -167,7 +164,9 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       return Promise.resolve(mockUser);
     });
 
-    Network.fetchAPI = jest.fn().mockResolvedValue({ ok: true, message: 'Email verified.' });
+    Network.fetchAPI = jest
+      .fn()
+      .mockResolvedValue({ ok: true, email_verified_at: 1782162112, message: 'Email verified.' });
     Network.getDocuments = jest
       .fn()
       .mockResolvedValue({ documents: [{ _id: 'doc1', title: 'Doc 1' }] });

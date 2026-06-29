@@ -86,6 +86,7 @@ describe('App Core Initialization', () => {
     Profile.prototype.loadProfile = jest.fn().mockResolvedValue({
       _id: 'user1',
       username: 'TestUser',
+      email_verified_at: 1782162112,
       emailVerified: true,
       isEmailVerified: true,
       accentColor: '#8b5cf6',

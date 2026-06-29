@@ -12,12 +12,7 @@ jest.mock('/js/features/auth/auth.js', () => ({
   },
   normalizeVerificationUser: (user) => {
     if (!user || typeof user !== 'object') return user;
-    const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
-    const emailVerified = hasCanonicalField
-      ? user.email_verified_at !== null && user.email_verified_at !== undefined
-      : user.isEmailVerified !== undefined
-        ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
-        : Boolean(user.emailVerified);
+    const emailVerified = user.email_verified_at !== null && user.email_verified_at !== undefined;
     return { ...user, emailVerified, isEmailVerified: emailVerified };
   },
 }));
@@ -189,7 +184,7 @@ describe('Profile UI', () => {
       expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
-    it('shows verified only for strict true', () => {
+    it('does not treat legacy true as verified without the canonical timestamp', () => {
       profile.user = {
         username: 'John Doe',
         email: 'john@example.com',
@@ -198,20 +193,38 @@ describe('Profile UI', () => {
 
       profile.updateUI();
 
-      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
-      expect(document.querySelector('.profile-verification-message').textContent).toBe(
-        'Your email address is verified.'
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain(
+        'Not verified'
       );
-      expect(document.querySelector('.profile-verification-actions').style.display).toBe('none');
-      expect(document.querySelector('.profile-verification-form').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toContain(
+        'Send a code'
+      );
     });
 
-    it('shows verified for numeric 1', () => {
+    it('does not treat legacy numeric 1 as verified without the canonical timestamp', () => {
       profile.user = {
         username: 'John Doe',
         email: 'john@example.com',
         isEmailVerified: 1,
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain(
+        'Not verified'
+      );
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toContain(
+        'Send a code'
+      );
+    });
+
+    it('shows verified when the canonical timestamp exists', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        email_verified_at: 1782162112,
       };
 
       profile.updateUI();
@@ -241,6 +254,24 @@ describe('Profile UI', () => {
       expect(profile.user.isEmailVerified).toBe(false);
       expect(profile.user.emailVerified).toBe(false);
     });
+
+    it('normalizes fetched canonical timestamps as verified', async () => {
+      const mockUser = {
+        username: 'testuser',
+        email: 'test@example.com',
+        email_verified_at: 1782162112,
+        isEmailVerified: false,
+        emailVerified: false,
+      };
+      Auth.verifyToken.mockResolvedValue(mockUser);
+
+      const loaded = await profile.loadProfile({ silent: true });
+
+      expect(loaded.isEmailVerified).toBe(true);
+      expect(loaded.emailVerified).toBe(true);
+      expect(profile.user.isEmailVerified).toBe(true);
+      expect(profile.user.emailVerified).toBe(true);
+    });
   });
 
   describe('verification panel', () => {
@@ -260,7 +291,7 @@ describe('Profile UI', () => {
     });
 
     it('does not show the verification panel for a verified user', () => {
-      profile.user.isEmailVerified = true;
+      profile.user.email_verified_at = 1782162112;
 
       profile.updateUI();
 
@@ -302,7 +333,12 @@ describe('Profile UI', () => {
     });
 
     it('updates the modal to verified after a valid code is submitted', async () => {
-      Network.fetchAPI.mockResolvedValue({ ok: true, isEmailVerified: true, emailVerified: true });
+      Network.fetchAPI.mockResolvedValue({
+        ok: true,
+        email_verified_at: 1782162112,
+        isEmailVerified: true,
+        emailVerified: true,
+      });
       profile.updateUI();
       document.getElementById('verificationCodeInput').value = '123456';
       window.app = { user: null, handleEmailVerified: jest.fn() };
