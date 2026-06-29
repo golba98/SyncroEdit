@@ -82,6 +82,9 @@ export class MockD1 {
         'SELECT id, username, email, password, isEmailVerified FROM users WHERE username = ?'
       ) ||
       sql.includes(
+        'SELECT id, username, email, password, isEmailVerified, email_verified_at FROM users WHERE username = ?'
+      ) ||
+      sql.includes(
         'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
       ) ||
       sql.includes('SELECT id, username, email, password FROM users WHERE username = ?')
@@ -98,9 +101,12 @@ export class MockD1 {
       return firstOnly ? found : found ? [found] : [];
     }
 
-    // 5. SELECT username, email, email_verified_at FROM users WHERE id = ?
+    // 5. SELECT user verification state by id
     if (
       sql.includes('SELECT username, email, isEmailVerified FROM users WHERE id = ?') ||
+      sql.includes(
+        'SELECT id, username, email, isEmailVerified, email_verified_at FROM users WHERE id = ?'
+      ) ||
       sql.includes('SELECT username, email, email_verified_at FROM users WHERE id = ?')
     ) {
       const [id] = args;
@@ -267,6 +273,24 @@ export class MockD1 {
       return { success: true };
     }
 
+    if (sql.includes('UPDATE users SET isEmailVerified = 1 WHERE email_verified_at IS NOT NULL')) {
+      this.users.forEach((user) => {
+        if (user.email_verified_at !== null && user.email_verified_at !== undefined) {
+          user.isEmailVerified = 1;
+        }
+      });
+      return { success: true };
+    }
+
+    if (sql.includes('UPDATE users SET isEmailVerified = 0 WHERE email_verified_at IS NULL')) {
+      this.users.forEach((user) => {
+        if (user.email_verified_at === null || user.email_verified_at === undefined) {
+          user.isEmailVerified = 0;
+        }
+      });
+      return { success: true };
+    }
+
     // 12. UPDATE users SET ... WHERE id = ?
     if (sql.includes('UPDATE users SET')) {
       const id = args[args.length - 1];
@@ -278,6 +302,7 @@ export class MockD1 {
         if (sql.includes('bio = ?')) user.bio = args[0];
         if (sql.includes('showOnlineStatus = ?')) user.showOnlineStatus = args[0];
         if (sql.includes('password = ?')) user.password = args[0];
+        if (sql.includes('isEmailVerified = ?')) user.isEmailVerified = args[0];
         if (sql.includes('email_verified_at = ?')) {
           user.email_verified_at = args[0];
           user.isEmailVerified = 1;

@@ -397,7 +397,10 @@ export class App {
     if (!docId) return;
 
     const isVerified =
-      this.user && (this.user.isEmailVerified === true || Number(this.user.isEmailVerified) === 1);
+      this.user &&
+      (this.user.emailVerified === true ||
+        this.user.isEmailVerified === true ||
+        Number(this.user.isEmailVerified) === 1);
     if (!isVerified) {
       console.warn('[OPEN] Prevented document load for unverified user');
       this.documentId = null;

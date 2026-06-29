@@ -48,14 +48,11 @@ import {
 // The Synchro* aliases match the production class names already registered
 // in Cloudflare's namespace (wrangler.toml bindings use these names).
 export {
-  DocumentSyncObject,
-  DocumentSyncObject as SynchroDocumentObject,
+  SynchroDocumentObject,
+  SynchroDocumentObject as DocumentSyncObject,
 } from './syncObject.js';
 
-export {
-  RateLimitObject,
-  RateLimitObject as SynchroRateLimitObject,
-} from './rateLimitObject.js';
+export { RateLimitObject, RateLimitObject as SynchroRateLimitObject } from './rateLimitObject.js';
 
 const app = new Hono();
 
@@ -72,6 +69,43 @@ function logSignupFailure(c, step, err) {
     message: err && err.message ? err.message : 'Unknown error',
     stack: err && err.stack ? err.stack : undefined,
   });
+}
+
+function logVerificationEmailFailure(c, route, email, purpose, err) {
+  console.error('Verification email send failed:', {
+    route,
+    requestId: getRequestIdentifier(c),
+    email,
+    purpose,
+    errorCode: err?.code || 'email_send_failed',
+    provider: err?.provider || null,
+    providerStatus: err?.providerStatus || null,
+    providerResponse: err?.providerResponse || null,
+  });
+}
+
+function getEmailVerificationState(user) {
+  const verifiedAt = user?.email_verified_at ?? null;
+  const verified = verifiedAt !== null && verifiedAt !== undefined;
+  return {
+    email_verified_at: verifiedAt,
+    emailVerified: verified,
+    isEmailVerified: verified,
+  };
+}
+
+async function syncLegacyEmailVerificationMirror(db, user) {
+  if (!user || !user.id || user.isEmailVerified === undefined) return;
+
+  const canonicalMirror =
+    user.email_verified_at !== null && user.email_verified_at !== undefined ? 1 : 0;
+  if (Number(user.isEmailVerified) === canonicalMirror) return;
+
+  await db
+    .prepare('UPDATE users SET isEmailVerified = ? WHERE id = ?')
+    .bind(canonicalMirror, user.id)
+    .run();
+  user.isEmailVerified = canonicalMirror;
 }
 
 app.onError((err, c) => {
@@ -380,7 +414,7 @@ app.post('/api/auth/login', async (c) => {
 
     const user = await db
       .prepare(
-        'SELECT id, username, email, password, email_verified_at FROM users WHERE username = ?'
+        'SELECT id, username, email, password, isEmailVerified, email_verified_at FROM users WHERE username = ?'
       )
       .bind(trimmedUsername)
       .first();
@@ -397,19 +431,21 @@ app.post('/api/auth/login', async (c) => {
     }
 
     if (!user.email_verified_at) {
+      await syncLegacyEmailVerificationMirror(db, user);
       await createAndSendVerificationCode(c.env, db, user.email, 'signup');
       return c.json(
         {
           message: 'Email verification required',
           code: 'email_verification_required',
-          emailVerified: false,
-          isEmailVerified: false,
+          ...getEmailVerificationState(user),
           verificationRequired: true,
           email: user.email,
         },
         403
       );
     }
+
+    await syncLegacyEmailVerificationMirror(db, user);
 
     const { accessToken, refreshToken } = await generateTokens(
       user,
@@ -430,8 +466,7 @@ app.post('/api/auth/login', async (c) => {
       token: accessToken,
       username: user.username,
       email: user.email,
-      emailVerified: Boolean(user.email_verified_at),
-      isEmailVerified: Boolean(user.email_verified_at),
+      ...getEmailVerificationState(user),
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -491,7 +526,9 @@ app.post('/api/auth/refresh-token', async (c) => {
     }
 
     const user = await db
-      .prepare('SELECT username, email, email_verified_at FROM users WHERE id = ?')
+      .prepare(
+        'SELECT id, username, email, isEmailVerified, email_verified_at FROM users WHERE id = ?'
+      )
       .bind(decoded.id)
       .first();
     if (!user) {
@@ -514,10 +551,11 @@ app.post('/api/auth/refresh-token', async (c) => {
       .bind(decoded.sessionId)
       .run();
 
+    await syncLegacyEmailVerificationMirror(db, user);
+
     return c.json({
       token: accessToken,
-      emailVerified: Boolean(user.email_verified_at),
-      isEmailVerified: Boolean(user.email_verified_at),
+      ...getEmailVerificationState(user),
     });
   } catch {
     return c.json({ message: 'Invalid refresh token' }, 401);
@@ -525,11 +563,13 @@ app.post('/api/auth/refresh-token', async (c) => {
 });
 
 app.post('/api/auth/send-verification', async (c) => {
+  let normalizedEmail = null;
+  let verificationPurpose = null;
   try {
     const db = requireDb(c.env);
     const { email, purpose } = await readJson(c, LIMITS.authBody);
-    const normalizedEmail = validateVerificationEmail(email);
-    const verificationPurpose = validateVerificationPurpose(purpose);
+    normalizedEmail = validateVerificationEmail(email);
+    verificationPurpose = validateVerificationPurpose(purpose);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
@@ -548,6 +588,15 @@ app.post('/api/auth/send-verification', async (c) => {
           500
         );
       }
+      if (err.code === 'email_send_failed') {
+        logVerificationEmailFailure(
+          c,
+          '/api/auth/send-verification',
+          normalizedEmail,
+          verificationPurpose,
+          err
+        );
+      }
       throw err;
     }
     throw new AppError(500, 'Internal Server Error', 'send_verification_failed');
@@ -555,11 +604,13 @@ app.post('/api/auth/send-verification', async (c) => {
 });
 
 app.post('/api/auth/resend-code', async (c) => {
+  let normalizedEmail = null;
+  let verificationPurpose = null;
   try {
     const db = requireDb(c.env);
     const { email, purpose } = await readJson(c, LIMITS.authBody);
-    const normalizedEmail = validateVerificationEmail(email);
-    const verificationPurpose = validateVerificationPurpose(purpose);
+    normalizedEmail = validateVerificationEmail(email);
+    verificationPurpose = validateVerificationPurpose(purpose);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
     return verificationSentResponse(c);
@@ -576,6 +627,15 @@ app.post('/api/auth/resend-code', async (c) => {
             code: 'EMAIL_NOT_CONFIGURED',
           },
           500
+        );
+      }
+      if (err.code === 'email_send_failed') {
+        logVerificationEmailFailure(
+          c,
+          '/api/auth/resend-code',
+          normalizedEmail,
+          verificationPurpose,
+          err
         );
       }
       throw err;
@@ -651,8 +711,7 @@ app.post('/api/auth/verify-email', async (c) => {
 
     return c.json({
       ok: true,
-      emailVerified: true,
-      isEmailVerified: true,
+      ...getEmailVerificationState({ email_verified_at: now }),
       message: 'Email verified.',
     });
   } catch (err) {
@@ -689,17 +748,17 @@ app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) =>
   const user = c.get('user');
   const profile = await db
     .prepare(
-      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, email_verified_at, createdAt FROM users WHERE id = ?'
+      'SELECT id, username, email, profilePicture, accentColor, bio, showOnlineStatus, isEmailVerified, email_verified_at, createdAt FROM users WHERE id = ?'
     )
     .bind(user.id)
     .first();
 
   if (!profile) return c.json({ message: 'User not found' }, 404);
+  await syncLegacyEmailVerificationMirror(db, profile);
   return c.json({
     ...profile,
     showOnlineStatus: profile.showOnlineStatus === 1,
-    emailVerified: Boolean(profile.email_verified_at),
-    isEmailVerified: Boolean(profile.email_verified_at),
+    ...getEmailVerificationState(profile),
   });
 });
 

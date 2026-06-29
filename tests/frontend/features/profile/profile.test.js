@@ -6,7 +6,21 @@ import { Profile } from '/js/features/profile/profile.js';
 import { Auth } from '/js/features/auth/auth.js';
 import { Network } from '/js/app/network.js';
 
-jest.mock('/js/features/auth/auth.js');
+jest.mock('/js/features/auth/auth.js', () => ({
+  Auth: {
+    verifyToken: jest.fn(),
+  },
+  normalizeVerificationUser: (user) => {
+    if (!user || typeof user !== 'object') return user;
+    const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
+    const emailVerified = hasCanonicalField
+      ? user.email_verified_at !== null && user.email_verified_at !== undefined
+      : user.isEmailVerified !== undefined
+        ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
+        : Boolean(user.emailVerified);
+    return { ...user, emailVerified, isEmailVerified: emailVerified };
+  },
+}));
 jest.mock('/js/app/network.js');
 
 describe('Profile UI', () => {
@@ -286,6 +300,21 @@ describe('Profile UI', () => {
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
       expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
       expect(window.app.handleEmailVerified).toHaveBeenCalled();
+    });
+
+    it('should render verified when canonical timestamp exists despite stale legacy flag', () => {
+      profile.user = {
+        username: 'John Doe',
+        email: 'john@example.com',
+        email_verified_at: 1782162112,
+        emailVerified: false,
+        isEmailVerified: false,
+      };
+
+      profile.updateUI();
+
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
     });
   });
 });

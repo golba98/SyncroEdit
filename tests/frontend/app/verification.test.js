@@ -10,7 +10,21 @@ import * as Utils from '/js/app/utils.js';
 
 // Mocks
 jest.mock('/js/app/network.js');
-jest.mock('/js/features/auth/auth.js');
+jest.mock('/js/features/auth/auth.js', () => ({
+  Auth: {
+    verifyToken: jest.fn(),
+  },
+  normalizeVerificationUser: (user) => {
+    if (!user || typeof user !== 'object') return user;
+    const hasCanonicalField = Object.prototype.hasOwnProperty.call(user, 'email_verified_at');
+    const emailVerified = hasCanonicalField
+      ? user.email_verified_at !== null && user.email_verified_at !== undefined
+      : user.isEmailVerified !== undefined
+        ? user.isEmailVerified === true || Number(user.isEmailVerified) === 1
+        : Boolean(user.emailVerified);
+    return { ...user, emailVerified, isEmailVerified: emailVerified };
+  },
+}));
 jest.mock('/js/features/ui/ui.js');
 jest.mock('/js/features/editor/editor.js');
 jest.mock('/js/features/theme/theme.js');
