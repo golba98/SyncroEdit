@@ -4,6 +4,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const CODE_TTL_SECONDS = 10 * 60;
 export const SEND_WINDOW_SECONDS = 15 * 60;
 export const MAX_ACTIVE_CODES_PER_EMAIL = 3;
+const VERIFICATION_CODE_SPACE = 1000000;
+const UINT32_RANGE = 0x100000000;
+const VERIFICATION_CODE_RANDOM_LIMIT =
+  Math.floor(UINT32_RANGE / VERIFICATION_CODE_SPACE) * VERIFICATION_CODE_SPACE;
 
 export function normalizeEmail(email) {
   return typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -15,8 +19,15 @@ export function isValidEmail(email) {
 }
 
 export function generateCode() {
-  const value = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
-  return String(value).padStart(6, '0');
+  const randomValue = new Uint32Array(1);
+  let value;
+
+  do {
+    crypto.getRandomValues(randomValue);
+    value = randomValue[0];
+  } while (value >= VERIFICATION_CODE_RANDOM_LIMIT);
+
+  return String(value % VERIFICATION_CODE_SPACE).padStart(6, '0');
 }
 
 export async function sha256Hex(input) {
