@@ -871,7 +871,7 @@ export class Editor {
     Quill.register(Font, true);
 
     const Parchment = Quill.import('parchment');
-    const Style = Parchment.Attributor.Style;
+    const Style = Parchment.StyleAttributor || Parchment.Attributor.Style;
 
     const Width = new Style('width', 'width', {
       scope: Parchment.Scope.INLINE,
