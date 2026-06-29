@@ -1,4 +1,4 @@
-const CACHE_NAME = 'syncroedit-v8';
+const CACHE_NAME = 'syncroedit-v9';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -22,6 +22,7 @@ const ASSETS_TO_CACHE = [
   '/js/features/editor/managers/ReadabilityManager.js',
   '/js/features/editor/managers/SelectionManager.js',
   '/js/features/editor/managers/NavigationManager.js',
+  '/js/security/quillSanitizer.js',
   '/js/features/ui/ToolbarController.js',
   '/js/features/ui/UIManager.js',
   '/pages/login.html',
@@ -37,6 +38,7 @@ const ASSETS_TO_CACHE = [
   '/vendor/mammoth/mammoth.browser.min.js',
   '/vendor/pdfjs/pdf.min.js',
   '/vendor/html2pdf/html2pdf.bundle.min.js',
+  '/vendor/dompurify/purify.es.mjs',
   '/vendor/idb-keyval/index.js',
   '/vendor/yjs/process.mjs',
   '/vendor/yjs/yjs.mjs',
