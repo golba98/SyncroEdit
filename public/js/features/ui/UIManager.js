@@ -352,24 +352,14 @@ export class UIManager {
         bootLoader.style.display !== 'none' &&
         !bootLoader.classList.contains('fading-out')
       ) {
-        console.log('[BOOTLOADER] Hiding bootloader, state:', state);
         bootLoader.classList.add('fading-out');
         const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 200;
-        console.log('[BOOTLOADER] Duration:', duration);
         if (duration === 0) {
-          console.log('[BOOTLOADER] Hiding bootloader synchronously');
           bootLoader.style.display = 'none';
         } else {
           setTimeout(() => {
-            console.log(
-              '[BOOTLOADER] Timeout fired, current state:',
-              document.body.dataset.viewState
-            );
             if (document.body.dataset.viewState !== 'booting') {
-              console.log('[BOOTLOADER] Hiding bootloader');
               bootLoader.style.display = 'none';
-            } else {
-              console.log('[BOOTLOADER] Keeping bootloader because state is booting');
             }
           }, duration);
         }

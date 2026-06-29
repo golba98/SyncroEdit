@@ -31,10 +31,6 @@ export class App {
     this.documentContentLoaded = false;
     this.initialSyncReceived = false;
     this.isNewBlankDocument = false;
-    this.pendingWebSocketConnectedLog = false;
-    this.hasLoggedWebSocketConnected = false;
-    this.pendingInitialSyncLog = false;
-    this.hasLoggedInitialSync = false;
     this.verificationRestricted = false;
 
     // Offline Indicator
@@ -68,8 +64,6 @@ export class App {
         navigator.serviceWorker
           .register('/sw.js')
           .then((reg) => {
-            console.log('Service Worker registered');
-
             // Check for updates
             reg.onupdatefound = () => {
               const installingWorker = reg.installing;
@@ -80,26 +74,23 @@ export class App {
                     navigator.serviceWorker.controller
                   ) {
                     // New update available
-                    console.log('New update available, skipping waiting...');
                     installingWorker.postMessage({ type: 'SKIP_WAITING' });
                   }
                 };
               }
             };
           })
-          .catch((err) => console.log('Service Worker registration failed:', err));
+          .catch((err) => console.warn('Service Worker registration failed:', err));
       });
 
       // Reload on controller change
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        console.log('Service Worker updated, refreshing...');
         window.location.reload();
       });
     }
   }
 
   async init() {
-    console.log('[BOOT] start');
     this.uiManager.applyViewState('booting');
 
     // If we are on the login page, don't try to load the profile immediately.
@@ -108,18 +99,14 @@ export class App {
       return;
     }
 
-    console.log('[BOOT] auth resolving');
     this.user = await this.profile.loadProfile({ silent: true });
 
     if (!this.user) {
-      console.log('[BOOT] failed');
       this.uiManager.applyViewState('auth');
       const params = new URLSearchParams(window.location.search).get('doc');
       navigateTo(params ? `pages/login.html?doc=${params}` : 'pages/login.html');
       return;
     }
-
-    console.log('[BOOT] auth resolved');
 
     // Sync Theme from Profile
     if (this.user.accentColor) {
@@ -142,26 +129,20 @@ export class App {
     this.verificationRestricted = !this.profile.isVerified?.(this.user);
 
     if (this.verificationRestricted) {
-      console.log('[BOOT] route resolved unverified');
       await this.showVerificationRestrictedState();
       return;
     }
 
     if (this.documentId) {
-      console.log('[BOOT] route resolved document');
       await this.loadDocument();
     } else {
-      console.log('[BOOT] route resolved dashboard');
       await this.libraryManager.showLibrary();
-      console.log('[BOOT] dashboard ready');
     }
   }
 
   setupVisibilityListener() {
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'visible') {
-        console.log('Tab visible, checking session and connection...');
-
         // 1. Re-validate session (triggers refresh if needed)
         const user = await this.profile.loadProfile({ silent: true });
         if (!user) {
@@ -179,8 +160,6 @@ export class App {
         // 2. Check connection
         if (this.editor && this.editor.provider) {
           if (!this.editor.provider.wsconnected) {
-            console.log('WS disconnected on wake, forcing reconnection...');
-
             // Force reconnection with fresh ticket and updated user
             if (this.editor.reconnect) {
               this.editor.reconnect(user);
@@ -243,11 +222,6 @@ export class App {
     ].includes(nextLoadState);
 
     if (this.isEditorReadyForCurrentDocument() && isFullLoadingState) {
-      console.log('[CONNECTION] suppressed full loader after ready', {
-        requestedState: state,
-        documentLoadState: this.documentLoadState,
-        connectionState: this.connectionState,
-      });
       return;
     }
 
@@ -264,13 +238,11 @@ export class App {
     // Guard: Once editor is ready for this document, don't revert to loading/error states
     // for subsequent lifecycle events (like delayed connection errors after user started typing).
     if (this.isEditorReadyForCurrentDocument() && state !== 'ready') {
-      console.log('[SYNC] suppressed lifecycle update after ready:', state);
       return;
     }
 
     if (state === 'ready') {
       this.initialSyncReceived = true;
-      this.logInitialSyncReceived(requestToken);
       this.maybeMarkEditorReady(requestToken, 'editor-lifecycle-ready');
       return;
     }
@@ -285,20 +257,11 @@ export class App {
     this.handleWSStatusChange(status);
 
     if (wasReady) {
-      if (status === 'connected') {
-        console.log('[SYNC] reconnected after ready');
-      } else if (status === 'reconnecting' || status === 'disconnected') {
-        console.log('[CONNECTION] reconnect after ready - non blocking');
-      } else if (status === 'offline') {
-        console.log('[SYNC] connection lost after ready');
-      }
-      console.log('[CONNECTION] suppressed full loader after ready', { status });
       return;
     }
 
     if (status === 'connected') {
       this.logLifecycle('websocket-connected', { docId });
-      this.logWebSocketConnected(this.loadDocumentToken);
     } else if (status === 'connecting') {
       this.setDocumentLifecycleState('initial-syncing');
     } else if (status === 'reconnecting' || status === 'disconnected') {
@@ -315,8 +278,6 @@ export class App {
     const normalized = status === 'offline-saved' ? 'offline' : status;
     const knownStates = new Set(['saved', 'saving', 'unsaved', 'offline', 'failed']);
     this.saveState = knownStates.has(normalized) ? normalized : 'saved';
-    if (this.saveState === 'saving' || this.saveState === 'unsaved') console.log('[SAVE] saving');
-    if (this.saveState === 'saved') console.log('[SAVE] saved');
     this.uiManager.setSaveStatus(this.saveState);
   }
 
@@ -341,10 +302,6 @@ export class App {
     this.documentContentLoaded = false;
     this.initialSyncReceived = false;
     this.isNewBlankDocument = Boolean(isNewDocument || mode === 'creating');
-    this.pendingWebSocketConnectedLog = false;
-    this.hasLoggedWebSocketConnected = false;
-    this.pendingInitialSyncLog = false;
-    this.hasLoggedInitialSync = false;
     this.documentLoadState = documentState;
     this.documentLifecycleState = documentState;
 
@@ -357,37 +314,9 @@ export class App {
       this.uiManager.showEditorWorkspaceLoader(loaderText, 'Preparing your workspace');
       this.uiManager.showDocumentOpeningLoader(loaderText);
     }
-
-    console.log('[OPEN] loader visible', { token: this.loadDocumentToken });
-  }
-
-  logWebSocketConnected(requestToken) {
-    if (this.hasLoggedWebSocketConnected) return;
-    if (!this.documentContentLoaded) {
-      this.pendingWebSocketConnectedLog = true;
-      return;
-    }
-    this.hasLoggedWebSocketConnected = true;
-    this.pendingWebSocketConnectedLog = false;
-    console.log('[OPEN] websocket connected', { token: requestToken });
-  }
-
-  logInitialSyncReceived(requestToken) {
-    if (this.hasLoggedInitialSync) return;
-    if (!this.documentContentLoaded) {
-      this.pendingInitialSyncLog = true;
-      return;
-    }
-    if (this.pendingWebSocketConnectedLog) {
-      this.logWebSocketConnected(requestToken);
-    }
-    this.hasLoggedInitialSync = true;
-    this.pendingInitialSyncLog = false;
-    console.log('[OPEN] initial sync received', { token: requestToken });
   }
 
   async loadDocument(options = {}) {
-    console.log('[OPEN] opening document');
     if (this.verificationRestricted) {
       await this.showVerificationRestrictedState();
       return;
@@ -413,10 +342,8 @@ export class App {
 
     const mode = options.mode || 'loading-content';
     const requestToken = ++this.loadDocumentToken;
-    const type = mode === 'creating' ? 'create-document' : 'open-document';
     this.openingDocumentId = docId;
     this.beginDocumentOpen({ mode, docId, isNewDocument: Boolean(options.isNewDocument) });
-    console.log('[OPEN] start', { token: requestToken, type, docId });
     this.logLifecycle('document-open-start', { docId, mode });
 
     this.setDocumentLifecycleState(mode);
@@ -504,13 +431,6 @@ export class App {
       if (requestToken !== this.loadDocumentToken) return;
 
       this.documentContentLoaded = true;
-      console.log('[OPEN] document loaded', { token: requestToken });
-      if (this.pendingWebSocketConnectedLog) {
-        this.logWebSocketConnected(requestToken);
-      }
-      if (this.pendingInitialSyncLog) {
-        this.logInitialSyncReceived(requestToken);
-      }
 
       if (
         this.editor?.isReadyForUser ? this.editor.isReadyForUser() : this.hasLoadedEditorContent()
@@ -527,7 +447,6 @@ export class App {
       }
     } catch (err) {
       console.error('[App] Failed to load document:', err);
-      console.log('[OPEN] failed');
       if (requestToken === this.loadDocumentToken) {
         this.showDocumentOpenError(requestToken, 'Could not load this document.');
       }
@@ -603,22 +522,7 @@ export class App {
       !hasLoadedContent ||
       !initialSyncDone
     ) {
-      console.log('[OPEN] not ready yet', {
-        token: requestToken,
-        reason,
-        hasDocument,
-        hasEditorModel,
-        hasPages: hasPagesContainer,
-        hasLoadedContent,
-        initialSyncDone,
-        documentLoadState: this.documentLoadState,
-        connectionState: this.connectionState,
-      });
       return;
-    }
-
-    if (!this.initialSyncReceived && this.isNewBlankDocument) {
-      console.log('[OPEN] initial sync skipped for new blank doc', { token: requestToken });
     }
 
     if (this.openingSafetyTimeout) {
@@ -634,8 +538,6 @@ export class App {
     this.documentLifecycleState = 'ready';
     this.setSaveState('saved');
     this.libraryManager.clearOpeningStates();
-    console.log('[OPEN] editor ready', { token: requestToken, reason });
-    console.log('[OPEN] cleanup', { token: requestToken });
     this.logLifecycle('editor-ready', { docId: this.documentId, token: requestToken, reason });
   }
 
@@ -650,7 +552,6 @@ export class App {
     this.uiManager.applyViewState('editor-error');
     this.setDocumentLifecycleState('error', { description: message });
     this.libraryManager.clearOpeningStates();
-    console.log('[OPEN] failed');
     this.uiManager.showDocumentOpenError({
       message,
       onRetry: () => this.loadDocument(),

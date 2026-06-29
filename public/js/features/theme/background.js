@@ -52,7 +52,7 @@ export class DynamicBackground {
     this.init();
   }
 
-  setTheme(themeName) {
+  setTheme() {
     // No-op as background theme is now constant ('dots')
   }
 

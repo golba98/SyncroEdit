@@ -3,10 +3,8 @@
  */
 
 import { App } from '/js/app/app.js';
-import { LibraryManager } from '/js/features/library/LibraryManager.js';
 import { Network } from '/js/app/network.js';
 import { Profile } from '/js/features/profile/profile.js';
-import * as Utils from '/js/app/utils.js';
 
 // Mocks
 jest.mock('/js/app/network.js');
@@ -35,7 +33,6 @@ jest.mock('/js/app/utils.js', () => ({
 }));
 
 describe('Unverified User Dashboard & Verification Handling', () => {
-  const originalURLSearchParams = global.URLSearchParams;
   let originalConsoleError;
   let loadProfileSpy;
 
@@ -92,7 +89,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
 
     Network.getDocuments = jest.fn();
 
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
 
     // Verify documents endpoint is not called
@@ -123,7 +120,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
     error.status = 403;
     Network.getDocuments = jest.fn().mockRejectedValue(error);
 
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
 
     // console.error should NOT have been called with the network failure
@@ -148,7 +145,7 @@ describe('Unverified User Dashboard & Verification Handling', () => {
       .fn()
       .mockResolvedValue({ documents: [{ _id: 'doc1', title: 'Doc 1' }] });
 
-    const app = new App();
+    new App();
     await new Promise(process.nextTick);
 
     // Verify documents endpoint is called
