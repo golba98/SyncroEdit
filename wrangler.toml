@@ -1,4 +1,4 @@
-name = "syncroedit"
+name = "synchroedit"
 main = "src-worker/index.js"
 compatibility_date = "2026-06-10"
 
@@ -16,19 +16,19 @@ migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
 name = "DOCUMENT_SYNC_OBJECT"
-class_name = "DocumentSyncObject"
+class_name = "SynchroDocumentObject"
 
 [[durable_objects.bindings]]
 name = "RATE_LIMIT_OBJECT"
-class_name = "RateLimitObject"
+class_name = "SynchroRateLimitObject"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["DocumentSyncObject"]
+new_sqlite_classes = ["SynchroDocumentObject"]
 
 [[migrations]]
 tag = "v2"
-new_sqlite_classes = ["RateLimitObject"]
+new_sqlite_classes = ["SynchroRateLimitObject"]
 
 [vars]
 EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
