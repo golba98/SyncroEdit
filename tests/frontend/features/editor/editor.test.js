@@ -51,11 +51,18 @@ function createMockProvider(serverUrl, roomname, doc, opts = {}) {
 
 const mockQuillInstance = {
   on: jest.fn(),
+  clipboard: {
+    convert: jest.fn().mockReturnValue({
+      ops: [{ insert: 'safe paste' }],
+      length: () => 10,
+    }),
+  },
   getSelection: jest.fn(),
   getLength: jest.fn().mockReturnValue(1),
   setSelection: jest.fn(),
   focus: jest.fn(),
   formatText: jest.fn(),
+  updateContents: jest.fn(),
   root: document.createElement('div'),
 };
 
@@ -98,6 +105,12 @@ describe('Editor Lifecycle & Resilience', () => {
     mockProviderInstances.length = 0;
     global.__mockWebsocketProvider = createMockProvider;
     global.__mockQuillBinding = mockQuillBinding;
+    mockQuillInstance.root = document.createElement('div');
+    mockQuillInstance.getSelection.mockReturnValue({ index: 0, length: 0 });
+    mockQuillInstance.getLength.mockReturnValue(1);
+    mockQuillInstance.clipboard.convert.mockClear();
+    mockQuillInstance.updateContents.mockClear();
+    mockQuillInstance.setSelection.mockClear();
     document.body.innerHTML = '<div id="editor-container"></div><input id="docTitle">';
 
     // Mock URL search params
@@ -167,6 +180,64 @@ describe('Editor Lifecycle & Resilience', () => {
     const lastQuillCall = global.Quill.mock.calls.at(-1);
     expect(lastQuillCall[1].placeholder).toBe('');
     expect(document.body.textContent).not.toContain('Start typing...');
+
+    editor.destroy();
+  });
+
+  it('configures Quill without unused embed formats', async () => {
+    const editor = new Editor('editor-container');
+    editor.provider = null;
+
+    const pageMap = new Y.Map();
+    pageMap.set('id', 'formats-test');
+    pageMap.set('content', new Y.Text(''));
+    editor.yPages.push([pageMap]);
+    editor.createPageContainer('formats-test', 0);
+    editor.mountPage('formats-test');
+
+    const lastQuillCall = global.Quill.mock.calls.at(-1);
+    expect(lastQuillCall[1].formats).toContain('image');
+    expect(lastQuillCall[1].formats).toContain('link');
+    expect(lastQuillCall[1].formats).not.toContain('video');
+    expect(lastQuillCall[1].formats).not.toContain('formula');
+
+    editor.destroy();
+  });
+
+  it('sanitizes HTML paste before inserting Delta content', async () => {
+    const editor = new Editor('editor-container');
+    editor.provider = null;
+
+    const pageMap = new Y.Map();
+    pageMap.set('id', 'paste-test');
+    pageMap.set('content', new Y.Text(''));
+    editor.yPages.push([pageMap]);
+    editor.createPageContainer('paste-test', 0);
+    editor.mountPage('paste-test');
+
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: {
+        getData: jest.fn((type) =>
+          type === 'text/html'
+            ? '<p><img src=x onerror=alert(1)><a href="javascript:alert(1)">x</a></p>'
+            : 'x'
+        ),
+      },
+    });
+
+    mockQuillInstance.root.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(mockQuillInstance.clipboard.convert).toHaveBeenCalledWith({
+      html: '<p><img src="x"><a>x</a></p>',
+      text: 'x',
+    });
+    expect(mockQuillInstance.updateContents).toHaveBeenCalledWith(
+      { ops: [{ insert: 'safe paste' }] },
+      'user'
+    );
+    expect(mockQuillInstance.setSelection).toHaveBeenCalledWith(10, 0, 'silent');
 
     editor.destroy();
   });

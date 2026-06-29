@@ -53,6 +53,7 @@
   },
   "homepage": "https://github.com/golba98-dev/SynchroEdit#readme",
   "dependencies": {
+    "dompurify": "3.4.11",
     "hono": "^4.12.25",
     "idb-keyval": "^6.2.5",
     "quill": "2.0.3",

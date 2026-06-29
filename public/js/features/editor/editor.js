@@ -13,6 +13,31 @@ import { NavigationManager } from '/js/features/editor/managers/NavigationManage
 import { SearchManager } from '/js/features/editor/managers/SearchManager.js';
 import { Network } from '/js/app/network.js';
 import { debounce } from '/js/app/utils.js';
+import { convertSanitizedHtmlToDelta } from '/js/security/quillSanitizer.js';
+
+const QUILL_FORMATS = [
+  'align',
+  'background',
+  'blockquote',
+  'bold',
+  'code',
+  'code-block',
+  'color',
+  'display',
+  'float',
+  'font',
+  'header',
+  'height',
+  'image',
+  'italic',
+  'link',
+  'list',
+  'margin',
+  'size',
+  'strike',
+  'underline',
+  'width',
+];
 
 export class Editor {
   constructor(containerId, options = {}) {
@@ -22,6 +47,7 @@ export class Editor {
     this.quill = null; // Current active quill
     this.pageQuillInstances = new Map(); // pageId -> Quill
     this.pageBindings = new Map(); // pageId -> QuillBinding
+    this.pagePasteHandlers = new Map(); // pageId -> sanitized paste listener
     this.currentPageIndex = 0;
     this.currentZoom = 100;
 
@@ -708,6 +734,10 @@ export class Editor {
       if (typeof plugin.destroy === 'function') plugin.destroy();
     });
     this.plugins.clear();
+    this.pagePasteHandlers.forEach(({ root, handler }) => {
+      root.removeEventListener('paste', handler, true);
+    });
+    this.pagePasteHandlers.clear();
     this.pageQuillInstances.clear();
     this.pageBindings.clear();
     if (this.container) this.container.replaceChildren();
@@ -1188,9 +1218,11 @@ export class Editor {
         syntax: { highlight: (text) => hljs.highlightAuto(text).value },
         history: { userOnly: true },
       },
+      formats: QUILL_FORMATS,
     });
 
     this.pageQuillInstances.set(pageId, pageQuill);
+    this.installSanitizedPasteHandler(pageId, pageQuill);
 
     pageQuill.on('text-change', (delta, oldDelta, source) => {
       if (source === 'user' && !this._hasLoggedTyping) {
@@ -1226,6 +1258,47 @@ export class Editor {
     }
   }
 
+  installSanitizedPasteHandler(pageId, pageQuill) {
+    if (!pageQuill || !pageQuill.root || this.pagePasteHandlers.has(pageId)) return;
+
+    const handler = (event) => {
+      const clipboardData = event.clipboardData;
+      const html = clipboardData && clipboardData.getData('text/html');
+      if (!html) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const text = clipboardData.getData('text/plain') || '';
+      const delta = convertSanitizedHtmlToDelta(pageQuill, html, text);
+      if (!delta || !Array.isArray(delta.ops) || delta.ops.length === 0) return;
+
+      const range = pageQuill.getSelection(true) || { index: pageQuill.getLength() - 1, length: 0 };
+      const ops = [];
+      if (range.index > 0) ops.push({ retain: range.index });
+      if (range.length > 0) ops.push({ delete: range.length });
+      ops.push(...delta.ops);
+
+      pageQuill.updateContents({ ops }, 'user');
+      const insertedLength = this.getDeltaLength(delta);
+      pageQuill.setSelection(range.index + insertedLength, 0, 'silent');
+    };
+
+    // Quill HTML is untrusted until sanitized, including clipboard HTML.
+    pageQuill.root.addEventListener('paste', handler, true);
+    this.pagePasteHandlers.set(pageId, { root: pageQuill.root, handler });
+  }
+
+  getDeltaLength(delta) {
+    if (delta && typeof delta.length === 'function') return delta.length();
+    return (delta?.ops || []).reduce((total, op) => {
+      if (typeof op.insert === 'string') return total + op.insert.length;
+      if (op.insert) return total + 1;
+      if (typeof op.retain === 'number') return total + op.retain;
+      return total;
+    }, 0);
+  }
+
   unmountPage(pageId) {
     if (!this.pageQuillInstances.has(pageId)) return;
 
@@ -1245,6 +1318,12 @@ export class Editor {
     if (binding) {
       binding.destroy();
       this.pageBindings.delete(pageId);
+    }
+
+    const pasteHandler = this.pagePasteHandlers.get(pageId);
+    if (pasteHandler) {
+      pasteHandler.root.removeEventListener('paste', pasteHandler.handler, true);
+      this.pagePasteHandlers.delete(pageId);
     }
 
     this.pageQuillInstances.delete(pageId);
