@@ -584,6 +584,11 @@ body.light-theme .create-doc-card:hover {
   background: rgba(245, 158, 11, 0.08);
 }
 
+.profile-verification-panel.is-verified {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.08);
+}
+
 .profile-verification-copy {
   display: flex;
   flex-direction: column;
@@ -4254,6 +4259,11 @@ body.light-theme .profile-collapsible-header:hover {
 body.light-theme .profile-verification-panel {
   background: rgba(245, 158, 11, 0.08);
   border-color: rgba(217, 119, 6, 0.22);
+}
+
+body.light-theme .profile-verification-panel.is-verified {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(5, 150, 105, 0.22);
 }
 
 /* Responsive styles */

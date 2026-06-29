@@ -273,6 +273,29 @@ function verificationSentResponse(c) {
   });
 }
 
+async function getAuthenticatedRequestUser(c, db) {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+
+  try {
+    const decoded = await verify(authHeader.substring(7), requireJwtSecret(c.env), 'HS256');
+    const session = await db
+      .prepare('SELECT id FROM sessions WHERE id = ?')
+      .bind(decoded.sessionId)
+      .first();
+    if (!session) return null;
+
+    return db
+      .prepare(
+        'SELECT id, username, email, isEmailVerified, email_verified_at FROM users WHERE id = ?'
+      )
+      .bind(decoded.id)
+      .first();
+  } catch {
+    return null;
+  }
+}
+
 // -------------------------------------------------------------
 // Health and Config Routes (Public)
 // -------------------------------------------------------------
@@ -571,7 +594,10 @@ app.post('/api/auth/send-verification', async (c) => {
   try {
     const db = requireDb(c.env);
     const { email, purpose } = await readJson(c, LIMITS.authBody);
-    normalizedEmail = validateVerificationEmail(email);
+    const authenticatedUser = await getAuthenticatedRequestUser(c, db);
+    normalizedEmail = authenticatedUser
+      ? authenticatedUser.email
+      : validateVerificationEmail(email);
     verificationPurpose = validateVerificationPurpose(purpose);
 
     await createAndSendVerificationCode(c.env, db, normalizedEmail, verificationPurpose);
@@ -651,7 +677,10 @@ app.post('/api/auth/verify-email', async (c) => {
   try {
     const db = requireDb(c.env);
     const { email, code, purpose } = await readJson(c, LIMITS.authBody);
-    const normalizedEmail = validateVerificationEmail(email);
+    const authenticatedUser = await getAuthenticatedRequestUser(c, db);
+    const normalizedEmail = authenticatedUser
+      ? authenticatedUser.email
+      : validateVerificationEmail(email);
     const submittedCode = String(code || '').trim();
     const verificationPurpose = validateVerificationPurpose(purpose);
 
@@ -707,10 +736,19 @@ app.post('/api/auth/verify-email', async (c) => {
       .bind(now, row.id)
       .run();
 
-    await db
-      .prepare('UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE email = ?')
-      .bind(now, normalizedEmail)
-      .run();
+    if (authenticatedUser) {
+      await db
+        .prepare(
+          'UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE id = ? AND email = ?'
+        )
+        .bind(now, authenticatedUser.id, normalizedEmail)
+        .run();
+    } else {
+      await db
+        .prepare('UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE email = ?')
+        .bind(now, normalizedEmail)
+        .run();
+    }
 
     return c.json({
       ok: true,
@@ -746,7 +784,7 @@ app.get('/api/auth/ws-ticket', authenticateUser, requireVerifiedAuth, async (c) 
 // User Profile & Session Routes (Auth Required)
 // -------------------------------------------------------------
 
-app.get('/api/user/profile', authenticateUser, requireVerifiedAuth, async (c) => {
+app.get('/api/user/profile', authenticateUser, async (c) => {
   const db = requireDb(c.env);
   const user = c.get('user');
   const profile = await db

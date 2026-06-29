@@ -273,6 +273,20 @@ export class MockD1 {
       return { success: true };
     }
 
+    if (
+      sql.includes(
+        'UPDATE users SET email_verified_at = ?, isEmailVerified = 1 WHERE id = ? AND email = ?'
+      )
+    ) {
+      const [verifiedAt, id, email] = args;
+      const user = this.users.find((u) => u.id === id && u.email === email);
+      if (user) {
+        user.email_verified_at = verifiedAt;
+        user.isEmailVerified = 1;
+      }
+      return { success: true };
+    }
+
     if (sql.includes('UPDATE users SET isEmailVerified = 1 WHERE email_verified_at IS NOT NULL')) {
       this.users.forEach((user) => {
         if (user.email_verified_at !== null && user.email_verified_at !== undefined) {
