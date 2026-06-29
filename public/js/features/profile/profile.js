@@ -319,12 +319,16 @@ export class Profile {
         '<span class="status-pill status-pill-verified"><i class="fas fa-check-circle"></i> Verified</span>';
     } else {
       badge.innerHTML =
-        '<span class="status-pill status-pill-unverified"><i class="fas fa-exclamation-circle"></i> Unverified</span>';
+        '<span class="status-pill status-pill-unverified"><i class="fas fa-exclamation-circle"></i> Not verified</span>';
     }
   }
 
   updateVerificationPanel() {
     const panel = document.getElementById('emailVerificationPanel');
+    const title = panel?.querySelector('.profile-verification-title');
+    const message = panel?.querySelector('.profile-verification-message');
+    const actions = panel?.querySelector('.profile-verification-actions');
+    const form = panel?.querySelector('.profile-verification-form');
     const sendButton = document.getElementById('sendVerificationBtn');
     const codeInput = document.getElementById('verificationCodeInput');
     const verifyButton = document.getElementById('verifyEmailBtn');
@@ -332,13 +336,22 @@ export class Profile {
     if (!panel) return;
 
     const isVerified = this.isVerified();
-    panel.style.display = isVerified ? 'none' : 'flex';
+    panel.style.display = 'flex';
+    panel.classList.toggle('is-verified', isVerified);
+
+    if (title) title.textContent = isVerified ? 'Email verified' : 'Verify your email';
+    if (message) {
+      message.textContent = isVerified
+        ? 'Your email address is verified.'
+        : 'Send a code to your email address, then enter the 6-digit code here.';
+    }
+    if (actions) actions.style.display = isVerified ? 'none' : 'flex';
+    if (form) form.style.display = isVerified ? 'none' : 'grid';
 
     if (sendButton) {
-      sendButton.textContent = this.hasSentVerificationCode
-        ? 'Resend verification code'
-        : 'Send verification code';
+      sendButton.textContent = this.hasSentVerificationCode ? 'Resend code' : 'Send code';
     }
+    if (verifyButton) verifyButton.textContent = 'Verify code';
 
     if (isVerified) {
       this.hasSentVerificationCode = false;
@@ -373,9 +386,7 @@ export class Profile {
   }
 
   async sendVerificationCode() {
-    const idleText = this.hasSentVerificationCode
-      ? 'Resend verification code'
-      : 'Send verification code';
+    const idleText = this.hasSentVerificationCode ? 'Resend code' : 'Send code';
 
     try {
       this.setVerificationButtonLoading('sendVerificationBtn', true, 'Sending...', idleText);
@@ -387,7 +398,7 @@ export class Profile {
 
       this.hasSentVerificationCode = true;
       this.updateVerificationPanel();
-      this.setVerificationStatus('Verification code sent. Check your email.', 'success');
+      this.setVerificationStatus('Verification code sent. Check your inbox.', 'success');
     } catch (err) {
       console.error('Verification code send failed:', err);
       this.setVerificationStatus(
@@ -399,7 +410,7 @@ export class Profile {
         'sendVerificationBtn',
         false,
         'Sending...',
-        this.hasSentVerificationCode ? 'Resend verification code' : 'Send verification code'
+        this.hasSentVerificationCode ? 'Resend code' : 'Send code'
       );
     }
   }
@@ -409,12 +420,12 @@ export class Profile {
     const code = String(codeInput?.value || '').trim();
 
     if (!/^\d{6}$/.test(code)) {
-      this.setVerificationStatus('Enter the 6-digit verification code.', 'error');
+      this.setVerificationStatus('Enter a valid 6-digit verification code.', 'error');
       return;
     }
 
     try {
-      this.setVerificationButtonLoading('verifyEmailBtn', true, 'Verifying...', 'Verify email');
+      this.setVerificationButtonLoading('verifyEmailBtn', true, 'Verifying...', 'Verify code');
       this.setVerificationStatus('Verifying email...', 'loading');
       const response = await Network.fetchAPI('/api/auth/verify-email', {
         method: 'POST',
@@ -446,7 +457,7 @@ export class Profile {
           : this.getErrorMessage(err, 'Failed to verify email.');
       this.setVerificationStatus(message, 'error');
     } finally {
-      this.setVerificationButtonLoading('verifyEmailBtn', false, 'Verifying...', 'Verify email');
+      this.setVerificationButtonLoading('verifyEmailBtn', false, 'Verifying...', 'Verify code');
     }
   }
 

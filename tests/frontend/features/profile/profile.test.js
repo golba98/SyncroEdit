@@ -34,9 +34,17 @@ describe('Profile UI', () => {
       <textarea id="profileBioInput"></textarea>
       <div id="emailVerificationBadge"></div>
       <div id="emailVerificationPanel" style="display:none;">
-        <button id="sendVerificationBtn" type="button"></button>
-        <input id="verificationCodeInput" />
-        <button id="verifyEmailBtn" type="button"></button>
+        <div class="profile-verification-copy">
+          <h3 class="profile-verification-title"></h3>
+          <p class="profile-verification-message"></p>
+        </div>
+        <div class="profile-verification-actions">
+          <button id="sendVerificationBtn" type="button"></button>
+        </div>
+        <div class="profile-verification-form">
+          <input id="verificationCodeInput" />
+          <button id="verifyEmailBtn" type="button"></button>
+        </div>
         <div id="verificationStatusMessage"></div>
       </div>
       <img id="profilePfp" style="display:none;" />
@@ -145,7 +153,9 @@ describe('Profile UI', () => {
 
       profile.updateUI();
 
-      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain(
+        'Not verified'
+      );
       expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
@@ -159,7 +169,9 @@ describe('Profile UI', () => {
 
       profile.updateUI();
 
-      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain(
+        'Not verified'
+      );
       expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
@@ -171,7 +183,9 @@ describe('Profile UI', () => {
 
       profile.updateUI();
 
-      expect(document.getElementById('emailVerificationBadge').textContent).toContain('Unverified');
+      expect(document.getElementById('emailVerificationBadge').textContent).toContain(
+        'Not verified'
+      );
       expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
     });
 
@@ -185,7 +199,12 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toBe(
+        'Your email address is verified.'
+      );
+      expect(document.querySelector('.profile-verification-actions').style.display).toBe('none');
+      expect(document.querySelector('.profile-verification-form').style.display).toBe('none');
     });
 
     it('shows verified for numeric 1', () => {
@@ -198,7 +217,10 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toBe(
+        'Your email address is verified.'
+      );
     });
   });
 
@@ -234,9 +256,7 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
-      expect(document.getElementById('sendVerificationBtn').textContent).toBe(
-        'Send verification code'
-      );
+      expect(document.getElementById('sendVerificationBtn').textContent).toBe('Send code');
     });
 
     it('does not show the verification panel for a verified user', () => {
@@ -244,7 +264,10 @@ describe('Profile UI', () => {
 
       profile.updateUI();
 
-      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toBe(
+        'Your email address is verified.'
+      );
     });
 
     it('shows success state after sending a verification code', async () => {
@@ -257,11 +280,9 @@ describe('Profile UI', () => {
         method: 'POST',
         body: JSON.stringify({ email: 'john@example.com', purpose: 'signup' }),
       });
-      expect(document.getElementById('sendVerificationBtn').textContent).toBe(
-        'Resend verification code'
-      );
+      expect(document.getElementById('sendVerificationBtn').textContent).toBe('Resend code');
       expect(document.getElementById('verificationStatusMessage').textContent).toBe(
-        'Verification code sent. Check your email.'
+        'Verification code sent. Check your inbox.'
       );
     });
 
@@ -298,7 +319,10 @@ describe('Profile UI', () => {
       });
       expect(profile.user.isEmailVerified).toBe(true);
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toBe(
+        'Your email address is verified.'
+      );
       expect(window.app.handleEmailVerified).toHaveBeenCalled();
     });
 
@@ -314,7 +338,10 @@ describe('Profile UI', () => {
       profile.updateUI();
 
       expect(document.getElementById('emailVerificationBadge').textContent).toContain('Verified');
-      expect(document.getElementById('emailVerificationPanel').style.display).toBe('none');
+      expect(document.getElementById('emailVerificationPanel').style.display).toBe('flex');
+      expect(document.querySelector('.profile-verification-message').textContent).toBe(
+        'Your email address is verified.'
+      );
     });
   });
 });
