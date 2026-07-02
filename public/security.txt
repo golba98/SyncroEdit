@@ -1,0 +1,3 @@
+Contact: mailto:security@syncroedit.online
+Preferred-Languages: en
+Canonical: https://syncroedit.online/.well-known/security.txt

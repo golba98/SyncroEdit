@@ -56,7 +56,7 @@ Configure these email settings for verification-code delivery:
 ```txt
 RESEND_API_KEY=wrangler secret
 EMAIL_CODE_PEPPER=wrangler secret
-EMAIL_FROM="SyncroEdit <verify@yourdomain.com>"
+EMAIL_FROM="SyncroEdit <no-reply@syncroedit.online>"
 APP_NAME="SyncroEdit"
 ```
 
@@ -131,7 +131,18 @@ SyncroEdit's production backend is the Cloudflare Worker in `src-worker/`. API r
 | -------------------------------------------------- | ----------------------------- |
 | **<https://syncroedit.online>**                    | Production (custom domain)    |
 | **<https://www.syncroedit.online>**                | Production www redirect       |
-| `https://synchroedit.jordanvorster404.workers.dev` | Worker fallback (workers.dev) |
+| `https://syncroedit.jordanvorster404.workers.dev`  | Worker fallback (workers.dev) |
+
+### Production DNS and Security Controls
+
+Keep the Cloudflare zone, Resend domain, and Worker settings aligned before deploying production email or security changes:
+
+- Resend is the active outbound email provider. `EMAIL_FROM` must use a sender verified for `syncroedit.online`.
+- Keep exactly one root SPF TXT record and exactly one `_dmarc` TXT record. Copy SPF, DKIM, MX, and provider verification records from the Resend domain Records tab instead of guessing provider values.
+- Route `security@syncroedit.online` and `dmarc@syncroedit.online` to monitored mailboxes before publishing them in `security.txt` or DMARC `rua`.
+- Serve the contact policy at `https://syncroedit.online/.well-known/security.txt`; `https://syncroedit.online/security.txt` is kept as a compatibility copy.
+- Production Cloudflare SSL/TLS should stay on a secure mode, with Always Use HTTPS enabled after HTTPS validates. Enable HSTS without preload or subdomain coverage until all hostnames are confirmed HTTPS-ready.
+- Bot controls should protect the app without challenging normal users, API requests, WebSocket sync, or trusted crawlers/monitors. Prefer scoped Super Bot Fight Mode rules when available.
 
 ---
 
