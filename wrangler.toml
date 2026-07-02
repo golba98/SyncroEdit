@@ -30,6 +30,10 @@ new_sqlite_classes = ["SynchroDocumentObject"]
 tag = "v2"
 new_sqlite_classes = ["SynchroRateLimitObject"]
 
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["SynchroDocumentObject", "SynchroRateLimitObject"]
+
 [vars]
 EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
 APP_NAME = "SyncroEdit"
