@@ -177,6 +177,9 @@ export class App {
 
   handleWSStatusChange(status) {
     this.setConnectionState(status);
+    if (this.connectionState === 'connected' && this.saveState === 'offline') {
+      this.setSaveState('saved');
+    }
     if (this.uiManager && this.uiManager.handleWSStatusChange) {
       this.uiManager.handleWSStatusChange(status);
     }
@@ -269,13 +272,8 @@ export class App {
 
     if (status === 'connected') {
       this.logLifecycle('websocket-connected', { docId });
-    } else if (status === 'connecting') {
+    } else if (status === 'connecting' || status === 'reconnecting' || status === 'disconnected') {
       this.setDocumentLifecycleState('initial-syncing');
-    } else if (status === 'reconnecting' || status === 'disconnected') {
-      this.setDocumentLifecycleState('initial-syncing', {
-        title: 'Reconnecting...',
-        description: 'Keeping local edits available while sync reconnects.',
-      });
     }
   }
 
@@ -314,7 +312,14 @@ export class App {
   }
 
   setSaveState(status) {
-    const normalized = status === 'offline-saved' ? 'offline' : status;
+    let normalized = status === 'offline-saved' ? 'offline' : status;
+    // Without a live socket, edits are only cached locally, so "Saved" would overstate it.
+    if (
+      normalized === 'saved' &&
+      (this.connectionState === 'reconnecting' || this.connectionState === 'offline')
+    ) {
+      normalized = 'offline';
+    }
     const knownStates = new Set(['saved', 'saving', 'unsaved', 'offline', 'failed']);
     this.saveState = knownStates.has(normalized) ? normalized : 'saved';
     this.uiManager.setSaveStatus(this.saveState);

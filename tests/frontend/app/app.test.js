@@ -39,7 +39,6 @@ describe('App Core Initialization', () => {
       <input id="docSearch" />
       <div id="documentList"></div>
       <div id="activeCollaborators"></div>
-      <div id="connectionBadge" hidden></div>
       <div id="saveStatusIndicator"></div>
       <div id="serverOfflineOverlay"></div>
       <div class="main-workspace">
@@ -193,7 +192,7 @@ describe('App Core Initialization', () => {
     expect(document.getElementById('docLibrary').style.display).toBe('block');
   });
 
-  it('hides initial connecting badge without showing the connection overlay', async () => {
+  it('does not show the connection overlay while connecting', async () => {
     jest.useFakeTimers();
     try {
       global.URLSearchParams = jest.fn(() => ({
@@ -209,7 +208,6 @@ describe('App Core Initialization', () => {
       jest.runAllTicks();
 
       const overlay = document.getElementById('serverOfflineOverlay');
-      const badge = document.getElementById('connectionBadge');
       overlay.style.display = 'none';
 
       app.uiManager.documentOpenState = 'ready';
@@ -217,8 +215,6 @@ describe('App Core Initialization', () => {
       jest.advanceTimersByTime(5000);
 
       expect(overlay.style.display).toBe('none');
-      expect(badge.hidden).toBe(true);
-      expect(badge.textContent).toBe('');
     } finally {
       jest.useRealTimers();
     }
@@ -287,48 +283,43 @@ describe('App Core Initialization', () => {
     expect(document.body.dataset.documentOpenState).toBe('loading-content');
 
     app.setDocumentLifecycleState('initial-syncing');
-    expect(document.getElementById('editorSkeletonTitle').textContent).toBe('Syncing document...');
+    expect(document.getElementById('editorSkeletonTitle').textContent).toBe('Opening document...');
     expect(document.body.dataset.documentOpenState).toBe('initial-syncing');
   });
 
-  it('does not show reconnect status before the delay', () => {
-    jest.useFakeTimers();
-    try {
-      const app = new App();
-      app.uiManager.documentOpenState = 'ready';
-      const badge = document.getElementById('connectionBadge');
+  it('keeps the creating title for a new document through loading and sync', () => {
+    const app = new App();
+    app.beginDocumentOpen({ mode: 'creating', docId: 'doc-new', isNewDocument: true });
+    const title = () => document.getElementById('editorSkeletonTitle').textContent;
 
-      app.handleWSStatusChange('reconnecting');
-      jest.advanceTimersByTime(999);
-
-      expect(badge.hidden).toBe(true);
-      expect(badge.textContent).toBe('');
-
-      jest.advanceTimersByTime(1);
-
-      expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Reconnecting...');
-    } finally {
-      jest.useRealTimers();
-    }
+    expect(title()).toBe('Creating document...');
+    app.setDocumentLifecycleState('loading-content');
+    expect(title()).toBe('Creating document...');
+    app.setDocumentLifecycleState('initial-syncing');
+    expect(title()).toBe('Creating document...');
   });
 
-  it('does not flicker connecting status on quick connect', () => {
-    jest.useFakeTimers();
-    try {
-      const app = new App();
-      app.uiManager.documentOpenState = 'ready';
-      const badge = document.getElementById('connectionBadge');
+  it('shows edits saved while reconnecting as offline until the socket returns', () => {
+    const app = new App();
+    const indicator = document.getElementById('saveStatusIndicator');
 
-      app.handleWSStatusChange('connecting');
-      jest.advanceTimersByTime(200);
-      app.handleWSStatusChange('connected');
-      jest.advanceTimersByTime(1000);
+    app.handleWSStatusChange('reconnecting');
+    app.setSaveState('saved');
+    expect(indicator.textContent).toBe('Offline');
 
-      expect(badge.hidden).toBe(true);
-    } finally {
-      jest.useRealTimers();
-    }
+    app.handleWSStatusChange('connected');
+    expect(indicator.textContent).toBe('Saved');
+  });
+
+  it('leaves the save indicator alone on a connection blip without edits', () => {
+    const app = new App();
+    const indicator = document.getElementById('saveStatusIndicator');
+    app.setSaveState('saved');
+
+    app.handleWSStatusChange('reconnecting');
+    app.handleWSStatusChange('connected');
+
+    expect(indicator.textContent).toBe('Saved');
   });
 
   it('keeps a ready document visible when reconnecting after editor ready', () => {
@@ -343,7 +334,6 @@ describe('App Core Initialization', () => {
       app.uiManager.setDocumentOpenState('ready');
 
       const skeleton = document.getElementById('editorSkeleton');
-      const badge = document.getElementById('connectionBadge');
 
       app.handleEditorStatusChange('reconnecting', 'doc-ready');
       jest.advanceTimersByTime(1000);
@@ -352,9 +342,7 @@ describe('App Core Initialization', () => {
       expect(app.uiManager.documentOpenState).toBe('ready');
       expect(document.body.dataset.documentOpenState).toBe('ready');
       expect(skeleton.classList.contains('hidden')).toBe(true);
-      expect(badge.hidden).toBe(false);
-      expect(badge.textContent).toBe('Reconnecting...');
-      expect(badge.dataset.status).toBe('reconnecting');
+      expect(document.body.textContent).not.toContain('Reconnecting');
     } finally {
       jest.useRealTimers();
     }
@@ -593,23 +581,6 @@ describe('App Core Initialization', () => {
 
     expect(retry).toHaveBeenCalledTimes(1);
     expect(back).toHaveBeenCalledTimes(1);
-  });
-
-  it('cleanup cancels pending connection status timers', () => {
-    jest.useFakeTimers();
-    try {
-      const app = new App();
-      app.uiManager.documentOpenState = 'ready';
-      const badge = document.getElementById('connectionBadge');
-
-      app.handleWSStatusChange('reconnecting');
-      app.uiManager.cleanupTimers();
-      jest.advanceTimersByTime(1000);
-
-      expect(badge.hidden).toBe(true);
-    } finally {
-      jest.useRealTimers();
-    }
   });
 
   it('removes dashboard opening class and disabled attributes after success', async () => {

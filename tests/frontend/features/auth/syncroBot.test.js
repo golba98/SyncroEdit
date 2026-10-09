@@ -252,4 +252,208 @@ describe('SyncroBot', () => {
     bot.onCharacterKeydown({ key: 'Enter', preventDefault: jest.fn() });
     expect(bot.botRig.classList.contains('syncro-reaction--pleased')).toBe(true);
   });
+
+  describe('password privacy', () => {
+    it('keeps its eyes covered and turned away after a revealed password loses focus', () => {
+      const password = document.getElementById('password');
+      password.focus();
+      bot.onFieldFocus('password');
+      bot.onPasswordToggle(true, password);
+
+      password.blur();
+      bot.onFieldBlur();
+      jest.runAllTicks();
+      bot.onPointerMove({ clientX: 100, clientY: 300 });
+
+      expect(bot.botRig.dataset.syncroState).toBe('password-visible');
+      expect(bot.resolveGazeTarget().x).toBeGreaterThan(0);
+    });
+
+    it('does not look at other fields while a password is revealed', () => {
+      const email = document.getElementById('email');
+      bot.onPasswordToggle(true, document.getElementById('password'));
+
+      email.focus();
+      bot.onFieldFocus('email');
+      bot.onFieldInput('email', 'someone', { isValid: false });
+
+      expect(bot.botRig.dataset.syncroState).toBe('password-visible');
+    });
+
+    it('goes back to idle once the password is hidden and nothing is focused', () => {
+      const password = document.getElementById('password');
+      bot.onPasswordToggle(true, password);
+      bot.onPasswordToggle(false, password);
+
+      expect(bot.passwordVisible).toBe(false);
+      expect(bot.botRig.dataset.syncroState).toBe('idle');
+    });
+
+    it('treats a reset without an input as hiding every password', () => {
+      bot.onPasswordToggle(true, document.getElementById('password'));
+      bot.onPasswordToggle(false);
+
+      expect(bot.passwordVisible).toBe(false);
+      expect(bot.botRig.dataset.syncroState).toBe('idle');
+    });
+  });
+
+  describe('intro', () => {
+    const startWithIntro = (options = {}) => {
+      bot.destroy();
+      renderBot();
+      bot = new SyncroBot({ intro: true, ...options });
+      bot.init('.character-container');
+    };
+
+    it('wakes up, then waves', () => {
+      startWithIntro();
+      expect(bot.botRig.classList.contains('syncro-intro')).toBe(true);
+
+      jest.advanceTimersByTime(bot.config.introWakeDelay);
+      expect(bot.botRig.classList.contains('syncro-intro')).toBe(false);
+
+      jest.advanceTimersByTime(bot.config.introWaveDelay - bot.config.introWakeDelay);
+      expect(bot.botRig.classList.contains('syncro-reaction--wave')).toBe(true);
+    });
+
+    it('nods at a returning user after waving', () => {
+      startWithIntro({ isReturningUser: () => true });
+      jest.advanceTimersByTime(3000);
+
+      expect(bot.botRig.classList.contains('syncro-reaction--nod')).toBe(true);
+    });
+
+    it('does not nod when nobody is remembered', () => {
+      startWithIntro({ isReturningUser: () => false });
+      jest.advanceTimersByTime(3000);
+
+      expect(bot.botRig.classList.contains('syncro-reaction--nod')).toBe(false);
+    });
+
+    it('stops the intro as soon as the user focuses a field', () => {
+      startWithIntro();
+      bot.setAuthState('username-focus');
+      jest.advanceTimersByTime(3000);
+
+      expect(bot.botRig.classList.contains('syncro-intro')).toBe(false);
+      expect(bot.botRig.classList.contains('syncro-reaction--wave')).toBe(false);
+    });
+
+    it('is skipped for reduced motion', () => {
+      window.matchMedia = jest.fn().mockReturnValue({ matches: true });
+      startWithIntro();
+
+      expect(bot.botRig.classList.contains('syncro-intro')).toBe(false);
+    });
+  });
+
+  describe('visibility', () => {
+    let observers;
+
+    beforeEach(() => {
+      observers = [];
+      window.IntersectionObserver = jest.fn((callback) => {
+        const observer = { callback, observe: jest.fn(), disconnect: jest.fn() };
+        observers.push(observer);
+        return observer;
+      });
+      bot.destroy();
+      renderBot();
+      window.requestAnimationFrame.mockClear();
+      bot = new SyncroBot();
+      bot.init('.character-container');
+    });
+
+    afterEach(() => {
+      delete window.IntersectionObserver;
+    });
+
+    it('waits until the bot is on screen before running the gaze loop', () => {
+      expect(observers[0].observe).toHaveBeenCalledWith(bot.container);
+      expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+
+      observers[0].callback([{ isIntersecting: true }]);
+      expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
+      expect(bot.rafId).toBe(1);
+    });
+
+    it('stops the gaze loop while hidden, e.g. on phones', () => {
+      observers[0].callback([{ isIntersecting: true }]);
+      observers[0].callback([{ isIntersecting: false }]);
+
+      expect(window.cancelAnimationFrame).toHaveBeenCalledWith(1);
+      expect(bot.rafId).toBe(null);
+    });
+
+    it('disconnects the observer on destroy', () => {
+      bot.destroy();
+      expect(observers[0].disconnect).toHaveBeenCalled();
+    });
+  });
+
+  describe('idle life', () => {
+    const startWithRandom = (value) => {
+      bot.destroy();
+      renderBot();
+      bot = new SyncroBot({ random: () => value });
+      bot.init('.character-container');
+    };
+
+    it('fidgets on its own when left alone', () => {
+      startWithRandom(0); // shortest delay, first fidget (look-around)
+      jest.advanceTimersByTime(bot.config.fidgetMinDelay);
+
+      expect(bot.botRig.classList.contains('syncro-reaction--look-around')).toBe(true);
+    });
+
+    it('does not fidget while a password is revealed', () => {
+      startWithRandom(0);
+      bot.onPasswordToggle(true, document.getElementById('password'));
+      jest.advanceTimersByTime(bot.config.fidgetMinDelay);
+
+      expect(
+        Array.from(bot.botRig.classList).some((name) => name.startsWith('syncro-reaction--'))
+      ).toBe(false);
+    });
+
+    it('gets bored, falls asleep, and startles awake on activity', () => {
+      jest.advanceTimersByTime(bot.config.idleBoredDelay);
+      expect(bot.botRig.classList.contains('syncro-mood--bored')).toBe(true);
+      expect(bot.botRig.classList.contains('syncro-reaction--yawn')).toBe(true);
+
+      jest.advanceTimersByTime(bot.config.idleSleepDelay - bot.config.idleBoredDelay);
+      expect(bot.botRig.classList.contains('syncro-mood--sleeping')).toBe(true);
+      expect(bot.botRig.classList.contains('syncro-mood--bored')).toBe(false);
+      expect(bot.botRig.querySelectorAll('.syncro-zzz i')).toHaveLength(3);
+
+      bot.onPointerMove({ clientX: 600, clientY: 260 });
+      expect(bot.botRig.classList.contains('syncro-mood--sleeping')).toBe(false);
+      expect(bot.botRig.classList.contains('syncro-reaction--startle')).toBe(true);
+    });
+
+    it('wakes on a key press too', () => {
+      jest.advanceTimersByTime(bot.config.idleSleepDelay);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+
+      expect(bot.botRig.classList.contains('syncro-mood--sleeping')).toBe(false);
+    });
+
+    it('keeps a single auth state class while in a mood', () => {
+      jest.advanceTimersByTime(bot.config.idleSleepDelay);
+      const stateClasses = Array.from(bot.botRig.classList).filter((name) =>
+        name.startsWith('syncro-state--')
+      );
+
+      expect(stateClasses).toEqual(['syncro-state--idle']);
+    });
+
+    it('clears transient reactions that only animate child parts', () => {
+      bot.react('wave');
+      jest.advanceTimersByTime(2000);
+
+      expect(bot.reaction).toBe(null);
+      expect(bot.botRig.classList.contains('syncro-reaction--wave')).toBe(false);
+    });
+  });
 });

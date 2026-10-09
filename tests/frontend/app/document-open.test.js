@@ -43,7 +43,6 @@ describe('Document Opening Flow', () => {
             <div class="editor-workspace-loader-card">
               <div class="loader-document-icon">⌁</div>
               <div class="loader-title">Opening document...</div>
-              <div class="loader-subtitle">Preparing your workspace</div>
               <div class="loader-progress"><span></span></div>
             </div>
           </div>
@@ -175,11 +174,11 @@ describe('Document Opening Flow', () => {
     expect(loader.querySelector('.loader-title').textContent).toBe('Opening document...');
   });
 
-  test('workspace loader changes to "Syncing document..." during initial sync', () => {
+  test('workspace loader keeps "Opening document..." during initial sync', () => {
     const loader = document.getElementById('editorWorkspaceLoader');
     uiManager.setDocumentOpenState('initial-syncing');
 
-    expect(loader.querySelector('.loader-title').textContent).toBe('Syncing document...');
+    expect(loader.querySelector('.loader-title').textContent).toBe('Opening document...');
   });
 
   test('workspace loader hides only after editor ready', () => {

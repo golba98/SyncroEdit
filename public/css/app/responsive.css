@@ -241,7 +241,8 @@ button {
 
   #docLibrary .dashboard-container {
     width: 100%;
-    padding-inline: clamp(12px, 3vw, 28px);
+    /* !important: effects.css sets the padding shorthand with !important, zeroing the gutters. */
+    padding-inline: clamp(12px, 3vw, 28px) !important;
   }
 
   #docLibrary .library-create-grid {
@@ -295,7 +296,7 @@ button {
   #docTitle {
     width: auto !important;
     flex: 1 1 6rem;
-    font-size: 14px !important;
+    font-size: 16px !important;
   }
 
   .ribbon-tabs,
@@ -447,6 +448,22 @@ button {
     right: 8px;
   }
 
+  /* The row has its own document icon; drop the extra one from the older card layout. */
+  #docLibrary .doc-item::before {
+    content: none;
+  }
+
+  /* Location and date share one line instead of stacking. */
+  #docLibrary .doc-item td:nth-child(2),
+  #docLibrary .doc-item td:nth-child(3) {
+    display: inline-block !important;
+  }
+
+  #docLibrary .doc-item td:nth-child(2)::after {
+    content: '·';
+    margin-left: 6px;
+  }
+
   .modal-overlay,
   .profile-modal-overlay {
     align-items: flex-start !important;
@@ -485,5 +502,26 @@ button {
 
   .pages-container {
     padding-top: 12px;
+  }
+}
+
+/* Dashboard-only mobile controls must not sit over the document loading screen (they are shown
+   with inline styles, hence !important). */
+body[data-view-state='opening-document'] .fab-create,
+body[data-view-state='opening-document'] .bottom-nav {
+  display: none !important;
+}
+
+/* iOS zooms the page when a field under 16px gets focus; covers phones in either orientation. */
+@media (max-width: 599px), (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
+  input[type='number'],
+  input:not([type]),
+  textarea,
+  #docLibrary .document-search {
+    font-size: 16px !important;
   }
 }
