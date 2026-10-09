@@ -22,6 +22,30 @@ const AUTH_STATES = new Set([
 
 const LOCKED_STATES = new Set(['submitting', 'success']);
 
+// Transient reactions and how long each animation runs (ms). Several only animate child parts
+// (hands, pupils, antenna), which never fire `animationend` on the rig, so a timer clears them.
+const REACTION_DURATIONS = {
+  'poke-left': 400,
+  'poke-right': 400,
+  'poke-head': 400,
+  pleased: 450,
+  cheer: 450,
+  nod: 1000,
+  annoyed: 480,
+  sad: 700,
+  confused: 650,
+  dizzy: 1600,
+  wave: 1400,
+  'look-around': 1600,
+  'antenna-wiggle': 900,
+  'head-tilt': 1200,
+  hop: 700,
+  yawn: 1600,
+  startle: 500,
+};
+
+const FIDGETS = ['look-around', 'antenna-wiggle', 'head-tilt', 'hop', 'double-blink'];
+
 /**
  * SyncroBot Controller
  * High-performance interactive mascot controller with ultra-responsive eye & mouse tracking.
@@ -38,7 +62,7 @@ export class SyncroBot {
     this.currentState = 'idle';
     this.focusTarget = 'none';
     this.formCompleteness = 'empty';
-    this.passwordVisible = false;
+    this.revealedPasswords = new Set();
     this.isProcessing = false;
     this.targetElement = null;
     this.pointer = null;
@@ -60,6 +84,13 @@ export class SyncroBot {
     this.blinkEndTimer = null;
     this.typingTimer = null;
     this.idleTimer = null;
+    this.sleepTimer = null;
+    this.fidgetTimer = null;
+    this.doubleBlinkTimer = null;
+    this.reactionTimer = null;
+    this.introTimers = [];
+    this.mood = null;
+    this.zzz = null;
     this.reaction = null;
     this.pokeCount = 0;
     this.pokeResetTimer = null;
@@ -67,6 +98,10 @@ export class SyncroBot {
       typeof window !== 'undefined' && window.matchMedia
         ? window.matchMedia('(prefers-reduced-motion: reduce)')
         : null;
+    this.playsIntro = options.intro === true;
+    this.isReturningUser =
+      typeof options.isReturningUser === 'function' ? options.isReturningUser : () => false;
+    this.random = typeof options.random === 'function' ? options.random : Math.random;
 
     this.config = {
       eyeMaxX: 11,
@@ -78,6 +113,10 @@ export class SyncroBot {
       typingSettleDelay: 450,
       idleBoredDelay: 18000,
       idleSleepDelay: 40000,
+      fidgetMinDelay: 8000,
+      fidgetMaxDelay: 14000,
+      introWakeDelay: 450,
+      introWaveDelay: 800,
     };
 
     this.onPointerMove = this.onPointerMove.bind(this);
@@ -88,7 +127,12 @@ export class SyncroBot {
     this.onCharacterPress = this.onCharacterPress.bind(this);
     this.onCharacterKeydown = this.onCharacterKeydown.bind(this);
     this.onReactionEnd = this.onReactionEnd.bind(this);
+    this.onWindowKeydown = this.onWindowKeydown.bind(this);
     this.tickGaze = this.tickGaze.bind(this);
+  }
+
+  get passwordVisible() {
+    return this.revealedPasswords.size > 0;
   }
 
   init(containerSelector) {
@@ -116,12 +160,44 @@ export class SyncroBot {
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointercancel', this.onPointerCancel);
     this.container.addEventListener('keydown', this.onCharacterKeydown);
+    window.addEventListener('keydown', this.onWindowKeydown);
     this.botRig.addEventListener('animationend', this.onReactionEnd);
+
+    this.zzz = document.createElement('span');
+    this.zzz.className = 'syncro-zzz';
+    this.zzz.setAttribute('aria-hidden', 'true');
+    this.zzz.innerHTML = '<i>z</i><i>z</i><i>z</i>';
+    this.botRig.appendChild(this.zzz);
 
     this.setAuthState('idle');
     this.rafId = requestAnimationFrame(this.tickGaze);
     this.startIdleTimer();
+    this.scheduleFidget();
+    if (this.playsIntro) this.playIntro();
     return true;
+  }
+
+  /** Wakes up, waves hello, and nods at a user whose username is already filled in. */
+  playIntro() {
+    if (!this.botRig || this.reducedMotion?.matches) return;
+    const { introWakeDelay, introWaveDelay } = this.config;
+    this.botRig.classList.add('syncro-intro');
+    this.introTimers = [
+      setTimeout(() => this.botRig?.classList.remove('syncro-intro'), introWakeDelay),
+      setTimeout(() => this.react('wave'), introWaveDelay),
+      setTimeout(
+        () => {
+          if (this.primaryState === 'idle' && this.isReturningUser()) this.react('nod');
+        },
+        introWaveDelay + REACTION_DURATIONS.wave + 150
+      ),
+    ];
+  }
+
+  cancelIntro() {
+    this.introTimers.forEach((timer) => clearTimeout(timer));
+    this.introTimers = [];
+    this.botRig?.classList.remove('syncro-intro');
   }
 
   normalizeState(state) {
@@ -152,6 +228,7 @@ export class SyncroBot {
     this.currentState = normalized;
     this.targetElement = options.target || null;
     this.clearReaction();
+    if (normalized !== 'idle') this.cancelIntro();
 
     this.botRig.dataset.syncroState = normalized;
     for (const className of Array.from(this.botRig.classList)) {
@@ -164,6 +241,7 @@ export class SyncroBot {
     if (LOCKED_STATES.has(normalized)) {
       this.clearBlinkTimer();
       this.clearIdleTimer();
+      this.clearMood();
       this.botRig.classList.remove('blinking');
     } else {
       this.scheduleBlink();
@@ -338,23 +416,15 @@ export class SyncroBot {
 
   react(kind) {
     if (!this.botRig || LOCKED_STATES.has(this.primaryState)) return;
-    const allowed = new Set([
-      'poke-left',
-      'poke-right',
-      'poke-head',
-      'pleased',
-      'cheer',
-      'nod',
-      'annoyed',
-      'sad',
-      'confused',
-      'dizzy',
-    ]);
-    const reaction = allowed.has(kind) ? kind : 'pleased';
+    const reaction = REACTION_DURATIONS[kind] ? kind : 'pleased';
     this.clearReaction();
     this.reaction = reaction;
     this.botRig.classList.add(`syncro-reaction--${reaction}`);
-    if (this.reducedMotion?.matches) queueMicrotask(() => this.clearReaction());
+    if (this.reducedMotion?.matches) {
+      queueMicrotask(() => this.clearReaction());
+      return;
+    }
+    this.reactionTimer = setTimeout(() => this.clearReaction(), REACTION_DURATIONS[reaction] + 80);
   }
 
   reactExcited() {
@@ -383,6 +453,8 @@ export class SyncroBot {
   }
 
   clearReaction() {
+    clearTimeout(this.reactionTimer);
+    this.reactionTimer = null;
     if (!this.botRig) return;
     for (const className of Array.from(this.botRig.classList)) {
       if (className.startsWith('syncro-reaction--')) this.botRig.classList.remove(className);
@@ -393,7 +465,8 @@ export class SyncroBot {
   resolveGazeTarget() {
     const fixed = {
       'password-focus': { x: 0, y: 0.15 },
-      'password-visible': { x: -0.4, y: 0.1 },
+      // Turned away from the form (left of the bot) so a revealed password stays private.
+      'password-visible': { x: 0.7, y: -0.35 },
       submitting: { x: 0, y: -0.3 },
       success: { x: 0, y: -0.35 },
       error: { x: -0.4, y: 0.4 },
@@ -468,8 +541,10 @@ export class SyncroBot {
     const input = document.activeElement?.matches?.('input, textarea')
       ? document.activeElement
       : null;
-    if (fieldName.toLowerCase().includes('password')) {
-      this.setAuthState(this.passwordVisible ? 'password-visible' : 'password-focus');
+    if (this.passwordVisible) {
+      this.setAuthState('password-visible');
+    } else if (fieldName.toLowerCase().includes('password')) {
+      this.setAuthState('password-focus');
     } else {
       this.setAuthState('username-focus', { target: input });
     }
@@ -485,12 +560,16 @@ export class SyncroBot {
       ? document.activeElement
       : null;
 
+    if (this.passwordVisible) {
+      this.setAuthState('password-visible');
+      return;
+    }
     if (invalid) {
       this.setAuthState('invalid-field', { target: input });
       return;
     }
     if (fieldName.toLowerCase().includes('password')) {
-      this.setAuthState(this.passwordVisible ? 'password-visible' : 'password-focus');
+      this.setAuthState('password-focus');
       return;
     }
 
@@ -508,16 +587,39 @@ export class SyncroBot {
       if (this.isProcessing || document.activeElement?.matches?.('input, textarea')) return;
       this.focusTarget = 'none';
       this.targetElement = null;
-      this.setAuthState('idle');
+      this.setAuthState(this.passwordVisible ? 'password-visible' : 'idle');
     });
   }
 
+  /**
+   * Tracks each revealed password field. Without an input, every field is treated as hidden
+   * (used when the page resets all toggles, e.g. switching between login and signup).
+   */
   onPasswordToggle(visible, input = null) {
+    if (!input) {
+      this.revealedPasswords.clear();
+    } else if (visible) {
+      this.revealedPasswords.add(input);
+    } else {
+      this.revealedPasswords.delete(input);
+    }
     if (this.isProcessing) return;
-    this.passwordVisible = visible;
-    this.setAuthState(visible ? 'password-visible' : 'password-focus', {
-      target: visible ? input : null,
-    });
+
+    if (this.passwordVisible) {
+      this.setAuthState('password-visible');
+      return;
+    }
+    const active = document.activeElement?.matches?.('input, textarea')
+      ? document.activeElement
+      : null;
+    if (active?.type === 'password') {
+      this.setAuthState('password-focus');
+    } else if (active) {
+      this.setAuthState('username-focus', { target: active });
+    } else {
+      this.focusTarget = 'none';
+      this.setAuthState('idle');
+    }
   }
 
   onButtonHover(active) {
@@ -582,23 +684,75 @@ export class SyncroBot {
 
   startIdleTimer() {
     this.clearIdleTimer();
-    this.idleTimer = setTimeout(() => {
-      if (this.primaryState === 'idle' && !this.isProcessing && this.focusTarget === 'none') {
-        this.botRig?.classList.add('syncro-state--bored');
-      }
-    }, this.config.idleBoredDelay);
+    this.idleTimer = setTimeout(() => this.enterMood('bored'), this.config.idleBoredDelay);
+    this.sleepTimer = setTimeout(() => this.enterMood('sleeping'), this.config.idleSleepDelay);
   }
 
   resetIdleTimer() {
-    if (this.botRig?.classList.contains('syncro-state--bored')) {
-      this.botRig.classList.remove('syncro-state--bored');
-    }
+    const wasAsleep = this.mood === 'sleeping';
+    this.clearMood();
     this.startIdleTimer();
+    if (wasAsleep) this.react('startle');
   }
 
   clearIdleTimer() {
     clearTimeout(this.idleTimer);
+    clearTimeout(this.sleepTimer);
     this.idleTimer = null;
+    this.sleepTimer = null;
+  }
+
+  /** True when nothing is asking for the bot's attention, so it may amuse itself. */
+  isUnattended() {
+    return (
+      this.primaryState === 'idle' &&
+      !this.isProcessing &&
+      this.focusTarget === 'none' &&
+      !this.passwordVisible &&
+      this.dragPointerId === null
+    );
+  }
+
+  enterMood(mood) {
+    if (!this.botRig || !this.isUnattended()) return;
+    this.clearMood();
+    this.mood = mood;
+    this.botRig.classList.add(`syncro-mood--${mood}`);
+    if (mood === 'bored') this.react('yawn');
+    else this.clearReaction();
+  }
+
+  clearMood() {
+    this.mood = null;
+    this.botRig?.classList.remove('syncro-mood--bored', 'syncro-mood--sleeping');
+  }
+
+  onWindowKeydown() {
+    this.resetIdleTimer();
+  }
+
+  scheduleFidget() {
+    clearTimeout(this.fidgetTimer);
+    this.fidgetTimer = null;
+    if (this.reducedMotion?.matches) return;
+    const { fidgetMinDelay, fidgetMaxDelay } = this.config;
+    const delay = fidgetMinDelay + Math.floor(this.random() * (fidgetMaxDelay - fidgetMinDelay));
+    this.fidgetTimer = setTimeout(() => {
+      this.fidget();
+      this.scheduleFidget();
+    }, delay);
+  }
+
+  fidget() {
+    if (!this.isUnattended() || this.mood || this.reaction || document.hidden) return;
+    const move = FIDGETS[Math.floor(this.random() * FIDGETS.length)];
+    if (move === 'double-blink') {
+      this.triggerBlink();
+      clearTimeout(this.doubleBlinkTimer);
+      this.doubleBlinkTimer = setTimeout(() => this.triggerBlink(), 220);
+      return;
+    }
+    this.react(move);
   }
 
   clearPasswordToggleTimer() {}
@@ -608,6 +762,10 @@ export class SyncroBot {
     clearTimeout(this.pokeResetTimer);
     clearTimeout(this.eyeHitTimer);
     clearTimeout(this.eyeHitDecayTimer);
+    clearTimeout(this.fidgetTimer);
+    clearTimeout(this.doubleBlinkTimer);
+    clearTimeout(this.reactionTimer);
+    this.cancelIntro();
     this.clearBlinkTimer();
     this.clearIdleTimer();
     if (this.rafId) cancelAnimationFrame(this.rafId);
@@ -617,6 +775,8 @@ export class SyncroBot {
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointercancel', this.onPointerCancel);
     this.container?.removeEventListener('keydown', this.onCharacterKeydown);
+    window.removeEventListener('keydown', this.onWindowKeydown);
     this.botRig?.removeEventListener('animationend', this.onReactionEnd);
+    this.zzz?.remove();
   }
 }

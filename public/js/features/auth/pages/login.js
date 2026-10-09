@@ -32,7 +32,11 @@ export class AuthController {
     }
 
     // Initialize SyncroBot
-    this.syncro = new SyncroBot({ authFlow });
+    this.syncro = new SyncroBot({
+      authFlow,
+      intro: true,
+      isReturningUser: () => this._hasRememberedUsername(),
+    });
     this.syncro.init('.character-container');
 
     // Setup form event listeners
@@ -319,6 +323,18 @@ export class AuthController {
     this._updatePasswordStrength('');
   }
 
+  _hasRememberedUsername() {
+    const input = document.getElementById('loginUsername');
+    if (!input) return false;
+    if (input.value.trim()) return true;
+    // Chrome hides autofilled values from script until the user interacts with the page.
+    try {
+      return input.matches(':-webkit-autofill');
+    } catch {
+      return false;
+    }
+  }
+
   _resetPasswordVisibility() {
     const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
     inputs.forEach((input) => {
@@ -331,6 +347,7 @@ export class AuthController {
     toggleIcons.forEach((icon) => {
       icon.className = 'fas fa-eye';
     });
+    this.syncro?.onPasswordToggle(false);
   }
 
   _clearFormInputs(form) {

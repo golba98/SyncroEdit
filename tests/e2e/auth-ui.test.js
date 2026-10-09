@@ -91,9 +91,11 @@ test.describe('Login Page Tests', () => {
     await page.locator('#loginPassword').focus();
     await expect(botRig).toHaveAttribute('data-syncro-state', 'password-focus');
 
-    // Peeking Mode
-    await page.fill('#loginPassword', 'peekaboo'); // Must have content to peek
+    // Revealed password: he covers his eyes and keeps them covered when focus moves elsewhere
+    await page.fill('#loginPassword', 'peekaboo');
     await page.locator('#loginPasswordToggle').click();
+    await expect(botRig).toHaveAttribute('data-syncro-state', 'password-visible');
+    await page.locator('#loginUsername').focus();
     await expect(botRig).toHaveAttribute('data-syncro-state', 'password-visible');
     // Toggle back
     await page.locator('#loginPasswordToggle').click();
