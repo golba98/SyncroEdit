@@ -348,6 +348,50 @@ describe('SyncroBot', () => {
     });
   });
 
+  describe('visibility', () => {
+    let observers;
+
+    beforeEach(() => {
+      observers = [];
+      window.IntersectionObserver = jest.fn((callback) => {
+        const observer = { callback, observe: jest.fn(), disconnect: jest.fn() };
+        observers.push(observer);
+        return observer;
+      });
+      bot.destroy();
+      renderBot();
+      window.requestAnimationFrame.mockClear();
+      bot = new SyncroBot();
+      bot.init('.character-container');
+    });
+
+    afterEach(() => {
+      delete window.IntersectionObserver;
+    });
+
+    it('waits until the bot is on screen before running the gaze loop', () => {
+      expect(observers[0].observe).toHaveBeenCalledWith(bot.container);
+      expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+
+      observers[0].callback([{ isIntersecting: true }]);
+      expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
+      expect(bot.rafId).toBe(1);
+    });
+
+    it('stops the gaze loop while hidden, e.g. on phones', () => {
+      observers[0].callback([{ isIntersecting: true }]);
+      observers[0].callback([{ isIntersecting: false }]);
+
+      expect(window.cancelAnimationFrame).toHaveBeenCalledWith(1);
+      expect(bot.rafId).toBe(null);
+    });
+
+    it('disconnects the observer on destroy', () => {
+      bot.destroy();
+      expect(observers[0].disconnect).toHaveBeenCalled();
+    });
+  });
+
   describe('idle life', () => {
     const startWithRandom = (value) => {
       bot.destroy();

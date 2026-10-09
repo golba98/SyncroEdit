@@ -80,6 +80,7 @@ export class SyncroBot {
     this.eyeHitDecayTimer = null;
     this.eyeHitIntensity = 0;
     this.rafId = null;
+    this.visibilityObserver = null;
     this.blinkTimer = null;
     this.blinkEndTimer = null;
     this.typingTimer = null;
@@ -170,11 +171,33 @@ export class SyncroBot {
     this.botRig.appendChild(this.zzz);
 
     this.setAuthState('idle');
-    this.rafId = requestAnimationFrame(this.tickGaze);
+    this.observeVisibility();
     this.startIdleTimer();
     this.scheduleFidget();
     if (this.playsIntro) this.playIntro();
     return true;
+  }
+
+  /** Runs the gaze loop only while the bot is on screen; the panel is hidden on phones. */
+  observeVisibility() {
+    if (typeof IntersectionObserver !== 'function') {
+      this.startGazeLoop();
+      return;
+    }
+    this.visibilityObserver = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) this.startGazeLoop();
+      else this.stopGazeLoop();
+    });
+    this.visibilityObserver.observe(this.container);
+  }
+
+  startGazeLoop() {
+    if (!this.rafId) this.rafId = requestAnimationFrame(this.tickGaze);
+  }
+
+  stopGazeLoop() {
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
   }
 
   /** Wakes up, waves hello, and nods at a user whose username is already filled in. */
@@ -768,7 +791,8 @@ export class SyncroBot {
     this.cancelIntro();
     this.clearBlinkTimer();
     this.clearIdleTimer();
-    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.visibilityObserver?.disconnect();
+    this.stopGazeLoop();
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerleave', this.onPointerLeave);
     this.container?.removeEventListener('pointerdown', this.onPointerDown);

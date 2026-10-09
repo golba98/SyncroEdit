@@ -1089,6 +1089,12 @@ body.light-theme .skeleton {
   opacity: 0;
   transform: translateY(4px);
   pointer-events: none;
+  /* Also drop it from the accessibility tree once the fade-out finishes. */
+  visibility: hidden;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s ease-out,
+    visibility 0s linear 0.18s;
 }
 
 .editor-skeleton.has-error {

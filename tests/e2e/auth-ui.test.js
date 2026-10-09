@@ -70,7 +70,8 @@ test.describe('Login Page Tests', () => {
     await expect(page.locator('#botRig')).toHaveAttribute('data-syncro-state', 'username-typing');
   });
 
-  test('SyncroBot Animations', async ({ page }) => {
+  test('SyncroBot Animations', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'The SyncroBot panel is hidden on phones');
     const botRig = page.locator('#botRig');
     const pupil = page.locator('.pupil').first();
 
@@ -237,6 +238,8 @@ test.describe('Create Account (Signup) Tests', () => {
 });
 
 test.describe('Bot Alignment & Rig Tests', () => {
+  test.skip(({ isMobile }) => isMobile, 'The SyncroBot panel is hidden on phones');
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/pages/login.html');
   });
@@ -340,20 +343,18 @@ test.describe('Responsiveness & Scaling', () => {
   test('Mobile View Layout', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 }); // iPhone SE
 
-    // Check if layout switches to vertical (if implemented) OR if it just scales down/overflows properly.
-    // The user prompted "Test if the layout breaks on mobile".
-    // The current CSS sets width: 1000px on .login-container. This will likely overflow on mobile.
-    // We will assert the behavior. If it overflows, it "breaks" the viewport but maintains the design.
-    // Ideally we check if it is still usable or if media queries exist.
-    // Since I haven't implemented media queries for mobile in the CSS provided earlier,
-    // this test might identify that it *does* break (scrolls).
-    // I'll check if the login button is still visible/reachable via scroll.
+    // The SyncroBot panel would only push the form down on a phone.
+    await expect(page.locator('.right-section')).toBeHidden();
+    await expect(page.locator('#loginBtn')).toBeVisible();
+    // Under 16px, iOS zooms the page when the field is focused.
+    await expect(page.locator('#loginUsername')).toHaveCSS('font-size', '16px');
 
-    const loginBtn = page.locator('#loginBtn');
-    await expect(loginBtn).toBeVisible(); // Playwright auto-scrolls to check visibility
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(375);
   });
 
-  test('Aspect Ratio (Squircle)', async ({ page }) => {
+  test('Aspect Ratio (Squircle)', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'The SyncroBot panel is hidden on phones');
     const head = page.locator('.head');
     const box = await getVisibleBox(head);
     // Width should be roughly close to height (160x140 in CSS)

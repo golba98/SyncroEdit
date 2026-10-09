@@ -113,9 +113,12 @@ body[data-page='verify'] .right-section::after {
 body[data-page='forgot-password'] .auth-brand,
 body[data-page='reset-password'] .auth-brand,
 body[data-page='verify'] .auth-brand {
+  display: inline-flex;
+  align-items: center;
   align-self: flex-start;
   margin: 0 0 clamp(54px, 9vh, 86px);
   gap: 12px;
+  text-decoration: none;
   color: var(--auth-text);
   font-size: 15px;
   font-weight: 720;
@@ -138,15 +141,6 @@ body[data-page='verify'] .heading {
   font-weight: 740;
   letter-spacing: -0.045em;
   line-height: 1.06;
-}
-
-body[data-page='verify'] .heading {
-  gap: 12px;
-}
-
-body[data-page='verify'] .heading i {
-  color: var(--auth-muted);
-  font-size: 20px;
 }
 
 body[data-page='forgot-password'] .subtitle,
@@ -224,6 +218,9 @@ body[data-page='verify'] .code-input {
 }
 
 body[data-page='verify'] .email-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: fit-content;
   max-width: 100%;
   margin: -14px 0 26px;
@@ -238,6 +235,7 @@ body[data-page='verify'] .email-tag {
 }
 
 body[data-page='verify'] .email-tag span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -371,7 +369,8 @@ body[data-page='verify'] .character-container {
   transform: scale(1.04);
 }
 
-@media (max-width: 780px) {
+/* Phones in either orientation; a landscape phone is wide enough for two columns but too short. */
+@media (max-width: 780px), (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
   body[data-page='forgot-password'],
   body[data-page='reset-password'],
   body[data-page='verify'] {
@@ -395,13 +394,26 @@ body[data-page='verify'] .character-container {
     padding: 30px 24px 28px;
   }
 
+  /* The SyncroBot panel only pushes the form down on phones. */
   body[data-page='forgot-password'] .right-section,
   body[data-page='reset-password'] .right-section,
   body[data-page='verify'] .right-section {
-    grid-row: 1;
-    min-height: 132px;
-    border-bottom: 1px solid var(--auth-border);
-    border-left: 0;
+    display: none;
+  }
+
+  /* iOS zooms the page when a field under 16px gets focus. */
+  body[data-page='forgot-password'] .input-group input,
+  body[data-page='reset-password'] .input-group input {
+    font-size: 16px;
+  }
+
+  /* Finger-sized tap targets without shifting the text links. */
+  body[data-page='forgot-password'] .back-link a,
+  body[data-page='reset-password'] .back-link a,
+  body[data-page='verify'] .link {
+    display: inline-block;
+    padding: 12px 8px;
+    margin: -12px -8px;
   }
 
   body[data-page='forgot-password'] .auth-brand,
@@ -414,14 +426,6 @@ body[data-page='verify'] .character-container {
   body[data-page='reset-password'] .title,
   body[data-page='verify'] .heading {
     font-size: 30px;
-  }
-
-  body[data-page='forgot-password'] .character-container,
-  body[data-page='reset-password'] .character-container,
-  body[data-page='verify'] .character-container {
-    width: 100%;
-    height: 132px;
-    transform: scale(0.48);
   }
 }
 

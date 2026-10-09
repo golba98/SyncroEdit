@@ -7,6 +7,7 @@ export class UIManager {
   constructor(app) {
     this.app = app;
     this.saveStatusTimer = null;
+    this.isMobileEditing = false;
     this.documentOpenState = 'idle';
     this.hasShownEditorReady = false;
     this.responsiveLayout = new ResponsiveLayoutController(app);
@@ -351,7 +352,8 @@ export class UIManager {
       if (bottomNav) bottomNav.style.display = 'flex';
     } else if (hasDocument) {
       if (fabCreate) fabCreate.style.display = 'none';
-      if (fabEdit) fabEdit.style.display = 'flex';
+      // The edit button is only for getting into edit mode; the toolbar replaces it while editing.
+      if (fabEdit) fabEdit.style.display = this.isMobileEditing ? 'none' : 'flex';
       if (bottomNav) bottomNav.style.display = 'none';
     }
   }
@@ -681,6 +683,7 @@ export class UIManager {
   }
 
   setMobileEditMode(active) {
+    this.isMobileEditing = active;
     const toolbar = document.getElementById('mobileContextualToolbar');
     const fabEdit = document.getElementById('fabEditDoc');
     const header = document.querySelector('.header');
