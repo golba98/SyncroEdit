@@ -1987,9 +1987,10 @@
       <!-- Editor Workspace Loader (shows centered card above the workspace area when document is opening) -->
       <div id="editorWorkspaceLoader" class="editor-workspace-loader" hidden>
         <div class="editor-workspace-loader-card">
-          <div class="loader-document-icon">⌁</div>
+          <div class="loader-document-icon">
+            <img src="/logo.svg" alt="" width="26" height="26" />
+          </div>
           <div class="loader-title">Opening document...</div>
-          <div class="loader-subtitle">Preparing your workspace</div>
           <div class="loader-progress"><span></span></div>
         </div>
       </div>
@@ -2096,13 +2097,6 @@
         <span class="status-divider" aria-hidden="true"></span>
         <span id="saveStatusIndicator" class="status-item save-status-indicator" data-status="saved"
           >Saved</span
-        >
-        <span
-          id="connectionBadge"
-          class="status-item connection-badge"
-          data-status="connected"
-          hidden
-          >Connected</span
         >
       </div>
       <div class="status-bar-right">

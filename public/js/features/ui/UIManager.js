@@ -6,9 +6,6 @@ import { ResponsiveLayoutController } from '/js/features/ui/ResponsiveLayoutCont
 export class UIManager {
   constructor(app) {
     this.app = app;
-    this.connectionStatusTimer = null;
-    this.connectionCurrentStatus = null;
-    this.connectionPendingStatus = null;
     this.saveStatusTimer = null;
     this.documentOpenState = 'idle';
     this.hasShownEditorReady = false;
@@ -409,7 +406,8 @@ export class UIManager {
     const header = document.querySelector('.header');
     const ribbonTabs = document.querySelector('.ribbon-tabs');
     const ribbonContent = document.querySelector('.ribbon-content');
-    const softRevealEls = [header, ribbonTabs, ribbonContent].filter(Boolean);
+    const statusBar = document.querySelector('.status-bar');
+    const softRevealEls = [header, ribbonTabs, ribbonContent, statusBar].filter(Boolean);
 
     if (state === 'opening-document') {
       this.assertNoBlankOpeningState();
@@ -460,7 +458,7 @@ export class UIManager {
     }
   }
 
-  showEditorWorkspaceLoader(message = 'Opening document...', subtext = 'Preparing your workspace') {
+  showEditorWorkspaceLoader(message = 'Opening document...') {
     const loader = document.getElementById('editorWorkspaceLoader');
     if (!loader) return;
 
@@ -472,9 +470,7 @@ export class UIManager {
     loader.removeAttribute('hidden');
     loader.hidden = false;
     const titleEl = loader.querySelector('.loader-title');
-    const subEl = loader.querySelector('.loader-subtitle');
     if (titleEl) titleEl.textContent = message;
-    if (subEl) subEl.textContent = subtext;
 
     document.querySelector('.main-workspace')?.classList.add('is-document-opening');
   }
@@ -522,10 +518,7 @@ export class UIManager {
     if (editorVisible && pagesHidden && !editorReady && (loader ? loader.hidden : true)) {
       console.warn('[OPEN] Prevented black editor workspace: showing loader');
       const isCreating = this.app?.documentLoadState === 'creating';
-      this.showEditorWorkspaceLoader(
-        isCreating ? 'Creating document...' : 'Opening document...',
-        isCreating ? 'Setting up a blank page' : 'Preparing your workspace'
-      );
+      this.showEditorWorkspaceLoader(isCreating ? 'Creating document...' : 'Opening document...');
     }
   }
 
@@ -555,11 +548,6 @@ export class UIManager {
     this.revealPagesContainer();
 
     this.setDocumentOpenState('ready');
-
-    // Re-render final connection status badge when state becomes ready
-    if (this.connectionPendingStatus) {
-      this.renderConnectionStatus(this.connectionPendingStatus);
-    }
 
     this.preventBlackEditorLoadingState();
   }
@@ -640,12 +628,14 @@ export class UIManager {
     const titleEl = document.getElementById('editorSkeletonTitle');
     const descEl = document.getElementById('editorSkeletonDescription');
 
+    // Keep one title for the whole open flow instead of narrating each internal step.
+    const openTitle = this.app?.isNewBlankDocument ? 'Creating document...' : 'Opening document...';
     const copy = {
       idle: ['Opening document...', 'Getting your workspace ready.'],
       opening: ['Opening document...', 'Preparing your workspace.'],
       creating: ['Creating document...', 'Setting up a blank page.'],
-      'loading-content': ['Opening document...', 'Loading document content.'],
-      'initial-syncing': ['Syncing document...', 'Applying the latest document state.'],
+      'loading-content': [openTitle, 'Loading document content.'],
+      'initial-syncing': [openTitle, 'Loading document content.'],
       ready: ['Saved', 'Your document is ready.'],
       failed: ['Could not open document', 'Try again or return to the dashboard.'],
     };
@@ -656,7 +646,7 @@ export class UIManager {
     if (descEl) descEl.textContent = options.description || description;
 
     if (loadingStates.has(normalizedState)) {
-      this.showEditorWorkspaceLoader(options.status || title, options.description || description);
+      this.showEditorWorkspaceLoader(options.status || title);
     } else {
       this.hideEditorWorkspaceLoader();
     }
@@ -815,63 +805,10 @@ export class UIManager {
     }
   }
 
-  handleWSStatusChange(status) {
-    const badge = document.getElementById('connectionBadge');
+  handleWSStatusChange() {
+    // Connection state is not surfaced to the user; the save indicator covers it.
     const overlay = document.getElementById('serverOfflineOverlay');
     if (overlay) overlay.style.display = 'none';
-
-    this.connectionPendingStatus = status;
-
-    if (this.connectionStatusTimer) {
-      clearTimeout(this.connectionStatusTimer);
-      this.connectionStatusTimer = null;
-    }
-
-    // Hide badge during document opening to prevent distracting state changes
-    if (this.documentOpenState !== 'ready') {
-      if (badge) badge.hidden = true;
-      return;
-    }
-
-    if (!badge) return;
-
-    // Delay reconnect warnings; normal connected/connecting states stay hidden in the top bar.
-    const delay = status === 'reconnecting' || status === 'disconnected' ? 1000 : 0;
-
-    if (delay > 0) {
-      this.connectionStatusTimer = setTimeout(() => {
-        this.connectionStatusTimer = null;
-        if (this.connectionPendingStatus === status) {
-          this.renderConnectionStatus(status);
-        }
-      }, delay);
-      return;
-    }
-
-    this.renderConnectionStatus(status);
-  }
-
-  renderConnectionStatus(status) {
-    const badge = document.getElementById('connectionBadge');
-    if (!badge) return;
-
-    // Do not display badge if not ready, connected, or initial connecting.
-    if (this.documentOpenState !== 'ready' || status === 'connected' || status === 'connecting') {
-      badge.hidden = true;
-      return;
-    }
-
-    const stateMap = {
-      reconnecting: 'Reconnecting...',
-      disconnected: 'Reconnecting...',
-      offline: 'Offline',
-      failed: 'Connection issue',
-    };
-
-    this.connectionCurrentStatus = status;
-    badge.textContent = stateMap[status] || 'Connection issue';
-    badge.dataset.status = status;
-    badge.hidden = false;
   }
 
   setSaveStatus(status) {
@@ -908,9 +845,7 @@ export class UIManager {
   }
 
   cleanupTimers() {
-    if (this.connectionStatusTimer) clearTimeout(this.connectionStatusTimer);
     if (this.saveStatusTimer) clearTimeout(this.saveStatusTimer);
-    this.connectionStatusTimer = null;
     this.saveStatusTimer = null;
   }
 }

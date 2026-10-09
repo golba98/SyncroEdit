@@ -417,46 +417,6 @@ body.light-theme .doc-template-card:hover .doc-template-plus {
   opacity: 0.4;
 }
 
-.connection-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 112px;
-  min-height: 24px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1;
-  color: #cbd5e1;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  white-space: nowrap;
-  transition:
-    color 0.18s ease,
-    background-color 0.18s ease,
-    border-color 0.18s ease;
-}
-
-.connection-badge[data-status='connected'] {
-  color: #a7f3d0;
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.18);
-}
-
-.connection-badge[data-status='reconnecting'],
-.connection-badge[data-status='disconnected'],
-.connection-badge[data-status='syncing'] {
-  color: #fde68a;
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.28);
-}
-
-.connection-badge[data-status='offline'] {
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.14);
-  border-color: rgba(239, 68, 68, 0.28);
-}
-
 .save-status-indicator {
   display: inline-flex;
   align-items: center;

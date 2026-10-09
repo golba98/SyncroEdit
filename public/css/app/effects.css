@@ -1726,6 +1726,12 @@ body:not([data-page='login']) .pages-container {
   background: #0a0a0b !important;
 }
 
+/* The editor chrome is faded out while a document opens; match the canvas so no band shows.
+   !important to beat the body background theme.js injects. */
+body:not([data-page='login']):not(.light-theme)[data-view-state='opening-document'] {
+  background: #0a0a0b !important;
+}
+
 body:not([data-page='login']) .pages-container {
   padding: 48px 44px 110px;
   gap: 28px;
@@ -1891,11 +1897,7 @@ body:not([data-page='login']) .status-bar {
 body:not([data-page='login']) .status-bar .save-status-indicator[data-status='saving'],
 body:not([data-page='login']) .status-bar .save-status-indicator[data-status='unsaved'],
 body:not([data-page='login']) .status-bar .save-status-indicator[data-status='offline'],
-body:not([data-page='login']) .status-bar .save-status-indicator[data-status='failed'],
-body:not([data-page='login']) .status-bar .connection-badge[data-status='reconnecting'],
-body:not([data-page='login']) .status-bar .connection-badge[data-status='disconnected'],
-body:not([data-page='login']) .status-bar .connection-badge[data-status='offline'],
-body:not([data-page='login']) .status-bar .connection-badge[data-status='failed'] {
+body:not([data-page='login']) .status-bar .save-status-indicator[data-status='failed'] {
   color: #f5f5f5 !important;
   background: #242428 !important;
   border-color: #4a4a4e !important;
@@ -2304,12 +2306,6 @@ body:not([data-editor-ready='true'])
   font-weight: 600;
 }
 
-.loader-subtitle {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--text-soft);
-}
-
 .loader-progress {
   height: 3px;
   margin-top: 18px;
@@ -2392,6 +2388,18 @@ body:not([data-editor-ready='true'])
   height: 26px;
 }
 
+/* The workspace loader shows the app logo, which already carries its own tile. */
+.loader-document-icon {
+  border: none;
+  background: transparent;
+}
+
+.loader-document-icon img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+
 .document-opening-title,
 .loader-title {
   margin: 0 !important;
@@ -2401,8 +2409,7 @@ body:not([data-editor-ready='true'])
   letter-spacing: -0.02em;
 }
 
-.document-opening-subtitle,
-.loader-subtitle {
+.document-opening-subtitle {
   margin-top: 8px !important;
   color: #929297 !important;
   font-size: 13px !important;
@@ -2472,8 +2479,7 @@ body.light-theme .loader-title {
   color: #171717 !important;
 }
 
-body.light-theme .document-opening-subtitle,
-body.light-theme .loader-subtitle {
+body.light-theme .document-opening-subtitle {
   color: #6b6b72 !important;
 }
 

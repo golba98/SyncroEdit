@@ -637,9 +637,8 @@ body.light-theme .page-tab.active {
   white-space: nowrap;
 }
 
-/* Save Status & Connection Badge inside bottom status bar */
-.status-bar .save-status-indicator,
-.status-bar .connection-badge {
+/* Save status inside bottom status bar */
+.status-bar .save-status-indicator {
   font-size: 10px;
   font-weight: 500;
   padding: 1px 6px;
@@ -670,20 +669,6 @@ body.light-theme .page-tab.active {
 }
 
 .status-bar .save-status-indicator[data-status='failed'] {
-  color: #dc2626;
-  background: rgba(220, 38, 38, 0.08);
-  border: 1px solid rgba(220, 38, 38, 0.16);
-}
-
-.status-bar .connection-badge[data-status='reconnecting'],
-.status-bar .connection-badge[data-status='disconnected'] {
-  color: #d97706;
-  background: rgba(217, 119, 6, 0.08);
-  border: 1px solid rgba(217, 119, 6, 0.16);
-}
-
-.status-bar .connection-badge[data-status='offline'],
-.status-bar .connection-badge[data-status='failed'] {
   color: #dc2626;
   background: rgba(220, 38, 38, 0.08);
   border: 1px solid rgba(220, 38, 38, 0.16);
