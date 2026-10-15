@@ -242,8 +242,8 @@ and should not be retained after a cleanup pass.
 | `scripts/lib/safety.cjs` | Git identity, credentials/artifact checks, and exact Cloudflare targets. |
 | `scripts/lib/promotion.cjs` | Three-way source projection, receipts, and tree reconstruction. |
 | `scripts/hooks/pre-push` | Local cross-environment push and main/history guards. |
-| `scripts/check-migrations.py` | Fresh in-memory SQL migration check. |
-| `tests/release/promotion.test.cjs` | Real temporary-repository promotion and safety tests. |
+| `scripts/check-migrations.py` | Fresh and upgrade-preservation checks using disposable in-memory SQL databases. |
+| `tests/release/promotion.test.cjs` | Temporary-repository promotion, role-specific push, API diagnostics, and fail-closed audit tests. |
 | `docs/DELIVERY.md` | Repository boundaries, bootstrap, promotion, approval, and recovery. |
 | `docs/ENVIRONMENT.md` | Environment-specific resource and local-state details. |
 | `releases/baseline.json` | Production-only reviewed tooling bootstrap provenance. |

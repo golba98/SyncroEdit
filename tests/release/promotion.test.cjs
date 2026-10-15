@@ -238,3 +238,240 @@ test('recognizes dedicated cherry-pick and squash backports without requiring me
   assert.equal(proof.method, 'patch-equivalent');
   assert.equal(proof.developmentCommit, backport);
 });
+
+function pushFixture(role) {
+  const { TARGETS, ACCOUNT, LIVE_EXPORTS } = require('../../scripts/lib/safety.cjs');
+  const f = fixture();
+  const target = TARGETS[role];
+  git(f.root, 'remote', 'set-url', 'origin', `https://github.com/${target.repository}.git`);
+  f.write('config/environment.json', JSON.stringify({ role, repository: target.repository }));
+  function environment(name, local = false) {
+    const prefix = name ? `env.${name}.` : '';
+    const classes = local ? TARGETS.development.classes : target.classes;
+    const exported = local ? classes : LIVE_EXPORTS;
+    return `${name ? `[env.${name}]\n` : ''}name = "${local ? (role === 'production' ? 'syncroedit-production-local' : 'syncroedit-local') : target.worker}"
+account_id = "${ACCOUNT}"
+[${prefix}assets]
+directory = "./public"
+run_worker_first = ["/api/*", "/ws/*", "/health"]
+[[${prefix}d1_databases]]
+binding = "DB"
+database_name = "test-db"
+database_id = "${local ? '00000000-0000-0000-0000-000000000000' : target.database}"
+${classes.map((className, i) => `[[${prefix}durable_objects.bindings]]\nname = "${i === 0 ? 'DOCUMENT_SYNC_OBJECT' : 'RATE_LIMIT_OBJECT'}"\nclass_name = "${className}"`).join('\n')}
+${exported.map((className) => `[${prefix}exports.${className}]\ntype = "durable-object"\nstorage = "sqlite"`).join('\n')}
+[${prefix}vars]
+APP_URL = "${local ? `http://localhost:${role === 'production' ? 8788 : 8787}` : target.url}"
+`;
+  }
+  f.write(
+    'wrangler.toml',
+    environment('') +
+      environment('local', true) +
+      (role === 'development' ? environment('staging') : '')
+  );
+  const head = f.commit('push-ready environment');
+  return {
+    ...f,
+    head,
+    destination: `https://github.com/${target.repository}.git`,
+    update: `refs/heads/feature ${head} refs/heads/feature ${'0'.repeat(40)}`,
+  };
+}
+
+test('development push validates locally without production API credentials', async () => {
+  const { checkPush } = require('../../scripts/ops.cjs');
+  const f = pushFixture('development');
+  const forbidden = () => {
+    throw new Error('Production checks must not run for a development push');
+  };
+  const checks = {
+    lastReceipt: forbidden,
+    verifyReceipt: forbidden,
+    verifyBootstrap: forbidden,
+    requireSafeBuilds: forbidden,
+  };
+  await checkPush(f.root, f.destination, f.update, checks);
+  await assert.rejects(
+    () => checkPush(f.root, 'https://github.com/golba98/SyncroEdit.git', f.update, checks),
+    /Cross-environment/
+  );
+  await assert.rejects(
+    () =>
+      checkPush(
+        f.root,
+        f.destination,
+        f.update.replace('refs/heads/feature 000', 'refs/heads/main 000'),
+        checks
+      ),
+    /Direct main/
+  );
+  await assert.rejects(
+    () =>
+      checkPush(
+        f.root,
+        f.destination,
+        `refs/heads/feature ${'0'.repeat(40)} refs/heads/feature ${f.head}`,
+        checks
+      ),
+    /ref deletion/
+  );
+  await assert.rejects(
+    () =>
+      checkPush(
+        f.root,
+        f.destination,
+        `refs/heads/feature ${f.base} refs/heads/feature ${f.head}`,
+        checks
+      ),
+    /git failed/
+  );
+  f.write('.dev.vars', 'JWT_SECRET=local-test-value');
+  git(f.root, 'add', '.dev.vars');
+  await assert.rejects(
+    () => checkPush(f.root, f.destination, f.update, checks),
+    /Forbidden tracked/
+  );
+});
+
+test('production push still requires provenance and verified disconnected production builds', async () => {
+  const { checkPush } = require('../../scripts/ops.cjs');
+  const f = pushFixture('production');
+  const calls = [];
+  const checks = {
+    lastReceipt: () => null,
+    verifyBootstrap: () => calls.push('bootstrap'),
+    verifyReceipt: () => calls.push('receipt'),
+    requireSafeBuilds: async (role) => {
+      calls.push(role);
+      throw new Error('Builds API unavailable');
+    },
+  };
+  await assert.rejects(
+    () => checkPush(f.root, f.destination, f.update, checks),
+    /Builds API unavailable/
+  );
+  assert.deepEqual(calls, ['bootstrap', 'production']);
+  calls.length = 0;
+  checks.lastReceipt = () => ({});
+  checks.requireSafeBuilds = async (role) => calls.push(role);
+  await checkPush(f.root, f.destination, f.update, checks);
+  assert.deepEqual(calls, ['receipt', 'production']);
+});
+
+test('Cloudflare errors identify credential source and status without disclosing credentials', async () => {
+  const { cloudflare } = require('../../scripts/lib/safety.cjs');
+  const original = global.fetch;
+  const previous = {
+    api: process.env.CLOUDFLARE_API_TOKEN,
+    builds: process.env.SYNCROEDIT_BUILDS_API_TOKEN,
+  };
+  process.env.CLOUDFLARE_API_TOKEN = 'test-only-api-credential';
+  delete process.env.SYNCROEDIT_BUILDS_API_TOKEN;
+  try {
+    global.fetch = async () =>
+      Response.json(
+        { success: false, errors: [{ code: 10000, message: process.env.CLOUDFLARE_API_TOKEN }] },
+        { status: 403 }
+      );
+    await assert.rejects(
+      () => cloudflare('/builds/example'),
+      (error) => {
+        assert.match(error.message, /HTTP 403 using CLOUDFLARE_API_TOKEN/);
+        assert.match(error.message, /not exported in this process/);
+        assert.match(error.message, /10000/);
+        assert.ok(!error.message.includes(process.env.CLOUDFLARE_API_TOKEN));
+        return true;
+      }
+    );
+    process.env.SYNCROEDIT_BUILDS_API_TOKEN = 'test-only-builds-credential';
+    global.fetch = async (_url, init) => {
+      assert.equal(init.headers.Authorization, 'Bearer test-only-builds-credential');
+      return Response.json({ success: false, errors: [] }, { status: 401 });
+    };
+    await assert.rejects(
+      () => cloudflare('/builds/example'),
+      /HTTP 401 using SYNCROEDIT_BUILDS_API_TOKEN.*invalid or expired/
+    );
+    global.fetch = async () => {
+      throw new Error('test-only-builds-credential');
+    };
+    await assert.rejects(() => cloudflare('/builds/example'), /could not connect or timed out/);
+    global.fetch = async () => new Response('<html>blocked</html>', { status: 403 });
+    await assert.rejects(() => cloudflare('/builds/example'), /HTTP 403 without JSON/);
+  } finally {
+    global.fetch = original;
+    for (const [key, value] of [
+      ['CLOUDFLARE_API_TOKEN', previous.api],
+      ['SYNCROEDIT_BUILDS_API_TOKEN', previous.builds],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test('build verification selects the requested Worker and rejects connected or malformed triggers', async () => {
+  const { requireSafeBuilds } = require('../../scripts/lib/safety.cjs');
+  const original = global.fetch;
+  const previous = process.env.CLOUDFLARE_API_TOKEN;
+  process.env.CLOUDFLARE_API_TOKEN = 'test-only-api-credential';
+  let result = [];
+  const requested = [];
+  global.fetch = async (url) => {
+    requested.push(url);
+    return Response.json({
+      success: true,
+      result: url.endsWith('/workers/scripts')
+        ? [
+            { id: 'syncroedit', tag: 'prod-tag' },
+            { id: 'syncroedit-dev', tag: 'dev-tag' },
+          ]
+        : result,
+    });
+  };
+  try {
+    assert.deepEqual(await requireSafeBuilds('development'), {
+      worker: 'syncroedit-dev',
+      triggerCount: 0,
+    });
+    assert.ok(requested[1].endsWith('/builds/workers/dev-tag/triggers'));
+    requested.length = 0;
+    await requireSafeBuilds();
+    assert.ok(requested[1].endsWith('/builds/workers/prod-tag/triggers'));
+    result = [{ id: 'trigger' }];
+    await assert.rejects(() => requireSafeBuilds('development'), /syncroedit-dev has 1 connected/);
+    result = {};
+    await assert.rejects(() => requireSafeBuilds(), /Unexpected build-trigger response/);
+  } finally {
+    global.fetch = original;
+    if (previous === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
+    else process.env.CLOUDFLARE_API_TOKEN = previous;
+  }
+});
+
+test('remote audit fails closed instead of accepting an unverified Builds check', async () => {
+  const { auditRemote } = require('../../scripts/ops.cjs');
+  const original = console.log;
+  console.log = () => {};
+  const roles = [];
+  try {
+    await assert.rejects(
+      () =>
+        auditRemote('development', {
+          remoteTarget: async (role) => {
+            roles.push(role);
+            return {};
+          },
+          requireSafeBuilds: async (role) => {
+            roles.push(role);
+            throw new Error('HTTP 403');
+          },
+        }),
+      /HTTP 403/
+    );
+    assert.deepEqual(roles, ['development', 'development']);
+  } finally {
+    console.log = original;
+  }
+});

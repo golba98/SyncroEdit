@@ -175,6 +175,7 @@ function checkSecrets(root) {
     /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
     /(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/,
     /\bre_[A-Za-z0-9]{25,}\b/,
+    /\bcfut_[A-Za-z0-9_-]{20,}\b/,
   ];
   for (const file of git(root, 'ls-files', '-z').split('\0').filter(Boolean)) {
     if (file !== '.env.example' && forbidden.test(file))
@@ -202,16 +203,49 @@ function cloudflareToken() {
 }
 
 async function cloudflare(endpoint) {
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}${endpoint}`, {
-    headers: {
-      Authorization: `Bearer ${endpoint.startsWith('/builds/') && process.env.SYNCROEDIT_BUILDS_API_TOKEN ? process.env.SYNCROEDIT_BUILDS_API_TOKEN : cloudflareToken()}`,
-    },
-  });
-  const body = await res.json();
-  if (!res.ok || !body.success)
+  const builds = endpoint.startsWith('/builds/');
+  const dedicated = builds && process.env.SYNCROEDIT_BUILDS_API_TOKEN;
+  const credential = dedicated
+    ? 'SYNCROEDIT_BUILDS_API_TOKEN'
+    : process.env.CLOUDFLARE_API_TOKEN
+      ? 'CLOUDFLARE_API_TOKEN'
+      : 'Wrangler login';
+  const token = dedicated || cloudflareToken();
+  let res;
+  try {
+    res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
     throw new Error(
-      `Cloudflare read failed (${res.status}); requested API permission may be missing`
+      `Cloudflare GET ${endpoint} could not connect or timed out; no safety verification completed`
     );
+  }
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error(`Cloudflare GET ${endpoint} returned HTTP ${res.status} without JSON`);
+  }
+  if (!res.ok || !body?.success) {
+    const codes = (Array.isArray(body?.errors) ? body.errors : [])
+      .map((error) => error.code)
+      .filter(Number.isInteger);
+    const hint =
+      res.status === 401
+        ? 'Credential is invalid or expired.'
+        : res.status === 403
+          ? 'Check permission, selected account, and IP restrictions.'
+          : 'Check Cloudflare API availability and request configuration.';
+    const setup =
+      builds && !dedicated
+        ? ' SYNCROEDIT_BUILDS_API_TOKEN is not exported in this process; export a user-scoped token with Workers Builds Configuration access in the same terminal.'
+        : '';
+    throw new Error(
+      `Cloudflare GET ${endpoint} failed: HTTP ${res.status} using ${credential}${codes.length ? ` (error codes: ${codes.join(', ')})` : ''}. ${hint}${setup}`
+    );
+  }
   return body.result;
 }
 
@@ -264,14 +298,22 @@ async function remoteTarget(role) {
   };
 }
 
-async function requireSafeBuilds() {
+async function requireSafeBuilds(role = 'production') {
+  if (!TARGETS[role]) throw new Error('Unknown build target role');
   const workers = await cloudflare('/workers/scripts');
-  const worker = workers.find((w) => w.id === TARGETS.production.worker);
+  const worker = workers.find((w) => w.id === TARGETS[role].worker);
+  if (!worker?.tag)
+    throw new Error(`Cannot identify ${TARGETS[role].worker} for build-trigger verification`);
   const triggers = await cloudflare(`/builds/workers/${worker.tag}/triggers`);
-  // No production build triggers is the unambiguous safe state. A build-only
+  if (!Array.isArray(triggers))
+    throw new Error('Unexpected build-trigger response; safety remains unverified');
+  // No automatic build triggers is the unambiguous safe state. A build-only
   // trigger must be reviewed separately; arbitrary shell commands are not parsed.
   if (triggers.length)
-    throw new Error('Disconnect production Workers Builds before publishing release branches');
+    throw new Error(
+      `${worker.id} has ${triggers.length} connected build triggers. Disconnect its Git build integration for the explicit deployment workflow.`
+    );
+  return { worker: worker.id, triggerCount: 0 };
 }
 
 async function checkHealth(url) {

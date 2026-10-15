@@ -9,17 +9,19 @@ shared Git objects. A workspace file defaults the terminal to development.
 
 `config/environment.json` binds each checkout to its canonical GitHub repository. Operational scripts
 validate both fetch and push URLs, reject alternate hosts, compare exact Cloudflare account/resource
-identities, and prohibit environment overrides. Local hooks add pre-push checks; server rulesets are
+identities, and prohibit environment overrides. Local development push hooks validate locally without
+production API credentials. Production push hooks additionally verify provenance and disconnected
+production build triggers; server rulesets are
 the independent protection against direct main pushes and history rewriting. A repository owner can
 still deliberately change repository settings or invoke raw Cloudflare tools; these safeguards govern
 the supported workflow, rather than claiming to revoke the owner's infrastructure permissions.
 
-| Environment | Worker | D1 | Document/rate-limit classes |
-| --- | --- | --- | --- |
-| Development local | `syncroedit-local` | zero-ID emulator | `SynchroDocumentObject`, `SynchroRateLimitObject` |
-| Staging | `syncroedit-dev` | `synchroedit-dev-db` | `SynchroDocumentObject`, `SynchroRateLimitObject` |
-| Production local tests | `syncroedit-production-local` | separate zero-ID emulator | historical `Synchro` classes |
-| Production | `syncroedit` | `synchroedit-db` | `DocumentSyncObject`, `RateLimitObject` |
+| Environment            | Worker                        | D1                        | Document/rate-limit classes                       |
+| ---------------------- | ----------------------------- | ------------------------- | ------------------------------------------------- |
+| Development local      | `syncroedit-local`            | zero-ID emulator          | `SynchroDocumentObject`, `SynchroRateLimitObject` |
+| Staging                | `syncroedit-dev`              | `synchroedit-dev-db`      | `SynchroDocumentObject`, `SynchroRateLimitObject` |
+| Production local tests | `syncroedit-production-local` | separate zero-ID emulator | historical `Synchro` classes                      |
+| Production             | `syncroedit`                  | `synchroedit-db`          | `DocumentSyncObject`, `RateLimitObject`           |
 
 Both deployed Workers already have four live compatibility exports. Preserve their class names and
 namespace identities. API, WebSocket, and `/health` requests reach the Worker before SPA asset fallback; release verification requires actual healthy JSON, not just HTTP 200. Do not replay historical migrations or replace these exports with a new DO
@@ -29,18 +31,24 @@ are unavailable to the read API and have not been copied, compared, or replaced.
 
 ## One-time bootstrap and remote setup
 
-The restructuring branches remain local until production build triggers are made safe. Earlier
-Cloudflare checks show builds for both Workers; their exact current repository/branch trigger mappings
-cannot be assumed. The existing Wrangler OAuth token lacks Builds Configuration access.
+Delivery uses explicit commands for both Workers. Production `syncroedit` and the Developer
+Environment `syncroedit-dev` are separate resources, not interchangeable environment names.
+Production automatic Git builds were disconnected during setup and the operator verified zero
+triggers; recheck current state before production publishing/deployment. Developer Environment
+automatic Git builds must also be disconnected before its first guarded deployment. The existing
+Wrangler OAuth token may lack Builds Configuration access.
 
-1. In the Cloudflare dashboard, disconnect Workers Builds from the production `syncroedit` Worker.
+1. In the Cloudflare dashboard, verify Workers Builds is disconnected from production `syncroedit`,
+   and disconnect the Developer Environment `syncroedit-dev` Git build integration.
    This changes delivery automation, not live Worker code. Check that no production build/deploy hook
    or in-flight build can deploy a delivery branch. Retain the original settings for recovery.
 2. To let the CLI verify disconnection, provide a user-scoped token through
    `SYNCROEDIT_BUILDS_API_TOKEN` with Workers Builds Configuration access. Keep it in your process
    environment or credential manager, never source control. Existing Wrangler OAuth remains the
-   deployment credential. `npm run audit:cloudflare` reports API verification explicitly; an
-   authentication error is not treated as confirmation that triggers are disabled.
+   deployment credential. `npm run audit:cloudflare` verifies the current checkout's Worker bindings
+   and disconnected build triggers. It exits nonzero on missing access or failed safety verification. Ordinary
+   development pushes require no production token. Production publishing and both remote deployment
+   commands require the relevant live checks; never bypass those checks.
 3. Production GitHub environment `release-source` requires owner approval and a secret named
    `SOURCE_REPOSITORY_READ_TOKEN`. Use a fine-grained token scoped to development repository contents
    read access only. Do not copy a broad personal token or any application/Cloudflare secret into it.
@@ -64,7 +72,8 @@ to satisfy source verification. Cloudflare's independent build trigger must be d
 `npm run release:validate` requires a clean development commit, runs all local checks including
 Playwright, and writes exact-SHA/tree evidence under `.git/syncroedit/validation/`. After the commit
 has reached development main, migrate staging if needed and run `npm run deploy:staging`. It verifies
-the existing remote database/namespaces, deploys the exact source, checks health, and records the
+the existing remote database/namespaces and disconnected Developer Environment build triggers,
+deploys the exact source, checks health, and records the
 active staging deployment. A failed health probe records no staging approval.
 
 `npm run release:prepare -- --source <full-sha>` requires both forms of evidence and confirms staging

@@ -29,6 +29,10 @@ source commit has reached development main. Neither verification command deploys
 ## Deliberate deployment
 
 Disable and verify production Workers Builds triggers before publishing or merging delivery branches.
+`npm run audit:cloudflare` checks the `syncroedit` Worker, its resource bindings, and zero Git build
+triggers, and exits nonzero when any check is unverified. Wrangler login cannot read Builds settings:
+export a user-scoped `SYNCROEDIT_BUILDS_API_TOKEN` with Workers Builds Configuration read access in
+the same terminal before auditing or pushing from this repository. Never store it in project files.
 Merging a PR and deploying are separate owner decisions. After merging an approved release:
 
 ```bash

@@ -198,6 +198,7 @@ async function deploy(role, options) {
   const sha = git(root, 'rev-parse', 'HEAD');
   const before = await remoteTarget(role);
   if (role === 'development') {
+    await requireSafeBuilds('development');
     git(root, 'fetch', 'origin', 'main');
     ancestor(root, sha, 'origin/main');
     evidence(root, sha, 'validation');
@@ -335,26 +336,44 @@ async function deploy(role, options) {
   }
 }
 
+async function checkPush(
+  checkout,
+  destination,
+  updates,
+  checks = { lastReceipt, verifyReceipt, verifyBootstrap, requireSafeBuilds }
+) {
+  const { role } = identity(checkout);
+  if (repositoryName(destination) !== TARGETS[role].repository)
+    throw new Error('Cross-environment push blocked');
+  if (process.env.CLOUDFLARE_ENV || process.env.WRANGLER_ENV)
+    throw new Error('Unset ambient Cloudflare environment overrides');
+  checkConfig(checkout);
+  checkSecrets(checkout);
+  for (const update of updates.trim().split('\n').filter(Boolean)) {
+    const [, local, remote, old] = update.split(/\s+/);
+    if (remote === 'refs/heads/main' || /^0+$/.test(local))
+      throw new Error('Direct main pushes and ref deletion are blocked');
+    if (!/^0+$/.test(old)) ancestor(checkout, old, local);
+  }
+  if (role === 'production') {
+    if (checks.lastReceipt(checkout)) checks.verifyReceipt(checkout);
+    else checks.verifyBootstrap(checkout);
+    await checks.requireSafeBuilds('production');
+  }
+}
+
+async function auditRemote(role, checks = { remoteTarget, requireSafeBuilds }) {
+  const target = await checks.remoteTarget(role);
+  console.log(JSON.stringify(target, null, 2));
+  const builds = await checks.requireSafeBuilds(role);
+  console.log(`${builds.worker}: automatic Git build triggers disconnected, verified`);
+  return { target, builds };
+}
+
 async function main() {
   if (command === 'check-push') {
     const [, destination] = process.argv.slice(3);
-    const { role } = identity(root);
-    if (repositoryName(destination) !== TARGETS[role].repository)
-      throw new Error('Cross-environment push blocked');
-    checkConfig(root);
-    checkSecrets(root);
-    const updates = fs.readFileSync(0, 'utf8').trim().split('\n').filter(Boolean);
-    for (const update of updates) {
-      const [, local, remote, old] = update.split(/\s+/);
-      if (remote === 'refs/heads/main' || /^0+$/.test(local))
-        throw new Error('Direct main pushes and ref deletion are blocked');
-      if (!/^0+$/.test(old)) ancestor(root, old, local);
-    }
-    if (role === 'production') {
-      if (lastReceipt(root)) verifyReceipt(root);
-      else verifyBootstrap(root);
-    }
-    await requireSafeBuilds();
+    await checkPush(root, destination, fs.readFileSync(0, 'utf8'));
     return;
   }
   const { values: options, positionals } = parseArgs({
@@ -482,20 +501,17 @@ async function main() {
       break;
     }
     case 'audit-remote':
-      console.log(JSON.stringify(await remoteTarget(role), null, 2));
-      try {
-        await requireSafeBuilds();
-        console.log('Production Workers Builds disconnected: verified');
-      } catch (error) {
-        console.log(`Production build-trigger safety UNVERIFIED: ${error.message}`);
-      }
+      await auditRemote(role);
       break;
     default:
       throw new Error(`Unknown operation: ${command || '(missing)'}`);
   }
 }
 
-main().catch((error) => {
-  console.error(`Safety check failed: ${error.message}`);
-  process.exitCode = 1;
-});
+if (require.main === module)
+  main().catch((error) => {
+    console.error(`Safety check failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+
+module.exports = { checkPush, auditRemote };
