@@ -1,3 +1,5 @@
+> Environment-specific setup and safe release commands are in the repository README and [DELIVERY.md](DELIVERY.md).
+
 # SyncroEdit Technical Documentation
 
 ## System overview
@@ -56,9 +58,9 @@ Document permissions are centralized rather than reimplemented in routes. Import
 
 ## Development, verification, and operations
 
-Install with `npm install`; use `npm run dev` for local Wrangler development. Apply D1 migrations with `npm run db:migrate:local` or `npm run db:migrate:remote`. There is no asset compilation step: Cloudflare serves `public/` directly.
+Install with `npm install`; use `npm run dev` for local Wrangler development. Apply local migrations with `npm run db:migrate:local`; the guarded remote migration alias is staging-only in development and is rejected in production. There is no asset compilation step: Cloudflare serves `public/` directly.
 
-The normal quality gate is `npm run lint`, `npm test`, and `npm run test:e2e`. Deployment uses `npm run deploy`; a Wrangler dry-run should be used to validate bundling, bindings, static assets, and Durable Object exports before a live deployment. Schema migrations must be applied before deploying code that requires them.
+The normal quality gate is `npm run lint`, `npm test`, and `npm run test:e2e`. Development deployment uses guarded `npm run deploy:staging`; production requires the explicit owner-approved release command in its README; a Wrangler dry-run should be used to validate bundling, bindings, static assets, and Durable Object exports before a live deployment. Schema migrations must be applied before deploying code that requires them.
 
 ## Extension and failure rules
 

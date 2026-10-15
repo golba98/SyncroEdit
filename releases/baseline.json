@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "kind": "infrastructure-bootstrap",
+  "sourceRepository": "golba98/SyncroEdit_dev",
+  "sourceCommit": "525ff57f7eb844429713671d8d26dd48cdae9203",
+  "productionBase": "b40a89306afa94a3c9010dbac9623f02159c0f81",
+  "sharedFiles": [
+    "scripts/ops.cjs",
+    "scripts/lib/safety.cjs",
+    "scripts/lib/promotion.cjs",
+    "scripts/hooks/pre-push",
+    "scripts/check-migrations.py",
+    "scripts/seed-dev-user.mjs",
+    "config/promotion.json",
+    "config/playwright.config.js",
+    "config/eslint.config.cjs",
+    "tests/unit/wranglerConfig.test.js",
+    "tests/release/promotion.test.cjs",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release-verify.yml",
+    ".github/copilot-instructions.md",
+    ".env.example",
+    "docs/DELIVERY.md",
+    "docs/ARCHITECTURE.md",
+    "docs/PROJECT_STRUCTURE.md",
+    "docs/DOCUMENTATION.md",
+    "docs/FILE_REFERENCE.md",
+    ".gitignore",
+    "tests/e2e/loading-states.test.js"
+  ]
+}

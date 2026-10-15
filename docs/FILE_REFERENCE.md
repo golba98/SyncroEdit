@@ -181,6 +181,7 @@ step. Keep package licences and every binary referenced by the package CSS/impor
 | `tests/mocks/emptyModule.js`                                    | Replaces browser-only packages in Jest tests that do not exercise those bundles.                     |
 | `tests/unit/emailVerification.test.js`                          | Verifies verification-code generation properties.                                                    |
 | `tests/unit/worker.test.js`                                     | Covers Worker API, auth, permissions, sessions, validation, and Durable Object contracts.            |
+| `tests/unit/wranglerConfig.test.js`                             | Validates every `wrangler.toml` environment and keeps staging DO exports in parity with production.  |
 | `tests/integration/security.test.js`                            | Exercises security headers, CORS, malformed input, and integration error behavior.                   |
 | `tests/e2e/collaboration.test.js`                               | Proves two independent users share live document edits, chat, and persisted reconnect state.         |
 | `tests/frontend/app/app.test.js`                                | Verifies application composition, authentication gates, navigation, and document lifecycle behavior. |
@@ -227,3 +228,25 @@ they may contain local secrets or user-specific tool settings.
 `node_modules/` is reproducible from `package-lock.json`. `.wrangler/`, `test-results/`,
 `playwright-report/`, coverage output, logs, and empty directories are disposable generated state
 and should not be retained after a cleanup pass.
+
+
+## Repository separation and delivery additions
+
+| File | Purpose |
+| --- | --- |
+| `config/environment.json` | Repository-specific role; protected during promotion. |
+| `config/promotion.json` | Explicit shared/protected paths and initial release baseline. |
+| `.github/workflows/ci.yml` | Credential-free application, migration, bundling, and browser validation. |
+| `.github/workflows/release-verify.yml` | Owner-gated private development provenance checks in production. |
+| `scripts/ops.cjs` | Guarded development, deployment, validation, and release commands. |
+| `scripts/lib/safety.cjs` | Git identity, credentials/artifact checks, and exact Cloudflare targets. |
+| `scripts/lib/promotion.cjs` | Three-way source projection, receipts, and tree reconstruction. |
+| `scripts/hooks/pre-push` | Local cross-environment push and main/history guards. |
+| `scripts/check-migrations.py` | Fresh in-memory SQL migration check. |
+| `tests/release/promotion.test.cjs` | Real temporary-repository promotion and safety tests. |
+| `docs/DELIVERY.md` | Repository boundaries, bootstrap, promotion, approval, and recovery. |
+| `docs/ENVIRONMENT.md` | Environment-specific resource and local-state details. |
+| `releases/baseline.json` | Production-only reviewed tooling bootstrap provenance. |
+
+The CLI/environment README supersedes older generic command examples. Production uses the live
+`DocumentSyncObject` / `RateLimitObject` bindings; staging uses historical `Synchro` class names.

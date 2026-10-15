@@ -1,0 +1,38 @@
+name: Release provenance
+on:
+  pull_request:
+  push:
+    branches: [main, 'release/**', 'chore/workspace-release-safety']
+permissions:
+  contents: read
+jobs:
+  provenance:
+    name: release-provenance
+    if: github.repository == 'golba98/SyncroEdit' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    environment: release-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # Owner approval is required before this step receives read-only access
+      # to private development source. Review the workflow and verifier first.
+      - name: Verify exact private source and protected production configuration
+        env:
+          GH_TOKEN: ${{ secrets.SOURCE_REPOSITORY_READ_TOKEN }}
+        shell: bash
+        run: |
+          test -n "$GH_TOKEN" || { echo 'Configure a read-only development repository token in the release-source environment'; exit 1; }
+          gh auth setup-git
+          if git log --format= --name-only -- releases/ | grep -Eq '^releases/[a-f0-9]{40}\.json$'; then
+            npm run release:verify
+          else
+            npm run release:verify-bootstrap
+          fi

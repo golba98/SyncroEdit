@@ -79,3 +79,10 @@ AGENTS.md
 # Cloudflare Wrangler local state
 .wrangler/
 worker/.wrangler/
+
+# Environment-specific Wrangler files and release evidence
+.dev.vars.*
+.env.*
+!.env.example
+.release-evidence/
+.claude/
