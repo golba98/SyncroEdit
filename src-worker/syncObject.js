@@ -23,6 +23,7 @@ const messageQueryAwareness = 3;
 const WS_OPEN = 1;
 
 // y-protocols sync message subtypes.
+const syncMessageStep2 = 1;
 const syncMessageUpdate = 2;
 
 // A rejected client sends one update per keystroke batch; only notify it this often.
@@ -412,7 +413,7 @@ export class SynchroDocumentObject {
 
             if (readOnly) {
               const syncMessageType = decoding.peekVarUint(decoder);
-              if (syncMessageType === syncMessageUpdate) {
+              if (syncMessageType === syncMessageUpdate || syncMessageType === syncMessageStep2) {
                 // Refuse the update, but say so — never discard it silently.
                 this.sendThrottledRejection(
                   ws,

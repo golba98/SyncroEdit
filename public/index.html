@@ -296,6 +296,8 @@
             class="toolbar-btn save-button"
             id="saveBtn"
             title="Save Document"
+            aria-label="Saved"
+            data-status="saved"
             style="
               background: var(--accent-color);
               color: white;
@@ -310,7 +312,8 @@
               gap: 6px;
             "
           >
-            <i class="fas fa-save" aria-hidden="true"></i
+            <i class="fas fa-save save-action-icon" aria-hidden="true"></i
+            ><i class="fas fa-check save-status-icon" aria-hidden="true"></i
             ><span class="header-action-label">Save</span>
           </button>
 
@@ -2499,73 +2502,114 @@
       <i class="fas fa-plus"></i>
     </div>
 
-    <div class="fab-edit" id="fabEditDoc" title="Edit Document" style="display: none">
-      <i class="fas fa-pen"></i>
-    </div>
-
-    <!-- Mobile Contextual Toolbar (Fixed above keyboard) -->
-    <div id="mobileContextualToolbar" class="mobile-toolbar">
+    <!-- Mobile formatting toolbar: docked above the on-screen keyboard while editing -->
+    <div id="mobileContextualToolbar" class="mobile-toolbar" role="toolbar" aria-label="Formatting">
       <div class="mobile-toolbar-scroll">
-        <button class="mobile-tool-btn" id="mobileUndoBtn" title="Undo" aria-label="Undo">
+        <button class="mobile-tool-btn" id="mobileUndoBtn" type="button" aria-label="Undo">
           <i class="fas fa-undo" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn" id="mobileRedoBtn" title="Redo" aria-label="Redo">
+        <button class="mobile-tool-btn" id="mobileRedoBtn" type="button" aria-label="Redo">
           <i class="fas fa-redo" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-bold" title="Bold" aria-label="Bold">
+        <span class="mobile-tool-separator" aria-hidden="true"></span>
+        <button
+          class="mobile-tool-btn ql-bold"
+          type="button"
+          aria-label="Bold"
+          aria-pressed="false"
+        >
           <i class="fas fa-bold" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-italic" title="Italic" aria-label="Italic">
+        <button
+          class="mobile-tool-btn ql-italic"
+          type="button"
+          aria-label="Italic"
+          aria-pressed="false"
+        >
           <i class="fas fa-italic" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-underline" title="Underline" aria-label="Underline">
+        <button
+          class="mobile-tool-btn ql-underline"
+          type="button"
+          aria-label="Underline"
+          aria-pressed="false"
+        >
           <i class="fas fa-underline" aria-hidden="true"></i>
         </button>
         <button
-          class="mobile-tool-btn"
-          id="mobileMoreToolsBtn"
+          class="mobile-tool-btn ql-strike"
           type="button"
-          aria-controls="mobileMoreTools"
-          aria-expanded="false"
-          title="More formatting tools"
+          aria-label="Strikethrough"
+          aria-pressed="false"
         >
-          <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+          <i class="fas fa-strikethrough" aria-hidden="true"></i>
         </button>
-      </div>
-      <div id="mobileMoreTools" class="mobile-toolbar-more" hidden>
-        <button class="mobile-tool-btn ql-list" value="ordered" aria-label="Numbered list">
-          <i class="fas fa-list-ol"></i>
+        <span class="mobile-tool-separator" aria-hidden="true"></span>
+        <button
+          class="mobile-tool-btn ql-list"
+          value="bullet"
+          type="button"
+          aria-label="Bulleted list"
+          aria-pressed="false"
+        >
+          <i class="fas fa-list-ul" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-list" value="bullet" aria-label="Bulleted list">
-          <i class="fas fa-list-ul"></i>
+        <button
+          class="mobile-tool-btn ql-list"
+          value="ordered"
+          type="button"
+          aria-label="Numbered list"
+          aria-pressed="false"
+        >
+          <i class="fas fa-list-ol" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-align" value="" aria-label="Align left">
-          <i class="fas fa-align-left"></i>
+        <button
+          class="mobile-tool-btn ql-align"
+          value=""
+          type="button"
+          aria-label="Align left"
+          aria-pressed="false"
+        >
+          <i class="fas fa-align-left" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-align" value="center" aria-label="Align center">
-          <i class="fas fa-align-center"></i>
+        <button
+          class="mobile-tool-btn ql-align"
+          value="center"
+          type="button"
+          aria-label="Align center"
+          aria-pressed="false"
+        >
+          <i class="fas fa-align-center" aria-hidden="true"></i>
         </button>
-        <button class="mobile-tool-btn ql-image" aria-label="Insert image">
-          <i class="fas fa-image"></i>
+        <span class="mobile-tool-separator" aria-hidden="true"></span>
+        <button class="mobile-tool-btn ql-image" type="button" aria-label="Insert image">
+          <i class="fas fa-image" aria-hidden="true"></i>
         </button>
         <button
           class="mobile-tool-btn"
+          type="button"
           data-proxy-click="toggleOutline"
           aria-label="Document outline"
         >
-          <i class="fas fa-list-alt"></i>
+          <i class="fas fa-list-alt" aria-hidden="true"></i>
         </button>
         <button
           class="mobile-tool-btn"
+          type="button"
           data-proxy-click="toggleSearchBtn"
           aria-label="Find and replace"
         >
-          <i class="fas fa-search"></i>
-        </button>
-        <button class="mobile-tool-btn" id="mobileCloseKeyboard" aria-label="Close keyboard">
-          <i class="fas fa-keyboard"></i>
+          <i class="fas fa-search" aria-hidden="true"></i>
         </button>
       </div>
+      <button
+        class="mobile-tool-btn mobile-toolbar-done"
+        id="mobileCloseKeyboard"
+        type="button"
+        aria-label="Done editing"
+      >
+        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+      </button>
     </div>
 
     <!-- Offline Indicator -->

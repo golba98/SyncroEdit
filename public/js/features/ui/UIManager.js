@@ -261,20 +261,10 @@ export class UIManager {
   setupMobileEvents() {
     // FAB Logic
     const fabCreate = document.getElementById('fabCreateDoc');
-    const fabEdit = document.getElementById('fabEditDoc');
 
     if (fabCreate) {
       fabCreate.addEventListener('click', () => {
         this.app.libraryManager.createNewDocument();
-      });
-    }
-
-    if (fabEdit) {
-      fabEdit.addEventListener('click', () => {
-        if (this.app.editor && this.app.editor.quill) {
-          this.app.editor.quill.focus();
-          this.setMobileEditMode(true);
-        }
       });
     }
 
@@ -296,46 +286,65 @@ export class UIManager {
       });
     });
 
-    // Mobile Toolbar Close Keyboard
-    const closeKbd = document.getElementById('mobileCloseKeyboard');
-    if (closeKbd) {
-      closeKbd.addEventListener('click', () => {
-        if (this.app.editor && this.app.editor.quill) {
-          this.app.editor.quill.blur();
-          this.setMobileEditMode(false);
-        }
-      });
+    const toolbar = document.getElementById('mobileContextualToolbar');
+    if (toolbar) {
+      // Keep focus (and the on-screen keyboard) in the editor while a tool is tapped.
+      const keepEditorFocus = (e) => {
+        if (e.target.closest('.mobile-tool-btn')) e.preventDefault();
+      };
+      toolbar.addEventListener('pointerdown', keepEditorFocus);
+      toolbar.addEventListener('mousedown', keepEditorFocus);
+      toolbar.addEventListener('click', () =>
+        requestAnimationFrame(() => this.syncMobileFormats())
+      );
     }
 
-    const moreTools = document.getElementById('mobileMoreTools');
-    const moreToolsBtn = document.getElementById('mobileMoreToolsBtn');
-    if (moreTools && moreToolsBtn) {
-      moreToolsBtn.addEventListener('click', () => {
-        const open = moreTools.hidden;
-        moreTools.hidden = !open;
-        moreToolsBtn.setAttribute('aria-expanded', String(open));
-      });
-    }
+    document.getElementById('mobileCloseKeyboard')?.addEventListener('click', () => {
+      this.app.editor?.quill?.blur();
+      this.setMobileEditMode(false);
+    });
 
     // Initial state
     this.updateMobileUIState();
 
-    // Listen for editor focus/blur to toggle toolbar
+    // The formatting bar follows editor focus in the phone layout.
     document.addEventListener('focusin', (e) => {
-      if (window.innerWidth <= 768 && e.target.closest('.ql-editor')) {
+      if (document.body.dataset.layoutMode === 'mobile' && e.target.closest('.ql-editor')) {
         this.setMobileEditMode(true);
       }
     });
+    document.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (!document.activeElement?.closest('.ql-editor, #mobileContextualToolbar')) {
+          this.setMobileEditMode(false);
+        }
+      }, 0);
+    });
+    document.addEventListener('selectionchange', () => {
+      if (this.isMobileEditing) this.syncMobileFormats();
+    });
+  }
 
-    // We don't blur immediately on focusout because clicking a toolbar button might trigger focusout
-    // Instead, we rely on the Close Keyboard button or manual blur
+  syncMobileFormats() {
+    const quill = this.app.editor?.quill;
+    if (!quill?.hasFocus?.()) return;
+    const format = quill.getFormat();
+    document.querySelectorAll('#mobileContextualToolbar [aria-pressed]').forEach((button) => {
+      const name = ['bold', 'italic', 'underline', 'strike', 'list', 'align'].find((key) =>
+        button.classList.contains(`ql-${key}`)
+      );
+      if (!name) return;
+      const active = button.hasAttribute('value')
+        ? (format[name] || '') === button.value
+        : Boolean(format[name]);
+      button.setAttribute('aria-pressed', String(active));
+    });
   }
 
   updateMobileUIState() {
     const isMobile = window.innerWidth <= 768;
 
     const fabCreate = document.getElementById('fabCreateDoc');
-    const fabEdit = document.getElementById('fabEditDoc');
     const bottomNav = document.querySelector('.bottom-nav');
     const docLibrary = document.getElementById('docLibrary');
 
@@ -344,16 +353,12 @@ export class UIManager {
 
     if (!isMobile) {
       if (fabCreate) fabCreate.style.removeProperty('display');
-      if (fabEdit) fabEdit.style.removeProperty('display');
       if (bottomNav) bottomNav.style.removeProperty('display');
     } else if (isLibraryVisible) {
       if (fabCreate) fabCreate.style.display = 'flex';
-      if (fabEdit) fabEdit.style.display = 'none';
       if (bottomNav) bottomNav.style.display = 'flex';
     } else if (hasDocument) {
       if (fabCreate) fabCreate.style.display = 'none';
-      // The edit button is only for getting into edit mode; the toolbar replaces it while editing.
-      if (fabEdit) fabEdit.style.display = this.isMobileEditing ? 'none' : 'flex';
       if (bottomNav) bottomNav.style.display = 'none';
     }
   }
@@ -684,19 +689,9 @@ export class UIManager {
 
   setMobileEditMode(active) {
     this.isMobileEditing = active;
-    const toolbar = document.getElementById('mobileContextualToolbar');
-    const fabEdit = document.getElementById('fabEditDoc');
-    const header = document.querySelector('.header');
-
-    if (active) {
-      if (toolbar) toolbar.style.display = 'block';
-      if (fabEdit) fabEdit.style.display = 'none';
-      if (header) header.classList.add('is-mobile-editing');
-    } else {
-      if (toolbar) toolbar.style.display = 'none';
-      if (fabEdit) fabEdit.style.display = 'flex';
-      if (header) header.classList.remove('is-mobile-editing');
-    }
+    // CSS shows the docked formatting bar only in the phone layout.
+    document.body.classList.toggle('is-mobile-editing', active);
+    if (active) this.syncMobileFormats();
   }
 
   setupRibbonTabs() {
@@ -834,6 +829,23 @@ export class UIManager {
     indicator.textContent = stateMap[status] || stateMap.saved;
     indicator.dataset.status = status;
     indicator.hidden = false;
+
+    // The phone header shows the same state as an icon on the save button.
+    const saveBtn = document.getElementById('saveBtn');
+    const icon = saveBtn?.querySelector('.save-status-icon');
+    if (saveBtn) {
+      saveBtn.dataset.status = status;
+      saveBtn.setAttribute('aria-label', indicator.textContent);
+    }
+    if (icon) {
+      const icons = {
+        saving: 'fa-circle-notch',
+        offline: 'fa-cloud',
+        failed: 'fa-triangle-exclamation',
+        unsaved: 'fa-cloud-arrow-up',
+      };
+      icon.className = `fas ${icons[status] || 'fa-check'} save-status-icon`;
+    }
   }
 
   openProfileModal() {

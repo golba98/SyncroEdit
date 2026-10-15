@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "sourceRepository": "golba98/SyncroEdit_dev",
+  "sourceCommit": "82a3f19300cc14944b4c4ce5481b0dedb600731c",
+  "sourceTree": "7c61d1cff7db0b4ce7c3013d2ae352b8a45e78a5",
+  "baselineDevelopment": "b40a89306afa94a3c9010dbac9623f02159c0f81",
+  "bootstrapSource": "8593b9c661633ef942fa8870fdbefd98dfb4fd98",
+  "targetRepository": "golba98/SyncroEdit",
+  "targetBase": "5de37365ad59ebc5bd64cf84386bab21b651afbc",
+  "mergedTree": "04ff763f6135689c1bda15bf5e3fef10f6cf1c50",
+  "changesHash": "9acf5c0498c51ef7e2e36520db05b88c07315d506ff6337add813fcdc9d098a1",
+  "included": [
+    "docs/DELIVERY.md",
+    "docs/FILE_REFERENCE.md",
+    "package-lock.json",
+    "package.json",
+    "public/css/app/effects.css",
+    "public/css/app/responsive.css",
+    "public/index.html",
+    "public/js/features/ui/ResponsiveLayoutController.js",
+    "public/js/features/ui/UIManager.js",
+    "public/sw.js",
+    "public/vendor/dompurify/purify.es.mjs",
+    "scripts/lib/promotion.cjs",
+    "scripts/lib/safety.cjs",
+    "scripts/ops.cjs",
+    "src-worker/app.js",
+    "src-worker/syncObject.js",
+    "tests/e2e/loading-states.test.js",
+    "tests/e2e/mobile-editor.test.js",
+    "tests/e2e/responsiveness.test.js",
+    "tests/frontend/app/sw.test.js",
+    "tests/frontend/features/ui/responsiveLayout.test.js",
+    "tests/release/promotion.test.cjs",
+    "tests/unit/worker.test.js"
+  ],
+  "excluded": [
+    "README.md",
+    "config/environment.json",
+    "docs/ENVIRONMENT.md",
+    "wrangler.toml"
+  ],
+  "validation": {
+    "commit": "82a3f19300cc14944b4c4ce5481b0dedb600731c",
+    "tree": "7c61d1cff7db0b4ce7c3013d2ae352b8a45e78a5",
+    "checkedAt": "2026-10-15T18:13:26.517Z",
+    "suites": [
+      "lint",
+      "jest",
+      "release-safety",
+      "migrations",
+      "wrangler",
+      "playwright"
+    ]
+  },
+  "staging": {
+    "commit": "82a3f19300cc14944b4c4ce5481b0dedb600731c",
+    "tree": "7c61d1cff7db0b4ce7c3013d2ae352b8a45e78a5",
+    "deployment": {
+      "id": "bff583eb-da5d-4d5e-9fd7-6680341ff464",
+      "source": "wrangler",
+      "strategy": "percentage",
+      "author_email": "jordanvorster404@gmail.com",
+      "annotations": {
+        "workers/message": "Development validation 82a3f19300cc14944b4c4ce5...",
+        "workers/triggered_by": "upload"
+      },
+      "versions": [
+        {
+          "version_id": "5a89e6e1-2820-4778-889d-d89ec2980d7a",
+          "percentage": 100
+        }
+      ],
+      "created_on": "2026-10-15T18:13:59.70333Z"
+    },
+    "checkedAt": "2026-10-15T18:14:08.197Z"
+  },
+  "backports": [],
+  "rehearsal": false,
+  "preparedAt": "2026-10-15T18:19:44.053Z"
+}

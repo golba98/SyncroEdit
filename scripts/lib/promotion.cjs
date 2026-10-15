@@ -100,13 +100,55 @@ function lastReceipt(root, ref = 'HEAD') {
   return file ? JSON.parse(git(root, 'show', `${ref}:${file}`)) : null;
 }
 
-function reconstruct(root, baseline, source, target, policy) {
+// Before the first release, the infrastructure bootstrap already carries development tooling from
+// its source commit, so those files must merge from that version rather than the initial baseline.
+function bootstrapFor(root, target) {
+  if (lastReceipt(root, target) || !git(root, 'ls-tree', target, '--', 'releases/baseline.json'))
+    return null;
+  const baseline = JSON.parse(git(root, 'show', `${target}:releases/baseline.json`));
+  if (baseline.kind !== 'infrastructure-bootstrap') return null;
+  if (!/^[a-f0-9]{40}$/.test(baseline.sourceCommit) || !Array.isArray(baseline.sharedFiles))
+    throw new Error('Invalid bootstrap provenance');
+  return { sourceCommit: baseline.sourceCommit, sharedFiles: baseline.sharedFiles };
+}
+
+function reconstruct(root, baseline, source, target, policy, bootstrap = null) {
   ancestor(root, baseline, source);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'syncroedit-index-'));
   const env = { ...process.env, GIT_INDEX_FILE: path.join(temporary, 'index') };
   const indexed = (...args) => run('git', ['-C', root, ...args], { env });
-  indexed('read-tree', baseline);
-  const changed = git(root, 'diff', '--no-renames', '--name-only', '-z', baseline, source)
+  const stage = (commit, file) => {
+    const entry = git(root, 'ls-tree', commit, '--', file);
+    if (!entry) return indexed('update-index', '--force-remove', '--', file);
+    const [mode, type, oid] = entry.split(/\s+/);
+    if (type !== 'blob' || !['100644', '100755'].includes(mode))
+      throw new Error(`Unsupported source file type: ${file}`);
+    return indexed('update-index', '--add', '--cacheinfo', `${mode},${oid},${file}`);
+  };
+  let base = baseline;
+  if (bootstrap) {
+    ancestor(root, bootstrap.sourceCommit, source);
+    indexed('read-tree', baseline);
+    for (const file of bootstrap.sharedFiles) stage(bootstrap.sourceCommit, file);
+    base = run(
+      'git',
+      [
+        '-C',
+        root,
+        '-c',
+        'user.name=SyncroEdit Release',
+        '-c',
+        'user.email=release@syncroedit.local',
+        'commit-tree',
+        indexed('write-tree'),
+        '-p',
+        baseline,
+      ],
+      { input: 'Promotion base with bootstrap tooling\n' }
+    );
+  }
+  indexed('read-tree', base);
+  const changed = git(root, 'diff', '--no-renames', '--name-only', '-z', base, source)
     .split('\0')
     .filter(Boolean);
   const included = [];
@@ -116,16 +158,9 @@ function reconstruct(root, baseline, source, target, policy) {
       excluded.push(file);
       continue;
     }
-    const entry = git(root, 'ls-tree', source, '--', file);
     if (file.startsWith('migrations/') && git(root, 'ls-tree', baseline, '--', file))
       throw new Error(`Historical migration modification rejected: ${file}`);
-    if (!entry) indexed('update-index', '--force-remove', '--', file);
-    else {
-      const [mode, type, oid] = entry.split(/\s+/);
-      if (type !== 'blob' || !['100644', '100755'].includes(mode))
-        throw new Error(`Unsupported source file type: ${file}`);
-      indexed('update-index', '--add', '--cacheinfo', `${mode},${oid},${file}`);
-    }
+    stage(source, file);
     included.push(file);
   }
   const projected = indexed('write-tree');
@@ -141,20 +176,15 @@ function reconstruct(root, baseline, source, target, policy) {
       'commit-tree',
       projected,
       '-p',
-      baseline,
+      base,
     ],
     { input: 'Projected shared development changes\n' }
   );
   let tree;
   try {
-    tree = git(
-      root,
-      'merge-tree',
-      '--write-tree',
-      `--merge-base=${baseline}`,
-      target,
-      synthetic
-    ).split('\n')[0];
+    tree = git(root, 'merge-tree', '--write-tree', `--merge-base=${base}`, target, synthetic).split(
+      '\n'
+    )[0];
   } catch {
     throw new Error(
       'Three-way promotion conflict: candidate retained; resolve through development/backport review, never overwrite production'
@@ -235,12 +265,16 @@ function verifyReceipt(root, { allowRehearsal = false, fetchSource = true } = {}
   const backports = backportsFor(root, receipt.targetBase, receipt.sourceCommit, policy);
   if (JSON.stringify(backports) !== JSON.stringify(receipt.backports || []))
     throw new Error('Hotfix backport provenance mismatch');
+  const bootstrap = bootstrapFor(root, receipt.targetBase);
+  if ((bootstrap?.sourceCommit ?? null) !== (receipt.bootstrapSource ?? null))
+    throw new Error('Bootstrap provenance differs from the receipt');
   const merged = reconstruct(
     root,
     receipt.baselineDevelopment,
     receipt.sourceCommit,
     receipt.targetBase,
-    policy
+    policy,
+    bootstrap
   );
   if (
     merged.tree !== receipt.mergedTree ||
@@ -310,6 +344,7 @@ function verifyBootstrap(root) {
 }
 
 module.exports = {
+  bootstrapFor,
   findBackport,
   backportsFor,
   classification,

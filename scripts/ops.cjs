@@ -22,6 +22,7 @@ const {
 const {
   ancestor,
   backportsFor,
+  bootstrapFor,
   lastReceipt,
   reconstruct,
   withReceipt,
@@ -107,8 +108,9 @@ async function prepare(options) {
   if (fs.existsSync(path.join(directory, `releases/${sha}.json`)))
     throw new Error('This source has already been promoted');
   const baseline = previous?.sourceCommit || policy.initialBaseline;
+  const bootstrap = bootstrapFor(directory, target);
   const backports = backportsFor(directory, target, sha, policy);
-  const merged = reconstruct(directory, baseline, sha, target, policy);
+  const merged = reconstruct(directory, baseline, sha, target, policy, bootstrap);
   if (!merged.transferred.length) throw new Error('No unapplied shared changes to promote');
   const receipt = {
     schema: 1,
@@ -116,6 +118,7 @@ async function prepare(options) {
     sourceCommit: sha,
     sourceTree: git(root, 'rev-parse', 'HEAD^{tree}'),
     baselineDevelopment: baseline,
+    bootstrapSource: bootstrap?.sourceCommit ?? null,
     targetRepository: TARGETS.production.repository,
     targetBase: target,
     mergedTree: merged.tree,

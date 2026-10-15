@@ -75,6 +75,37 @@ test.describe('Loading surfaces', () => {
       viewport.height + 1
     );
 
+    // The visible overlay must be one opaque surface over the whole screen so
+    // the header never shows as a separate band and the card sits centered.
+    const overlay = page.locator('#editorWorkspaceLoader');
+    await expect(overlay).toBeVisible();
+    const overlayBox = await overlay.boundingBox();
+    expect(Math.abs(overlayBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(overlayBox.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(overlayBox.width - viewport.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(overlayBox.height - viewport.height)).toBeLessThanOrEqual(1);
+    const cardBox = await overlay.locator('.editor-workspace-loader-card').boundingBox();
+    expect(Math.abs(cardBox.x + cardBox.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(2);
+    expect(Math.abs(cardBox.y + cardBox.height / 2 - viewport.height / 2)).toBeLessThanOrEqual(2);
+    const surface = await page.evaluate(() => {
+      const el = document.getElementById('editorWorkspaceLoader');
+      const style = getComputedStyle(el);
+      const covers = (y) =>
+        el.contains(document.elementFromPoint(window.innerWidth / 2, y)) &&
+        el.contains(document.elementFromPoint(2, y));
+      return {
+        background: style.backgroundColor,
+        backdrop: style.backdropFilter,
+        top: covers(2),
+        bottom: covers(window.innerHeight - 2),
+      };
+    });
+    expect(surface.background).toMatch(/^rgb\(/);
+    expect(surface.backdrop).toBe('none');
+    expect(surface.top).toBe(true);
+    expect(surface.bottom).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('creating-document-loader.png') });
+
     releaseCreate();
     await expect(loader).toBeHidden({ timeout: 30000 });
     await expect(loader).toHaveAttribute('data-open-state', 'ready');

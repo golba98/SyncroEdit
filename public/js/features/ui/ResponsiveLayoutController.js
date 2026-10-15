@@ -47,6 +47,12 @@ function layoutMode(width) {
   return 'desktop';
 }
 
+// Height of the layout viewport hidden below the visual viewport, i.e. the on-screen keyboard.
+function keyboardInset(layoutHeight, viewport) {
+  if (!viewport) return 0;
+  return Math.max(0, Math.round(layoutHeight - viewport.height - viewport.offsetTop));
+}
+
 function elementWidth(element) {
   if (!element) return 0;
   const rect = element.getBoundingClientRect();
@@ -141,6 +147,10 @@ export class ResponsiveLayoutController {
       '--visual-viewport-offset-top',
       `${viewport?.offsetTop || 0}px`
     );
+    document.documentElement.style.setProperty(
+      '--keyboard-inset',
+      `${keyboardInset(window.innerHeight, viewport)}px`
+    );
 
     const pages = document.getElementById('pagesContainer');
     if (pages && this.app.editor) {
@@ -198,21 +208,30 @@ export class ResponsiveLayoutController {
     const sections = Array.from(ribbon.querySelectorAll(':scope > [data-responsive-section]'));
     const styles = getComputedStyle(ribbon);
     const available =
-      ribbon.clientWidth -
+      ribbon.getBoundingClientRect().width -
       parseFloat(styles.paddingLeft || 0) -
       parseFloat(styles.paddingRight || 0);
-    const overflowWidth = 42;
-    let used = sections.reduce((sum, section) => sum + elementWidth(section), 0);
+    const gap = parseFloat(styles.columnGap) || 0;
+    // The overflow host has an auto left margin, so measure its button plus its fixed right margin.
+    const overflowWidth =
+      (overflow.firstElementChild?.getBoundingClientRect().width || 40) +
+      (parseFloat(getComputedStyle(overflow).marginRight) || 0) +
+      gap;
+    const visible = new Set(sections);
+    // Sections, the gaps between them, and the overflow button once anything has moved into it.
+    const needed = () =>
+      [...visible].reduce((sum, section) => sum + elementWidth(section), 0) +
+      gap * Math.max(0, visible.size - 1) +
+      (visible.size < sections.length ? overflowWidth : 0);
     const candidates = [...sections].sort((a, b) => {
       const priority = Number(b.dataset.responsivePriority) - Number(a.dataset.responsivePriority);
       return priority || Number(b.dataset.responsiveOrder) - Number(a.dataset.responsiveOrder);
     });
 
-    while (used > available && candidates.length > 1) {
+    while (needed() > available && candidates.length > 1) {
       const section = candidates.shift();
-      used -= elementWidth(section);
+      visible.delete(section);
       panel.prepend(section);
-      if (used + overflowWidth <= available) break;
     }
 
     overflow.hidden = panel.children.length === 0;
@@ -283,4 +302,4 @@ export class ResponsiveLayoutController {
   }
 }
 
-export { layoutMode, VIEWPORT_BREAKPOINTS };
+export { keyboardInset, layoutMode, VIEWPORT_BREAKPOINTS };

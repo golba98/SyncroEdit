@@ -2,6 +2,7 @@
   --page-render-scale: 1;
   --visual-viewport-height: 100dvh;
   --visual-viewport-offset-top: 0px;
+  --keyboard-inset: 0px;
 }
 
 *,
@@ -255,68 +256,6 @@ button {
     overflow: hidden;
   }
 
-  .header {
-    position: relative;
-    height: 56px !important;
-    min-height: 56px;
-    padding-inline: 8px !important;
-  }
-
-  .header-left {
-    gap: 6px !important;
-  }
-
-  .header-right > div:not(.header-more),
-  #activeCollaborators,
-  #userProfileTrigger,
-  #localModeBadge {
-    display: none !important;
-  }
-
-  .header-right > div:has(#saveBtn),
-  .header-right > div:has(#shareBtn),
-  body .header-right > div:has(#headerMoreBtn) {
-    display: flex !important;
-  }
-
-  #menuBtn,
-  #saveBtn,
-  #shareBtn,
-  #chatToggle,
-  #headerMoreBtn {
-    display: inline-flex !important;
-    width: 40px !important;
-    min-width: 40px !important;
-    height: 40px;
-    padding: 0 !important;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #docTitle {
-    width: auto !important;
-    flex: 1 1 6rem;
-    font-size: 16px !important;
-  }
-
-  .ribbon-tabs,
-  .ribbon-content {
-    display: none !important;
-  }
-
-  .main-workspace {
-    top: auto !important;
-    height: auto !important;
-    margin-bottom: 0;
-  }
-
-  .pages-container {
-    align-items: stretch;
-    gap: 12px;
-    padding: 8px 0 calc(88px + env(safe-area-inset-bottom)) !important;
-    overflow-x: visible;
-  }
-
   body[data-document-presentation='continuous'] .editor-container {
     width: 100%;
     height: auto;
@@ -357,39 +296,6 @@ button {
 
   .document-chat__composer {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
-  }
-
-  .mobile-toolbar {
-    width: 100%;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .mobile-toolbar-scroll,
-  .mobile-toolbar-more {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(40px, 1fr));
-    gap: 6px;
-    padding: 8px;
-    overflow: visible;
-  }
-
-  .mobile-toolbar-more {
-    position: absolute;
-    right: 0;
-    bottom: 100%;
-    left: 0;
-    grid-template-columns: repeat(4, minmax(44px, 1fr));
-    border-top: 1px solid var(--border);
-    background: var(--surface-elevated);
-  }
-
-  .mobile-toolbar-more[hidden] {
-    display: none;
-  }
-
-  .mobile-tool-btn {
-    width: 100%;
-    min-width: 0;
   }
 
   #docLibrary .library-create-grid {
@@ -524,4 +430,265 @@ body[data-view-state='opening-document'] .bottom-nav {
   #docLibrary .document-search {
     font-size: 16px !important;
   }
+}
+
+/* ==========================================================================
+   Mobile editor (phone layout, set by ResponsiveLayoutController)
+   One surface from header to page, a quiet icon header with the save state,
+   and a formatting bar docked above the on-screen keyboard while editing.
+   ========================================================================== */
+
+.mobile-toolbar,
+.save-status-icon {
+  display: none;
+}
+
+body[data-layout-mode='mobile'] {
+  --mobile-surface: #171719;
+  --mobile-hairline: #26262a;
+  --mobile-title: #f4f4f5;
+  --mobile-icon: #d4d4d8;
+  --mobile-icon-muted: #8b8b92;
+  --mobile-press: rgba(255, 255, 255, 0.08);
+  --mobile-active: rgba(255, 255, 255, 0.16);
+  --mobile-bar: #1f1f22;
+  --mobile-toolbar-height: 52px;
+}
+
+body.light-theme[data-layout-mode='mobile'] {
+  --mobile-surface: #ffffff;
+  --mobile-hairline: #e4e4e7;
+  --mobile-title: #18181b;
+  --mobile-icon: #3f3f46;
+  --mobile-icon-muted: #71717a;
+  --mobile-press: rgba(0, 0, 0, 0.06);
+  --mobile-active: rgba(0, 0, 0, 0.1);
+  --mobile-bar: #f7f7f8;
+}
+
+/* Header: one 56px row. Inline styles in index.html require !important here. */
+body[data-layout-mode='mobile'] .header {
+  position: relative;
+  height: 56px !important;
+  min-height: 56px;
+  padding: 0 4px 0 4px !important;
+  gap: 4px;
+  background: var(--mobile-surface) !important;
+  border-bottom: 1px solid var(--mobile-hairline) !important;
+}
+
+body[data-layout-mode='mobile'] .header-left {
+  flex: 1 1 auto;
+  gap: 0 !important;
+}
+
+body[data-layout-mode='mobile'] .header-right {
+  flex: 0 0 auto;
+  gap: 0 !important;
+}
+
+body[data-layout-mode='mobile'] #editorBrand,
+body[data-layout-mode='mobile'] #localModeBadge,
+body[data-layout-mode='mobile'] #activeCollaborators,
+body[data-layout-mode='mobile'] #userProfileTrigger,
+body[data-layout-mode='mobile'] #saveAsBtn,
+body[data-layout-mode='mobile'] .save-action-icon,
+body[data-layout-mode='mobile'] .header-action-label,
+body[data-layout-mode='mobile'] .chat-toggle-label,
+body[data-layout-mode='mobile'] .ribbon-tabs,
+body[data-layout-mode='mobile'] .ribbon-content,
+body[data-layout-mode='mobile'] .status-bar,
+body[data-layout-mode='mobile'] .sidebar-right {
+  display: none !important;
+}
+
+body[data-layout-mode='mobile'] .header-right > div:has(#saveBtn) {
+  display: contents !important;
+}
+
+body[data-layout-mode='mobile'] .header-more {
+  display: flex !important;
+}
+
+body[data-layout-mode='mobile'] #menuBtn,
+body[data-layout-mode='mobile'] #saveBtn,
+body[data-layout-mode='mobile'] #chatToggle,
+body[data-layout-mode='mobile'] #shareBtn,
+body[data-layout-mode='mobile'] #headerMoreBtn {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  align-items: center;
+  justify-content: center;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--mobile-icon) !important;
+  font-size: 17px !important;
+}
+
+body[data-layout-mode='mobile'] #menuBtn:active,
+body[data-layout-mode='mobile'] #saveBtn:active,
+body[data-layout-mode='mobile'] #chatToggle:active,
+body[data-layout-mode='mobile'] #shareBtn:active,
+body[data-layout-mode='mobile'] #headerMoreBtn:active {
+  background: var(--mobile-press) !important;
+}
+
+body[data-layout-mode='mobile'] #docTitle {
+  flex: 1 1 auto;
+  width: auto !important;
+  min-width: 0;
+  max-width: none !important;
+  padding: 6px 8px !important;
+  color: var(--mobile-title) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+body[data-layout-mode='mobile'] #docTitle::placeholder {
+  color: var(--mobile-icon);
+  opacity: 1;
+}
+
+body[data-layout-mode='mobile'] .save-status-icon {
+  display: inline-block;
+  color: var(--mobile-icon-muted);
+  font-size: 15px;
+}
+
+body[data-layout-mode='mobile'] #saveBtn[data-status='saving'] .save-status-icon {
+  animation: fa-spin 1s linear infinite;
+}
+
+body[data-layout-mode='mobile'] #saveBtn[data-status='unsaved'] .save-status-icon,
+body[data-layout-mode='mobile'] #saveBtn[data-status='offline'] .save-status-icon {
+  color: var(--mobile-icon);
+}
+
+body[data-layout-mode='mobile'] #saveBtn[data-status='failed'] .save-status-icon {
+  color: #f87171;
+}
+
+@media (max-width: 360px) {
+  body[data-layout-mode='mobile'] #menuBtn,
+  body[data-layout-mode='mobile'] #saveBtn,
+  body[data-layout-mode='mobile'] #chatToggle,
+  body[data-layout-mode='mobile'] #shareBtn,
+  body[data-layout-mode='mobile'] #headerMoreBtn {
+    width: 36px !important;
+    min-width: 36px !important;
+  }
+}
+
+/* Page: header, canvas, and sheet share one surface, so no band or seam shows.
+   The body matches too, so the header's entrance slide never uncovers a strip. */
+body[data-layout-mode='mobile'][data-view-state='editor-ready'] {
+  background: var(--mobile-surface) !important;
+}
+
+body[data-layout-mode='mobile'] .main-workspace,
+body.light-theme[data-layout-mode='mobile'] .main-workspace {
+  top: auto !important;
+  height: auto !important;
+  margin-bottom: 0;
+  background: var(--mobile-surface) !important;
+}
+
+body[data-layout-mode='mobile'] #pagesContainer {
+  align-items: stretch;
+  gap: 0;
+  padding: 0 0 calc(24px + env(safe-area-inset-bottom)) !important;
+  overflow-x: visible;
+  background: var(--mobile-surface) !important;
+}
+
+body[data-layout-mode='mobile'].is-mobile-editing #pagesContainer {
+  padding-bottom: calc(var(--mobile-toolbar-height) + var(--keyboard-inset) + 24px) !important;
+}
+
+body[data-layout-mode='mobile'] #pagesContainer .page-scaler {
+  min-height: calc(var(--visual-viewport-height) - 56px);
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--mobile-surface) !important;
+  box-shadow: none !important;
+}
+
+/* Formatting bar: sits on the keyboard (bottom offset tracks visualViewport). */
+body[data-layout-mode='mobile'].is-mobile-editing .mobile-toolbar {
+  position: fixed;
+  z-index: 9500;
+  right: 0;
+  bottom: var(--keyboard-inset);
+  left: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: calc(var(--mobile-toolbar-height) + env(safe-area-inset-bottom));
+  padding: 0 4px env(safe-area-inset-bottom);
+  border-top: 1px solid var(--mobile-hairline);
+  background: var(--mobile-bar);
+}
+
+body[data-layout-mode='mobile'] .mobile-toolbar-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+}
+
+body[data-layout-mode='mobile'] .mobile-toolbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ID scope and !important: global .ql-align/.ql-picker select styles (core.css, theme.js)
+   would otherwise resize the align buttons. */
+body[data-layout-mode='mobile'] #mobileContextualToolbar .mobile-tool-btn {
+  display: inline-flex;
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  align-items: center;
+  justify-content: center;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--mobile-icon) !important;
+  font-size: 16px !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body[data-layout-mode='mobile'] #mobileContextualToolbar .mobile-tool-btn:active {
+  background: var(--mobile-press) !important;
+}
+
+body[data-layout-mode='mobile'] #mobileContextualToolbar .mobile-tool-btn[aria-pressed='true'] {
+  background: var(--mobile-active) !important;
+  color: var(--mobile-title) !important;
+}
+
+body[data-layout-mode='mobile'] .mobile-tool-separator {
+  flex: 0 0 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--mobile-hairline);
+}
+
+body[data-layout-mode='mobile'] #mobileContextualToolbar .mobile-toolbar-done {
+  margin-left: 4px;
+  color: var(--mobile-title) !important;
 }

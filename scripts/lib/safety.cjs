@@ -316,16 +316,27 @@ async function requireSafeBuilds(role = 'production') {
   return { worker: worker.id, triggerCount: 0 };
 }
 
-async function checkHealth(url) {
-  const response = await fetch(`${url}/health`, {
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!response.ok || !response.headers.get('content-type')?.includes('application/json'))
-    throw new Error(`Health check requires Worker JSON, received HTTP ${response.status}`);
-  const body = await response.json();
-  if (body.status !== 'healthy') throw new Error('Worker reports unhealthy status');
-  return body;
+async function checkHealth(url, { attempts = 12, delayMs = 5000 } = {}) {
+  // A new version takes a few seconds to reach every edge location, so the
+  // previous version may answer first. Only healthy Worker JSON passes.
+  let failure;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetch(`${url}/health`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json'))
+        throw new Error(`Health check requires Worker JSON, received HTTP ${response.status}`);
+      const body = await response.json();
+      if (body.status !== 'healthy') throw new Error('Worker reports unhealthy status');
+      return body;
+    } catch (error) {
+      failure = error;
+    }
+    if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error(`${failure.message} after ${attempts} attempts`);
 }
 
 module.exports = {
