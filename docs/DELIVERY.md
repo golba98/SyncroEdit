@@ -82,8 +82,11 @@ A temporary Git index projects only shared changes onto the baseline. Git's thre
 then combines that projection with the pinned production tree. Identical additions merge once,
 independent hotfixes survive, and overlapping conflicts stop. Historical migration edits and source
 symlinks are rejected. Source commits cannot be promoted twice. After a recorded release, production
-commits touching shared paths must be merged/backported into development with their commit ancestry
-preserved before another promotion; do not silently squash away a hotfix's identity.
+commits touching shared paths must be backported into development before another promotion. A
+dedicated cherry-pick/squash PR is accepted when its stable Git patch ID matches the production
+change; original merge ancestry is also accepted. Receipts record both commit identities and the
+proof, and production CI independently recomputes it. Keep each hotfix in a dedicated backport PR;
+modified or combined patches require separate conflict review and are blocked by the automated path.
 
 The candidate is a single production-parented commit, with a receipt naming source repository/commit,
 source tree, previous development baseline, production base, reconstructed tree, included/excluded

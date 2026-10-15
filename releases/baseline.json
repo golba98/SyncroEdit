@@ -2,7 +2,7 @@
   "schema": 1,
   "kind": "infrastructure-bootstrap",
   "sourceRepository": "golba98/SyncroEdit_dev",
-  "sourceCommit": "fb843f8c2c55b80e70cae77aaaa911429390314e",
+  "sourceCommit": "4f61838a65265e1b9169cbbc7113e988b4936117",
   "productionBase": "b40a89306afa94a3c9010dbac9623f02159c0f81",
   "sharedFiles": [
     "scripts/ops.cjs",

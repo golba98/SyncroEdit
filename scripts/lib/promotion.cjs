@@ -18,6 +18,82 @@ function ancestor(root, older, newer) {
   git(root, 'merge-base', '--is-ancestor', older, newer);
 }
 
+function patchId(root, commit, policy) {
+  const patch = git(
+    root,
+    'show',
+    '--format=',
+    '--binary',
+    '--no-ext-diff',
+    '--no-renames',
+    commit,
+    '--',
+    ...policy.sharedPrefixes,
+    ...policy.sharedFiles
+  );
+  return run('git', ['patch-id', '--stable'], { input: patch + '\n' }).split(' ')[0];
+}
+
+function findBackport(root, hotfix, baseline, source, policy) {
+  try {
+    ancestor(root, hotfix, source);
+    return { productionCommit: hotfix, developmentCommit: hotfix, method: 'ancestry' };
+  } catch {
+    const expected = patchId(root, hotfix, policy);
+    const commits = git(
+      root,
+      'rev-list',
+      '--no-merges',
+      `${baseline}..${source}`,
+      '--',
+      ...policy.sharedPrefixes,
+      ...policy.sharedFiles
+    )
+      .split('\n')
+      .filter(Boolean);
+    for (const commit of commits) {
+      if (expected && patchId(root, commit, policy) === expected)
+        return {
+          productionCommit: hotfix,
+          developmentCommit: commit,
+          method: 'patch-equivalent',
+          patchId: expected,
+        };
+    }
+    throw new Error(
+      `Backport production commit ${hotfix} in a dedicated development PR before another promotion`
+    );
+  }
+}
+
+function backportsFor(root, target, source, policy) {
+  const previous = lastReceipt(root, target);
+  if (!previous) return [];
+  const releaseCommit = git(
+    root,
+    'log',
+    '-1',
+    '--format=%H',
+    target,
+    '--',
+    `releases/${previous.sourceCommit}.json`
+  );
+  const hotfixes = git(
+    root,
+    'rev-list',
+    '--no-merges',
+    `${releaseCommit}..${target}`,
+    '--',
+    ...policy.sharedPrefixes,
+    ...policy.sharedFiles
+  )
+    .split('\n')
+    .filter(Boolean);
+  return hotfixes.map((hotfix) =>
+    findBackport(root, hotfix, previous.sourceCommit, source, policy)
+  );
+}
+
 function lastReceipt(root, ref = 'HEAD') {
   const names = git(root, 'log', '--format=', '--name-only', ref, '--', 'releases/').split('\n');
   const file = names.find((name) => /^releases\/[a-f0-9]{40}\.json$/.test(name));
@@ -156,6 +232,9 @@ function verifyReceipt(root, { allowRehearsal = false, fetchSource = true } = {}
     throw new Error('Source tree mismatch');
   ancestor(root, receipt.targetBase, 'HEAD');
   const policy = JSON.parse(git(root, 'show', `${receipt.targetBase}:config/promotion.json`));
+  const backports = backportsFor(root, receipt.targetBase, receipt.sourceCommit, policy);
+  if (JSON.stringify(backports) !== JSON.stringify(receipt.backports || []))
+    throw new Error('Hotfix backport provenance mismatch');
   const merged = reconstruct(
     root,
     receipt.baselineDevelopment,
@@ -231,6 +310,8 @@ function verifyBootstrap(root) {
 }
 
 module.exports = {
+  findBackport,
+  backportsFor,
   classification,
   ancestor,
   lastReceipt,

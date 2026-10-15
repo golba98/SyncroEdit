@@ -21,6 +21,7 @@ const {
 } = require('./lib/safety.cjs');
 const {
   ancestor,
+  backportsFor,
   lastReceipt,
   reconstruct,
   withReceipt,
@@ -106,36 +107,7 @@ async function prepare(options) {
   if (fs.existsSync(path.join(directory, `releases/${sha}.json`)))
     throw new Error('This source has already been promoted');
   const baseline = previous?.sourceCommit || policy.initialBaseline;
-  if (previous) {
-    const releaseCommit = git(
-      directory,
-      'log',
-      '-1',
-      '--format=%H',
-      '--',
-      `releases/${previous.sourceCommit}.json`
-    );
-    const hotfixes = git(
-      directory,
-      'rev-list',
-      '--no-merges',
-      `${releaseCommit}..${target}`,
-      '--',
-      ...policy.sharedPrefixes,
-      ...policy.sharedFiles
-    )
-      .split('\n')
-      .filter(Boolean);
-    for (const hotfix of hotfixes) {
-      try {
-        ancestor(directory, hotfix, sha);
-      } catch {
-        throw new Error(
-          `Backport production commit ${hotfix} into development before another promotion`
-        );
-      }
-    }
-  }
+  const backports = backportsFor(directory, target, sha, policy);
   const merged = reconstruct(directory, baseline, sha, target, policy);
   if (!merged.transferred.length) throw new Error('No unapplied shared changes to promote');
   const receipt = {
@@ -152,6 +124,7 @@ async function prepare(options) {
     excluded: merged.excluded,
     validation,
     staging,
+    backports,
     rehearsal: !!options.rehearsal,
     preparedAt: new Date().toISOString(),
   };

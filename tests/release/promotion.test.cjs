@@ -216,3 +216,25 @@ test('health verification rejects an HTTP-200 SPA fallback', async () => {
     global.fetch = original;
   }
 });
+
+test('recognizes dedicated cherry-pick and squash backports without requiring merge ancestry', () => {
+  const { findBackport } = require('../../scripts/lib/promotion.cjs');
+  const f = fixture();
+  git(f.root, 'switch', '-c', 'development');
+  f.write('src-worker/feature.js', 'const feature = true;\n');
+  const before = f.commit('development feature');
+  git(f.root, 'switch', 'main');
+  f.write('src-worker/sample.js', 'const value = 99;\n');
+  const hotfix = f.commit('urgent production fix');
+  assert.throws(
+    () => findBackport(f.root, hotfix, f.base, before, policy),
+    /dedicated development PR/
+  );
+  git(f.root, 'switch', 'development');
+  git(f.root, 'cherry-pick', '--no-commit', hotfix);
+  const backport = f.commit('squashed dedicated backport PR');
+  assert.notEqual(backport, hotfix);
+  const proof = findBackport(f.root, hotfix, f.base, backport, policy);
+  assert.equal(proof.method, 'patch-equivalent');
+  assert.equal(proof.developmentCommit, backport);
+});
