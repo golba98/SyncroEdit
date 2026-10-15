@@ -119,8 +119,9 @@ test.describe('Responsiveness', () => {
     for (const viewport of SHORT_VIEWPORTS) {
       await page.setViewportSize(viewport);
       await expectNoApplicationOverflow(page);
-      const modalBox = await page.locator('#shareModal .profile-modal').boundingBox();
-      expect(modalBox.height).toBeLessThanOrEqual(viewport.height);
+      await expect
+        .poll(async () => (await page.locator('#shareModal .profile-modal').boundingBox())?.height)
+        .toBeLessThanOrEqual(viewport.height);
     }
   });
 });

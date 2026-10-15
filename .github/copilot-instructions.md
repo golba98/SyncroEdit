@@ -1,3 +1,5 @@
+Read `config/environment.json` and `docs/DELIVERY.md` first. All new work starts in development. Never deploy production as part of routine development or use raw remote migration commands.
+
 # Copilot Instructions for SyncroEdit
 
 ## Commands

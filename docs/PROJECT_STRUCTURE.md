@@ -1,3 +1,5 @@
+> See [DELIVERY.md](DELIVERY.md) for independent repositories, guarded commands, and promotion.
+
 # SyncroEdit Project Structure and File Architecture
 
 This document explains how the SyncroEdit repository is organized, why each subsystem exists, and
@@ -472,10 +474,8 @@ they may contain secrets or user-specific configuration.
 Run these checks after architectural or file-structure changes:
 
 ```bash
-npm run lint
-npm test
+npm run validate
 npm run test:e2e
-npx wrangler deploy --dry-run --outdir /tmp/syncroedit-dry-run --env=""
 git diff --check
 ```
 

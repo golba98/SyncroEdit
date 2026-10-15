@@ -1,180 +1,72 @@
-# SyncroEdit (Cloudflare-Native)
+# SyncroEdit production
 
-SyncroEdit is a high-performance, real-time collaborative document editor rebuilt as a **Cloudflare-native backend** with a minimalist "Dark OLED" design. It uses Conflict-free Replicated Data Types (CRDTs) via **Yjs** and WebSockets coordinated by **Durable Objects** to provide zero-conflict, real-time multi-user editing.
+Repository: <https://github.com/golba98/SyncroEdit>. Live application: <https://syncroedit.online>.
+This checkout is for reviewing and deploying deliberately promoted releases. Use the sibling
+development repository for everyday work.
 
-## Project Purpose
+The initial restructuring branch adds delivery tooling and documentation while retaining production
+application source, assets, and migrations from the original production main. It is an infrastructure
+bootstrap, not an application release or authorization to deploy.
 
-This project is not intended to become an app that competes with Google Docs or to serve as a finished product for end users. It is an ongoing software-engineering project where I apply and strengthen the skills needed to build production-level systems, including Cloudflare-native architecture, realtime collaboration, authentication, security, scalability, and load balancing. It will continue to evolve as a practical way to learn how software companies design, operate, and improve production-quality systems.
+## Review a release
 
----
-
-## Architecture Overview
-
-See [the technical documentation](docs/DOCUMENTATION.md) for the standardized project overview.
-The detailed references are [architecture](docs/ARCHITECTURE.md),
-[project structure](docs/PROJECT_STRUCTURE.md), and the
-[per-file reference](docs/FILE_REFERENCE.md).
-
-SyncroEdit is deployed completely on Cloudflare's serverless edge architecture:
-
-```mermaid
-graph TD
-    Client[Browser Client] -->|HTTP / API| Worker[Cloudflare Worker / Hono]
-    Client -->|WebSocket| DO[Durable Object: SynchroDocumentObject]
-    Worker -->|D1 Binding| D1[(D1 SQLite Database)]
-    DO -->|Sync State & Pages| D1
-    Worker -->|Assets| CF_Assets[Static Assets /public]
-```
-
-- **Cloudflare Worker (Hono):** Composes domain route modules for authentication, profiles, documents, and realtime upgrades.
-- **Cloudflare D1:** Acts as the primary SQL relational database to store users, sessions, documents, and permissions.
-- **Durable Objects:** `SynchroDocumentObject` represents individual document collaboration rooms, and `SynchroRateLimitObject` tracks authentication abuse counters. The document object manages WebSocket connections, state vectors, Yjs sync steps, cursor awareness propagation, and debounced state flushes back to D1.
-- **Static Assets:** Served directly from the `./public` directory via Wrangler's assets binding.
-
----
-
-## Tech Stack & Core Libraries
-
-- **Frontend:** Vanilla JavaScript (ES Modules), Quill.js (Rich text editor), Yjs (Sync engine), `y-websocket` (WebSocket provider).
-- **Backend Worker:** Hono Router, Web Crypto APIs for JWT/password hashing, Durable Objects.
-- **Database:** Cloudflare D1 (SQLite).
-
----
-
-## Required Cloudflare Bindings & Secrets
-
-To run SyncroEdit in production, configure the following bindings in your Cloudflare dashboard or `wrangler.toml`:
-
-### Bindings
-
-1. **D1 Database:** Bind a D1 database to `DB`.
-2. **Document Durable Object:** Bind `SynchroDocumentObject` to `DOCUMENT_SYNC_OBJECT`.
-3. **Rate-limit Durable Object:** Bind `SynchroRateLimitObject` to `RATE_LIMIT_OBJECT`.
-
-### Secrets
-
-Set the following secret using wrangler CLI:
+Prepare releases from the development repository with `npm run release:prepare`. The command
+creates an independent production candidate with exact development provenance, applies only shared
+changes through a three-way merge, preserves production configuration, and runs validation.
+Review the full diff, receipt, migration additions, excluded paths, and CI results before merging.
+Production CI needs the read-only private-source credential described in [delivery architecture](docs/DELIVERY.md).
 
 ```bash
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put RESEND_API_KEY
-npx wrangler secret put EMAIL_CODE_PEPPER
+npm ci
+npm run validate
+npm run test:e2e
+npm run release:verify
 ```
 
-Configure these email settings for verification-code delivery:
+For the infrastructure bootstrap only, use `npm run release:verify-bootstrap` after its development
+source commit has reached development main. Neither verification command deploys anything.
 
-```txt
-RESEND_API_KEY=wrangler secret
-EMAIL_CODE_PEPPER=wrangler secret
-EMAIL_FROM="SyncroEdit <no-reply@syncroedit.online>"
-APP_NAME="SyncroEdit"
-```
+## Deliberate deployment
 
-_Note: `JWT_SECRET` is used for signing/verifying session access tokens and short-lived WebSocket connection tickets. `EMAIL_CODE_PEPPER` is used to hash one-time email verification codes before storing them in D1._
-
----
-
-## Development Setup
-
-### 1. Install Dependencies
+Disable and verify production Workers Builds triggers before publishing or merging delivery branches.
+`npm run audit:cloudflare` checks the `syncroedit` Worker, its resource bindings, and zero Git build
+triggers, and exits nonzero when any check is unverified. Wrangler login cannot read Builds settings:
+export a user-scoped `SYNCROEDIT_BUILDS_API_TOKEN` with Workers Builds Configuration read access in
+the same terminal before auditing or pushing from this repository. Never store it in project files.
+Merging a PR and deploying are separate owner decisions. After merging an approved release:
 
 ```bash
-npm install
+git switch main
+git pull --ff-only origin main
+npm ci
+npm run deploy:production -- --approve <full-production-main-sha>
 ```
 
-### 2. Apply Database Migrations (Local)
+The deploy command checks origin identity, the exact approved SHA, current main, a merged PR,
+application/provenance CI, reconstructed release contents, live resource bindings, and production
+build-trigger safety. It reruns local validation and browser tests, records owner approval and the
+previous Worker version, then creates an auditable GitHub deployment record. It does not run D1
+migrations. Rehearsals and the infrastructure bootstrap cannot be deployed through this command.
 
-Create the local SQLite database and apply the schema. The local scripts use the `local` Wrangler environment so production Durable Object migration history is not replayed during development.
+There is deliberately no automatic production D1 migration command. Review pending migrations and
+backward compatibility separately, validate them against staging, and obtain explicit authorization
+for the exact production database operation before executing it. Never edit applied migrations.
 
-```bash
-npm run db:migrate:local
-```
+`npm run deploy`, `npm run dev`, staging deployment, and staging remote migration commands reject
+this repository. Local tests use a separate emulator; no production secrets or database contents
+are copied into it. `npm run db:migrate:local` operates only on that local emulator.
 
-### 3. Start Local Development Server
+## Failures and rollback
 
-Launch wrangler's local dev server (which emulates D1 and Durable Objects locally):
+A failed release preparation retains its isolated clone and leaves this checkout untouched. A failed
+live deployment or health check records a failed GitHub deployment and stops; it does not try another
+version or change database state automatically. Approval/deployment logs live in `.git/syncroedit/`.
 
-```bash
-npm run dev
-```
+Inspect the saved previous Worker version and live bindings before deciding recovery. With explicit
+owner authorization, use `npx wrangler rollback <previous-version-id> --env=` from this production
+checkout. Rollback changes the live Worker and can interrupt WebSockets; it does not undo D1 schema
+or data changes, and Durable Object lifecycle compatibility must be reviewed first. Prefer a tested
+forward fix if database compatibility is uncertain. After recovery, verify health, authentication,
+sharing permissions, collaboration, and reconnection. Do not run write-based probes on live users' data.
 
-Open `http://localhost:8787` in your browser.
-
-The dev command automatically applies local migrations and seeds a verified test account:
-
-| Username  | Password       |
-| --------- | -------------- |
-| `devuser` | `Password123!` |
-
-This account is written only to Wrangler's local D1 database. Use `npm run db:seed:local` to reseed it without starting the server.
-
----
-
-## CLI Commands
-
-> [!NOTE]
-> There is no `npm run build` script in this repository. Static assets are served directly from the `public/` directory by Cloudflare.
-
-| Command                     | Description                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `npm run dev`               | Runs the Wrangler dev emulator with `--env local` on `http://localhost:8787` |
-| `npm run deploy`            | Deploys the top-level production Worker and static assets with `--env=""`    |
-| `npm run db:migrate:local`  | Applies migrations to the local development D1 database with `--env local`   |
-| `npm run db:seed:local`     | Creates or refreshes the verified `devuser` account in local D1              |
-| `npm run db:migrate:remote` | Applies migrations to the production remote D1 database                      |
-| `npm test`                  | Runs the Jest test suite (unit, integration, and frontend)                   |
-| `npm run lint`              | Runs the ESLint checker                                                      |
-| `npm run format`            | Standardizes codebase formatting via Prettier                                |
-
-For staging deploys and migrations, target the Wrangler environment explicitly:
-
-```bash
-npx wrangler deploy --env staging
-npx wrangler d1 migrations apply DB --remote --env staging
-```
-
-The `local` Wrangler environment is for local development only and uses a placeholder D1 database ID. Do not deploy it.
-
----
-
-## Testing
-
-The tests run using Jest and Hono's lightweight request testing harness combined with a stateful D1 mock database.
-
-To execute tests:
-
-```bash
-npm test
-```
-
----
-
-## Production Boundary
-
-SyncroEdit's production backend is the Cloudflare Worker in `src-worker/`. API routes, D1 access, session handling, and Durable Object realtime rooms all run in Cloudflare. Static assets are served from `./public` through Wrangler's assets binding.
-
-### Live URLs
-
-| URL                                               | Purpose                       |
-| ------------------------------------------------- | ----------------------------- |
-| **<https://syncroedit.online>**                   | Production (custom domain)    |
-| **<https://www.syncroedit.online>**               | Production www redirect       |
-| `https://syncroedit.jordanvorster404.workers.dev` | Worker fallback (workers.dev) |
-
-### Production DNS and Security Controls
-
-Keep the Cloudflare zone, Resend domain, and Worker settings aligned before deploying production email or security changes:
-
-- Resend is the active outbound email provider. `EMAIL_FROM` must use a sender verified for `syncroedit.online`.
-- Keep exactly one root SPF TXT record and exactly one `_dmarc` TXT record. Copy SPF, DKIM, MX, and provider verification records from the Resend domain Records tab instead of guessing provider values.
-- Route `security@syncroedit.online` and `dmarc@syncroedit.online` to monitored mailboxes before publishing them in `security.txt` or DMARC `rua`.
-- Serve the contact policy at `https://syncroedit.online/.well-known/security.txt`; `https://syncroedit.online/security.txt` is kept as a compatibility copy.
-- Production Cloudflare SSL/TLS should stay on a secure mode, with Always Use HTTPS enabled after HTTPS validates. Enable HSTS without preload or subdomain coverage until all hostnames are confirmed HTTPS-ready.
-- Bot controls should protect the app without challenging normal users, API requests, WebSocket sync, or trusted crawlers/monitors. Prefer scoped Super Bot Fight Mode rules when available.
-
----
-
-## Follow-up / Future Work
-
-- **Turnstile Integration:** Optionally integrate Cloudflare Turnstile on the signup/login pages for DDoS protection.
-- **Document Exporter:** Add export to PDF/Docx directly using Worker-compatible libraries if needed in the future.
+See [delivery architecture](docs/DELIVERY.md) and [environment details](docs/ENVIRONMENT.md).

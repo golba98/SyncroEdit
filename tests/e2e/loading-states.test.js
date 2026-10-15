@@ -24,7 +24,7 @@ test.describe('Loading surfaces', () => {
 
     const bootLoader = page.locator('#bootLoader');
     await expect(bootLoader).toBeVisible();
-    await expect(bootLoader.locator('.boot-loader-mark img')).toHaveAttribute('src', '/logo.svg');
+    await expect(bootLoader.locator('img.boot-loader-mark')).toHaveAttribute('src', '/logo.svg');
     await expect(bootLoader.locator('.boot-loader-progress')).toBeVisible();
     await expect(bootLoader).not.toContainText('📄');
 
@@ -55,7 +55,7 @@ test.describe('Loading surfaces', () => {
     const loader = page.locator('#editorSkeleton');
     await expect(loader).toBeVisible();
     await expect(page.locator('#editorSkeletonTitle')).toHaveText('Creating document...');
-    await expect(loader).toHaveAttribute('aria-busy', 'true');
+    await expect(loader).toHaveAttribute('data-open-state', 'creating');
 
     const viewport = page.viewportSize();
     const workspaceBox = await page.locator('.main-workspace').boundingBox();
@@ -77,6 +77,7 @@ test.describe('Loading surfaces', () => {
 
     releaseCreate();
     await expect(loader).toBeHidden({ timeout: 30000 });
+    await expect(loader).toHaveAttribute('data-open-state', 'ready');
     await expect(page.locator('.editor-container').first()).toBeVisible({ timeout: 30000 });
   });
 });

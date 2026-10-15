@@ -4,11 +4,11 @@
   "description": "Cloudflare Workers and Durable Objects collaborative editor.",
   "main": "src-worker/index.js",
   "scripts": {
-    "start": "npm run db:migrate:local && npm run db:seed:local && wrangler dev --env local --port 8787 --live-reload",
-    "dev": "npm run db:migrate:local && npm run db:seed:local && wrangler dev --env local --port 8787 --live-reload",
-    "deploy": "wrangler deploy --env staging",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local --env local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "start": "node scripts/ops.cjs dev",
+    "dev": "node scripts/ops.cjs dev",
+    "deploy": "node scripts/ops.cjs deploy",
+    "db:migrate:local": "node scripts/ops.cjs migrate-local",
+    "db:migrate:remote": "node scripts/ops.cjs migrate-staging",
     "db:seed:local": "node scripts/seed-dev-user.mjs",
     "test": "npm run test:unit && npm run test:integration && npm run test:frontend",
     "test:unit": "cross-env SKIP_DB_SETUP=true jest tests/unit",
@@ -16,7 +16,19 @@
     "test:frontend": "cross-env SKIP_DB_SETUP=true jest tests/frontend",
     "test:e2e": "playwright test --config=config/playwright.config.js",
     "lint": "eslint . --config config/eslint.config.cjs",
-    "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore"
+    "format": "prettier --write . --config config/.prettierrc --ignore-path config/.prettierignore",
+    "deploy:staging": "node scripts/ops.cjs deploy",
+    "deploy:production": "node scripts/ops.cjs deploy-production",
+    "db:migrate:staging": "node scripts/ops.cjs migrate-staging",
+    "validate": "node scripts/ops.cjs validate",
+    "check:environment": "node scripts/ops.cjs check",
+    "test:release": "node --test tests/release/*.test.cjs",
+    "release:validate": "node scripts/ops.cjs release-validate",
+    "release:prepare": "node scripts/ops.cjs prepare",
+    "release:verify": "node scripts/ops.cjs verify",
+    "release:verify-bootstrap": "node scripts/ops.cjs verify-bootstrap",
+    "audit:cloudflare": "node scripts/ops.cjs audit-remote",
+    "release:bootstrap-source": "node scripts/ops.cjs bootstrap-source"
   },
   "jest": {
     "setupFilesAfterEnv": [

@@ -1,3 +1,5 @@
+> Delivery and environment commands are defined in [DELIVERY.md](DELIVERY.md) and the repository README.
+
 # SyncroEdit Architecture
 
 This document is the technical source of truth for SyncroEdit. It describes the deployed
@@ -243,10 +245,8 @@ from transient network loss, while the UI reports reconnecting/offline/failed st
 Use the following gate before deployment:
 
 ```bash
-npm run lint
-npm test
+npm run validate
 npm run test:e2e
-npx wrangler deploy --dry-run --outdir /tmp/syncroedit-dry-run --env=""
 ```
 
 Apply D1 migrations before code that depends on them. Local work uses `--env local`; staging uses

@@ -1,4 +1,5 @@
 name = "syncroedit"
+account_id = "3c616f4db02149046562a2fa51a6440b"
 main = "src-worker/index.js"
 compatibility_date = "2026-06-10"
 
@@ -6,7 +7,7 @@ compatibility_date = "2026-06-10"
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "/ws/*"]
+run_worker_first = ["/api/*", "/ws/*", "/health"]
 
 [[d1_databases]]
 binding = "DB"
@@ -47,7 +48,7 @@ APP_NAME = "SyncroEdit"
 APP_URL = "https://syncroedit.online"
 
 [env.local]
-name = "syncroedit-local"
+name = "syncroedit-production-local"
 workers_dev = true
 
 [[env.local.d1_databases]]
@@ -75,46 +76,4 @@ storage = "sqlite"
 [env.local.vars]
 EMAIL_FROM = "SyncroEdit <verify@example.com>"
 APP_NAME = "SyncroEdit"
-APP_URL = "http://localhost:8787"
-
-[env.staging]
-name = "syncroedit-dev"
-workers_dev = true
-
-[[env.staging.d1_databases]]
-binding = "DB"
-database_name = "synchroedit-dev-db"
-database_id = "11ebe7c6-b238-43bd-906a-6a1fc651156f"
-migrations_dir = "migrations"
-
-[[env.staging.durable_objects.bindings]]
-name = "DOCUMENT_SYNC_OBJECT"
-class_name = "SynchroDocumentObject"
-
-[[env.staging.durable_objects.bindings]]
-name = "RATE_LIMIT_OBJECT"
-class_name = "SynchroRateLimitObject"
-
-# The existing syncroedit-dev namespace was previously migrated to the
-# product-spelling classes. The application now deliberately retains the
-# historical "Synchro" Durable Object class names, so move the staging
-# instances back instead of orphaning their stored documents and rate limits.
-[[env.staging.migrations]]
-tag = "v5"
-renamed_classes = [
-  { from = "SyncroDocumentObject", to = "SynchroDocumentObject" },
-  { from = "SyncroRateLimitObject", to = "SynchroRateLimitObject" },
-]
-
-[env.staging.exports.SynchroDocumentObject]
-type = "durable-object"
-storage = "sqlite"
-
-[env.staging.exports.SynchroRateLimitObject]
-type = "durable-object"
-storage = "sqlite"
-
-[env.staging.vars]
-EMAIL_FROM = "SyncroEdit <no-reply@syncroedit.online>"
-APP_NAME = "SyncroEdit"
-APP_URL = "https://syncroedit-dev.jordanvorster404.workers.dev"
+APP_URL = "http://localhost:8788"

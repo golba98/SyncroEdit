@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "initialBaseline": "b40a89306afa94a3c9010dbac9623f02159c0f81",
+  "sharedPrefixes": ["src-worker/", "public/", "migrations/", "tests/", "scripts/", "docs/"],
+  "sharedFiles": [
+    "package.json",
+    "package-lock.json",
+    ".gitignore",
+    ".env.example",
+    "SECURITY.md",
+    "config/promotion.json",
+    "config/playwright.config.js",
+    "config/eslint.config.cjs",
+    "config/.babelrc",
+    "config/.prettierrc",
+    "config/.prettierignore",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release-verify.yml",
+    ".github/copilot-instructions.md"
+  ],
+  "protectedPrefixes": ["releases/"],
+  "protectedFiles": [
+    "wrangler.toml",
+    "config/environment.json",
+    "README.md",
+    "docs/ENVIRONMENT.md",
+    ".github/dependabot.yml"
+  ]
+}
