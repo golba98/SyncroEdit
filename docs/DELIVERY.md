@@ -74,7 +74,8 @@ Playwright, and writes exact-SHA/tree evidence under `.git/syncroedit/validation
 has reached development main, migrate staging if needed and run `npm run deploy:staging`. It verifies
 the existing remote database/namespaces and disconnected Developer Environment build triggers,
 deploys the exact source, checks health, and records the
-active staging deployment. A failed health probe records no staging approval.
+active staging deployment. The health probe retries for about a minute while the new version reaches
+the edge; if it never returns healthy Worker JSON, no staging approval is recorded.
 
 `npm run release:prepare -- --source <full-sha>` requires both forms of evidence and confirms staging
 has not changed. It clones current production main into `.release-candidates/`, imports development

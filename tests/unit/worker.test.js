@@ -203,6 +203,39 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(data.authMode).toBe('bearer-access-token-refresh-cookie');
   });
 
+  it('does not let a public header bypass deployed authentication rate limits', async () => {
+    env.RATE_LIMIT_OBJECT.get = () => ({
+      fetch: async () => Response.json({ allowed: false, retryAfter: 60 }),
+    });
+    const response = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-bypass-rate-limit': 'true' },
+        body: JSON.stringify({ username: 'alice', password: PASSWORD }),
+      },
+      env
+    );
+    expect(response.status).toBe(429);
+  });
+
+  it('permits the explicit local-test rate-limit bypass only in test runtime', async () => {
+    env.NODE_ENV = 'test';
+    const limiter = jest.fn();
+    env.RATE_LIMIT_OBJECT.get = () => ({ fetch: limiter });
+    const response = await app.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-bypass-rate-limit': 'true' },
+        body: JSON.stringify({ username: 'alice', password: PASSWORD }),
+      },
+      env
+    );
+    expect(response.status).toBe(401);
+    expect(limiter).not.toHaveBeenCalled();
+  });
+
   it('does not expose a mock CSRF endpoint', async () => {
     const res = await app.request('/api/auth/csrf-token', {}, env);
     expect(res.status).toBe(404);
@@ -1186,6 +1219,32 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     clearTimeout(object.saveTimeout);
   });
 
+  it('merges simultaneous collaborator updates and reloads their state in a fresh object', async () => {
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
+    const bob = await signupVerified(env, 'bob', 'bob@example.com');
+    const document = await createDocument(env, alice.data.token, 'Concurrent persistence');
+    const object = new SynchroDocumentObject({}, env);
+    const owner = new FakeSocket();
+    const editor = new FakeSocket();
+    await object.handleConnection(owner, document.data.id, alice.user.id, 'owner', false);
+    await object.handleConnection(editor, document.data.id, bob.user.id, 'editor', false);
+    await Promise.all([
+      owner.listeners.message({ data: buildSyncUpdateMessage('owner edit').buffer }),
+      editor.listeners.message({ data: buildSyncUpdateMessage('editor edit').buffer }),
+    ]);
+    const combined = object.doc.getText('probe').toString();
+    expect(combined).toContain('owner edit');
+    expect(combined).toContain('editor edit');
+    await object.saveNow(document.data.id);
+    expect(env.DB.documents.find((row) => row.id === document.data.id).yjsState).toBeTruthy();
+    const restored = new SynchroDocumentObject({}, env);
+    const reloaded = await restored.getDoc(document.data.id);
+    expect(reloaded.getText('probe').toString()).toBe(combined);
+    expect(Y.encodeStateVector(reloaded)).toEqual(Y.encodeStateVector(object.doc));
+    object.doc.destroy();
+    reloaded.destroy();
+  });
+
   it('tells a read-only client it cannot edit as soon as it connects', async () => {
     const alice = await signupVerified(env, 'alice', 'alice@example.com');
     const doc = await createDocument(env, alice.data.token, 'Viewer Doc');
@@ -1224,6 +1283,28 @@ describe('SyncroEdit Cloudflare Worker API security', () => {
     expect(rejection.code).toBe('edit_rejected');
     expect(rejection.reason).toEqual(expect.any(String));
     expect(rejection.stateVector).toEqual(expect.any(String));
+  });
+
+  it('rejects a viewer SyncStep2 handshake without broadcasting or scheduling persistence', async () => {
+    const alice = await signupVerified(env, 'alice', 'alice@example.com');
+    const doc = await createDocument(env, alice.data.token, 'Viewer handshake');
+    const object = new SynchroDocumentObject({}, env);
+    const owner = new FakeSocket();
+    const viewer = new FakeSocket();
+    await object.handleConnection(owner, doc.data.id, alice.user.id, 'owner', false);
+    await object.handleConnection(viewer, doc.data.id, alice.user.id, 'viewer', true);
+    const before = owner.sent.length;
+    const malicious = new Y.Doc();
+    malicious.getText('probe').insert(0, 'unauthorized handshake edit');
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, MESSAGE_SYNC);
+    syncProtocol.writeSyncStep2(encoder, malicious);
+    await viewer.listeners.message({ data: encoding.toUint8Array(encoder).buffer });
+    expect(object.doc.getText('probe').toString()).toBe('');
+    expect(owner.sent.length).toBe(before);
+    expect(object.saveTimeout).toBeNull();
+    expect(findPermissionDenied(viewer).at(-1).code).toBe('edit_rejected');
+    malicious.destroy();
   });
 
   it('throttles repeated rejection notices to one per burst', async () => {

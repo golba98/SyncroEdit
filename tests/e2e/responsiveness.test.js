@@ -54,13 +54,13 @@ test.describe('Responsiveness', () => {
     const editorContainer = page.locator('.editor-container');
     await expect(editorContainer).toBeVisible();
 
-    // Ribbon tabs should be accessible on desktop; edit button on mobile
+    // Ribbon tabs on desktop; on mobile the docked formatting bar follows editor focus
     if (!isMobile) {
       const homeTab = page.locator('.ribbon-tab', { hasText: 'Home' });
       await expect(homeTab).toBeVisible();
     } else {
-      const fabEdit = page.locator('#fabEditDoc');
-      await expect(fabEdit).toBeVisible();
+      await page.locator('.ql-editor').first().tap();
+      await expect(page.locator('#mobileContextualToolbar')).toBeVisible();
     }
   });
 
@@ -93,6 +93,18 @@ test.describe('Responsiveness', () => {
       await page.setViewportSize({ width, height: 800 });
       await page.waitForTimeout(40);
       await expectNoApplicationOverflow(page);
+      // Visible ribbon sections and the overflow button must fit inside the ribbon's content box.
+      const ribbonOverhang = await page.evaluate(() => {
+        const ribbon = document.querySelector('.ribbon-content.active');
+        if (!ribbon?.getClientRects().length) return 0;
+        const edge =
+          ribbon.getBoundingClientRect().right - parseFloat(getComputedStyle(ribbon).paddingRight);
+        const items = ribbon.querySelectorAll(
+          ':scope > [data-responsive-section], :scope > .responsive-overflow:not([hidden])'
+        );
+        return Math.max(0, ...[...items].map((item) => item.getBoundingClientRect().right - edge));
+      });
+      expect(ribbonOverhang).toBeLessThanOrEqual(0.5);
 
       const presentation = await page.locator('body').getAttribute('data-document-presentation');
       if (width <= 600) {

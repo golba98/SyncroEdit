@@ -161,7 +161,7 @@ const AUTH_RATE_LIMITS = {
 };
 
 app.use('/api/auth/*', async (c, next) => {
-  if (c.req.header('x-bypass-rate-limit') === 'true') {
+  if (c.env.NODE_ENV === 'test' && c.req.header('x-bypass-rate-limit') === 'true') {
     await next();
     return;
   }

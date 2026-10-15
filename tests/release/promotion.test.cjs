@@ -14,6 +14,7 @@ const {
   sha256,
 } = require('../../scripts/lib/safety.cjs');
 const {
+  bootstrapFor,
   classification,
   reconstruct,
   withReceipt,
@@ -80,6 +81,42 @@ test('merges identical infrastructure additions once', () => {
   f.write('scripts/new.cjs', 'module.exports = true;\n');
   const target = f.commit('production tooling');
   assert.deepEqual(reconstruct(f.root, f.base, source, target, policy).transferred, []);
+});
+
+test('first release merges bootstrap tooling from its source commit, not the initial baseline', () => {
+  const f = fixture();
+  git(f.root, 'switch', '-c', 'development');
+  f.write('scripts/tool.cjs', 'module.exports = 1;\n');
+  const bootstrapSource = f.commit('development tooling');
+  git(f.root, 'switch', 'main');
+  f.write('scripts/tool.cjs', 'module.exports = 1;\n');
+  f.write(
+    'releases/baseline.json',
+    JSON.stringify({
+      kind: 'infrastructure-bootstrap',
+      sourceCommit: bootstrapSource,
+      sharedFiles: ['scripts/tool.cjs'],
+    })
+  );
+  const target = f.commit('production bootstrap');
+  git(f.root, 'switch', 'development');
+  f.write('scripts/tool.cjs', 'module.exports = 2;\n');
+  f.write('src-worker/sample.js', 'const value = 2;\n');
+  const source = f.commit('tooling and application changes after bootstrap');
+  git(f.root, 'switch', 'main');
+
+  // Without the bootstrap both sides "add" the tool with different content.
+  assert.throws(() => reconstruct(f.root, f.base, source, target, policy), /conflict/);
+
+  const bootstrap = bootstrapFor(f.root, target);
+  assert.deepEqual(bootstrap, { sourceCommit: bootstrapSource, sharedFiles: ['scripts/tool.cjs'] });
+  const merged = reconstruct(f.root, f.base, source, target, policy, bootstrap);
+  assert.equal(git(f.root, 'show', `${merged.tree}:scripts/tool.cjs`), 'module.exports = 2;');
+  assert.equal(git(f.root, 'show', `${merged.tree}:src-worker/sample.js`), 'const value = 2;');
+
+  // Once a release receipt exists, later releases merge from that receipt instead.
+  f.write(`releases/${source}.json`, JSON.stringify({ sourceCommit: source }));
+  assert.equal(bootstrapFor(f.root, f.commit('first release')), null);
 });
 
 test('rejects historical migration rewrites and unclassified files', () => {
@@ -209,9 +246,38 @@ test('health verification rejects an HTTP-200 SPA fallback', async () => {
   try {
     global.fetch = async () =>
       new Response('<html>SPA</html>', { headers: { 'content-type': 'text/html' } });
-    await assert.rejects(() => checkHealth('http://localhost'), /Worker JSON/);
+    await assert.rejects(
+      () => checkHealth('http://localhost', { attempts: 3, delayMs: 0 }),
+      /Worker JSON, received HTTP 200 after 3 attempts/
+    );
     global.fetch = async () => Response.json({ status: 'healthy' });
     assert.equal((await checkHealth('http://localhost')).status, 'healthy');
+  } finally {
+    global.fetch = original;
+  }
+});
+
+test('health verification waits for a new deployment to reach the edge', async () => {
+  const { checkHealth } = require('../../scripts/lib/safety.cjs');
+  const original = global.fetch;
+  let calls = 0;
+  try {
+    global.fetch = async () =>
+      ++calls < 3
+        ? new Response('<html>SPA</html>', { headers: { 'content-type': 'text/html' } })
+        : Response.json({ status: 'healthy' });
+    assert.equal(
+      (await checkHealth('http://localhost', { attempts: 5, delayMs: 0 })).status,
+      'healthy'
+    );
+    assert.equal(calls, 3);
+    calls = 0;
+    global.fetch = async () => (++calls, Response.json({ status: 'degraded' }));
+    await assert.rejects(
+      () => checkHealth('http://localhost', { attempts: 2, delayMs: 0 }),
+      /unhealthy status after 2 attempts/
+    );
+    assert.equal(calls, 2);
   } finally {
     global.fetch = original;
   }

@@ -211,6 +211,7 @@ step. Keep package licences and every binary referenced by the package CSS/impor
 | `tests/e2e/interactions.test.js`                                | Covers toolbar formatting and theme interaction in a real browser.                                   |
 | `tests/e2e/responsiveness.test.js`                              | Covers login and editor layout at desktop/mobile viewports.                                          |
 | `tests/e2e/loading-states.test.js`                              | Verifies branded boot loading and viewport-safe new-document loading at desktop/mobile viewports.    |
+| `tests/e2e/mobile-editor.test.js`                               | Verifies the phone editor header, single-surface page, and keyboard-docked formatting bar.           |
 
 ## Intentionally Local-Only Files
 
