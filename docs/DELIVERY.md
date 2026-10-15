@@ -22,7 +22,7 @@ the supported workflow, rather than claiming to revoke the owner's infrastructur
 | Production | `syncroedit` | `synchroedit-db` | `DocumentSyncObject`, `RateLimitObject` |
 
 Both deployed Workers already have four live compatibility exports. Preserve their class names and
-namespace identities. Do not replay historical migrations or replace these exports with a new DO
+namespace identities. API, WebSocket, and `/health` requests reach the Worker before SPA asset fallback; release verification requires actual healthy JSON, not just HTTP 200. Do not replay historical migrations or replace these exports with a new DO
 migration. Changing a DO class lifecycle requires its own reviewed infrastructure operation. No
 production data is needed for development. The authentication test bypass now requires a test runtime; a public request header alone cannot disable deployed rate limits. Existing remote secret names were verified; secret values
 are unavailable to the read API and have not been copied, compared, or replaced.

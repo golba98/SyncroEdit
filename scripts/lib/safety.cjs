@@ -109,6 +109,10 @@ function checkConfig(root) {
   for (const env of environments) {
     const c = readConfig(root, env);
     if (c.account_id !== ACCOUNT) throw new Error('Unexpected Cloudflare account');
+    if (
+      JSON.stringify(c.assets?.run_worker_first) !== JSON.stringify(['/api/*', '/ws/*', '/health'])
+    )
+      throw new Error('API, WebSocket, and health routes must reach the Worker before SPA assets');
     const local = env === 'local';
     const databases = c.d1_databases || [];
     if (databases.length !== 1 || databases[0].binding !== 'DB' || databases[0].remote) {
@@ -270,6 +274,18 @@ async function requireSafeBuilds() {
     throw new Error('Disconnect production Workers Builds before publishing release branches');
 }
 
+async function checkHealth(url) {
+  const response = await fetch(`${url}/health`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json'))
+    throw new Error(`Health check requires Worker JSON, received HTTP ${response.status}`);
+  const body = await response.json();
+  if (body.status !== 'healthy') throw new Error('Worker reports unhealthy status');
+  return body;
+}
+
 module.exports = {
   ACCOUNT,
   TARGETS,
@@ -289,4 +305,5 @@ module.exports = {
   cloudflare,
   remoteTarget,
   requireSafeBuilds,
+  checkHealth,
 };

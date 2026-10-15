@@ -16,6 +16,7 @@ const {
   checkSecrets,
   remoteTarget,
   requireSafeBuilds,
+  checkHealth,
   repositoryName,
 } = require('./lib/safety.cjs');
 const {
@@ -239,11 +240,7 @@ async function deploy(role, options) {
       '--message',
       `Development validation ${sha}`,
     ]);
-    const health = await fetch(`${TARGETS.development.url}/health`);
-    if (!health.ok)
-      throw new Error(
-        `Staging deployed but health verification failed (${health.status}); no staging approval evidence recorded`
-      );
+    await checkHealth(TARGETS.development.url);
     const after = await remoteTarget(role);
     if (after.tag !== sha)
       throw new Error('Active staging version does not match the validated source');
@@ -349,11 +346,7 @@ async function deploy(role, options) {
       '--message',
       `Approved release ${sha}`,
     ]);
-    const health = await fetch(`${TARGETS.production.url}/health`);
-    if (!health.ok)
-      throw new Error(
-        `Post-deployment health returned ${health.status}; inspect deployment before any rollback`
-      );
+    await checkHealth(TARGETS.production.url);
     const after = await remoteTarget(role);
     writeJson(localState(root, `deployments/${sha}.json`), {
       ...approval,

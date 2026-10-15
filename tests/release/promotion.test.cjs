@@ -202,3 +202,17 @@ test('rejects rehearsal and environment overrides on deployment commands before 
   assert.notEqual(override.status, 0);
   assert.match(override.stderr, /Unknown option/);
 });
+
+test('health verification rejects an HTTP-200 SPA fallback', async () => {
+  const { checkHealth } = require('../../scripts/lib/safety.cjs');
+  const original = global.fetch;
+  try {
+    global.fetch = async () =>
+      new Response('<html>SPA</html>', { headers: { 'content-type': 'text/html' } });
+    await assert.rejects(() => checkHealth('http://localhost'), /Worker JSON/);
+    global.fetch = async () => Response.json({ status: 'healthy' });
+    assert.equal((await checkHealth('http://localhost')).status, 'healthy');
+  } finally {
+    global.fetch = original;
+  }
+});
