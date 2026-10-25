@@ -86,7 +86,7 @@
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
     "prettier": "^3.9.10",
-    "wrangler": "^4.151.0"
+    "wrangler": "^4.152.0"
   },
   "overrides": {
     "js-yaml": "4.3.2"
